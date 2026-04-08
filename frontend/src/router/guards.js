@@ -35,7 +35,7 @@ export function applyGuards(router) {
       return "/admin/login";
     }
 
-    if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    if (!isAdminRoute && to.meta.requiresAuth && !authStore.isAuthenticated) {
       return "/auth/login";
     }
 

@@ -107,6 +107,7 @@ const routes = [
       },
       {
         path: "warehouse-inbound",
+        alias: ["warehouse-inbounds"],
         component: () => import("@/modules/warehouse/pages/admin/WarehouseInboundPage.vue")
       },
       {
