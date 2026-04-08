@@ -4,10 +4,11 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Builder
-public class WarehouseInboundResponse {
+public class WarehouseInboundDetailResponse {
 
     private Long id;
     private String code;
@@ -16,4 +17,5 @@ public class WarehouseInboundResponse {
     private Integer itemCount;
     private Long totalQuantity;
     private Long totalCost;
+    private List<WarehouseInboundItemResponse> items;
 }
