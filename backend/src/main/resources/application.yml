@@ -1,0 +1,77 @@
+server:
+  port: ${APP_PORT:8080}
+
+spring:
+  application:
+    name: clothing-be
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:clothing}
+    username: ${DB_USER:clothing}
+    password: ${DB_PASSWORD:clothing}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+    elasticsearch:
+      repositories:
+        enabled: true
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+    connection-timeout: 3s
+    socket-timeout: 10s
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+logging:
+  level:
+    org.springframework.security: INFO
+
+app:
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  jwt:
+    # >= 32 bytes for HS256
+    secret: ${JWT_SECRET:clothing-super-secret-key-need-32-bytes-min}
+    expiration-seconds: ${JWT_EXPIRATION_SECONDS:86400}
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    jwk-set-uri: ${GOOGLE_JWK_SET_URI:https://www.googleapis.com/oauth2/v3/certs}
+    allowed-issuers: ${GOOGLE_ALLOWED_ISSUERS:https://accounts.google.com,accounts.google.com}
+  r2:
+    account-id: ${R2_ACCOUNT_ID:your-account-id}
+    access-key: ${R2_ACCESS_KEY:your-access-key}
+    secret-key: ${R2_SECRET_KEY:your-secret-key}
+    bucket: ${R2_BUCKET:clothing-assets}
+    endpoint: ${R2_ENDPOINT:https://your-account-id.r2.cloudflarestorage.com}
+    region: ${R2_REGION:auto}
+    public-base-url: ${R2_PUBLIC_BASE_URL:https://cdn.example.com}
+    presign-expiration-minutes: ${R2_PRESIGN_EXPIRATION_MINUTES:15}
+    max-file-size-bytes: ${R2_MAX_FILE_SIZE_BYTES:10485760}
+    allowed-content-types: ${R2_ALLOWED_CONTENT_TYPES:image/jpeg,image/png,image/webp,image/avif}
+    image-cache-control: ${R2_IMAGE_CACHE_CONTROL:public, max-age=31536000, immutable}
+  messaging:
+    order:
+      exchange: ${ORDER_EVENT_EXCHANGE:order.exchange}
+      queue: ${ORDER_PROCESSING_QUEUE:order.processing.queue}
+      routing-key: ${ORDER_CREATED_ROUTING_KEY:order.created}
+  ghn:
+    base-url: ${GHN_BASE_URL:https://online-gateway.ghn.vn/shiip/public-api/master-data}
+    token: ${GHN_TOKEN:}
+  momo:
+    endpoint: ${MOMO_ENDPOINT:https://test-payment.momo.vn/v2/gateway/api/create}
+    partner-code: ${MOMO_PARTNER_CODE:}
+    access-key: ${MOMO_ACCESS_KEY:}
+    secret-key: ${MOMO_SECRET_KEY:}
+    redirect-url: ${MOMO_REDIRECT_URL:http://localhost:5173/orders}
+    ipn-url: ${MOMO_IPN_URL:http://localhost:8080/api/payments/momo/ipn}
+    request-type: ${MOMO_REQUEST_TYPE:captureWallet}

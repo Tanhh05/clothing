@@ -1,0 +1,14 @@
+# macOS / IDE
+.DS_Store
+.idea/
+
+# Environment files
+backend/.env
+frontend/.env
+
+# Backend build
+backend/target/
+
+# Frontend dependencies/build
+frontend/node_modules/
+frontend/dist/
