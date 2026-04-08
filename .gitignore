@@ -8,6 +8,7 @@ frontend/.env
 
 # Backend build
 backend/target/
+backend/.git.backup-single-repo/
 
 # Frontend dependencies/build
 frontend/node_modules/
