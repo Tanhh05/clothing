@@ -24,5 +24,7 @@ public interface WarehouseInboundService {
 
     WarehouseInboundDetailResponse getById(Long id);
 
+    List<String> getSkuSuggestions(String q);
+
     WarehouseInboundResponse create(WarehouseInboundCreateRequest request);
 }

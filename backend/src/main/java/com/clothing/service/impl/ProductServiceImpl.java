@@ -33,6 +33,7 @@ import com.clothing.repository.InventoryLogRepository;
 import com.clothing.service.ProductService;
 import com.clothing.service.ProductSearchService;
 import com.clothing.service.AuditLogService;
+import com.clothing.service.InventoryMovementService;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
@@ -101,6 +102,7 @@ public class ProductServiceImpl implements ProductService {
     private final VariantAttributeValueRepository variantAttributeValueRepository;
     private final ProductSearchService productSearchService;
     private final AuditLogService auditLogService;
+    private final InventoryMovementService inventoryMovementService;
 
     public ProductServiceImpl(
             ProductRepository productRepository,
@@ -113,7 +115,8 @@ public class ProductServiceImpl implements ProductService {
             AttributeValueRepository attributeValueRepository,
             VariantAttributeValueRepository variantAttributeValueRepository,
             ProductSearchService productSearchService,
-            AuditLogService auditLogService
+            AuditLogService auditLogService,
+            InventoryMovementService inventoryMovementService
     ) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
@@ -126,6 +129,7 @@ public class ProductServiceImpl implements ProductService {
         this.variantAttributeValueRepository = variantAttributeValueRepository;
         this.productSearchService = productSearchService;
         this.auditLogService = auditLogService;
+        this.inventoryMovementService = inventoryMovementService;
     }
 
     @Override
@@ -928,10 +932,16 @@ public class ProductServiceImpl implements ProductService {
             variant.setProductId(productId);
             variant.setSku(request.getSku().trim());
             variant.setPrice(request.getPrice());
-            variant.setStock(request.getStock());
+            variant.setStock(0);
             variant.setWeight(request.getWeight());
             variant.setStatus(normalizeStatus(request.getStatus()));
             ProductVariantEntity savedVariant = productVariantRepository.save(variant);
+            inventoryMovementService.setAbsoluteStockByVariantId(
+                    savedVariant.getId(),
+                    request.getStock(),
+                    "ADJUST",
+                    "Initial stock from product create"
+            );
 
             if (request.getSize() != null && !request.getSize().isBlank()) {
                 AttributeValueEntity sizeValue = getOrCreateAttributeValue(sizeAttribute.getId(), request.getSize().trim());
@@ -948,38 +958,67 @@ public class ProductServiceImpl implements ProductService {
         AttributeEntity sizeAttribute = getOrCreateAttribute(ATTRIBUTE_SIZE);
         AttributeEntity colorAttribute = getOrCreateAttribute(ATTRIBUTE_COLOR);
         List<ProductVariantEntity> existingVariants = productVariantRepository.findByProductIdOrderByIdAsc(productId);
-
-        int commonCount = Math.min(existingVariants.size(), variants.size());
-        for (int i = 0; i < commonCount; i++) {
-            ProductVariantEntity existing = existingVariants.get(i);
-            ProductVariantRequest request = variants.get(i);
-            existing.setSku(request.getSku().trim());
-            existing.setPrice(request.getPrice());
-            existing.setStock(request.getStock());
-            existing.setWeight(request.getWeight());
-            existing.setStatus(normalizeStatus(request.getStatus()));
-            ProductVariantEntity saved = productVariantRepository.save(existing);
-            syncVariantAttributes(saved.getId(), request, sizeAttribute, colorAttribute);
+        Map<Long, ProductVariantEntity> existingById = new HashMap<>();
+        Map<String, ProductVariantEntity> existingBySku = new HashMap<>();
+        for (ProductVariantEntity existing : existingVariants) {
+            existingById.put(existing.getId(), existing);
+            if (existing.getSku() != null) {
+                existingBySku.put(existing.getSku().trim().toLowerCase(Locale.ROOT), existing);
+            }
         }
 
-        for (int i = commonCount; i < variants.size(); i++) {
-            ProductVariantRequest request = variants.get(i);
-            ProductVariantEntity variant = new ProductVariantEntity();
-            variant.setProductId(productId);
-            variant.setSku(request.getSku().trim());
-            variant.setPrice(request.getPrice());
-            variant.setStock(request.getStock());
-            variant.setWeight(request.getWeight());
-            variant.setStatus(normalizeStatus(request.getStatus()));
-            ProductVariantEntity saved = productVariantRepository.save(variant);
+        Set<Long> handledVariantIds = new HashSet<>();
+
+        for (ProductVariantRequest request : variants) {
+            ProductVariantEntity target = resolveVariantForUpsert(request, existingById, existingBySku);
+            if (target.getId() != null && !handledVariantIds.add(target.getId())) {
+                throw new BusinessException("Duplicate variant in request: " + target.getId(), HttpStatus.BAD_REQUEST);
+            }
+            boolean isNew = target.getId() == null;
+            target.setProductId(productId);
+            target.setSku(request.getSku().trim());
+            target.setPrice(request.getPrice());
+            target.setWeight(request.getWeight());
+            target.setStatus(normalizeStatus(request.getStatus()));
+            if (isNew) {
+                target.setStock(0);
+            }
+
+            ProductVariantEntity saved = productVariantRepository.save(target);
+            handledVariantIds.add(saved.getId());
             syncVariantAttributes(saved.getId(), request, sizeAttribute, colorAttribute);
+            inventoryMovementService.setAbsoluteStockByVariantId(
+                    saved.getId(),
+                    request.getStock(),
+                    "ADJUST",
+                    "Adjusted stock from product update"
+            );
         }
 
-        for (int i = commonCount; i < existingVariants.size(); i++) {
-            ProductVariantEntity existing = existingVariants.get(i);
+        for (ProductVariantEntity existing : existingVariants) {
+            if (handledVariantIds.contains(existing.getId())) {
+                continue;
+            }
             existing.setStatus("INACTIVE");
             productVariantRepository.save(existing);
         }
+    }
+
+    private ProductVariantEntity resolveVariantForUpsert(
+            ProductVariantRequest request,
+            Map<Long, ProductVariantEntity> existingById,
+            Map<String, ProductVariantEntity> existingBySku
+    ) {
+        if (request.getId() != null) {
+            ProductVariantEntity byId = existingById.get(request.getId());
+            if (byId == null) {
+                throw new BusinessException("Variant not found in product: " + request.getId(), HttpStatus.BAD_REQUEST);
+            }
+            return byId;
+        }
+
+        String skuKey = request.getSku().trim().toLowerCase(Locale.ROOT);
+        return existingBySku.getOrDefault(skuKey, new ProductVariantEntity());
     }
 
     private void syncVariantAttributes(
@@ -1063,10 +1102,14 @@ public class ProductServiceImpl implements ProductService {
 
     private void validateVariantSkus(List<ProductVariantRequest> variants, Long currentProductId) {
         Set<String> requestSkus = new HashSet<>();
+        Set<Long> requestIds = new HashSet<>();
         for (ProductVariantRequest variant : variants) {
             String sku = variant.getSku().trim().toLowerCase(Locale.ROOT);
             if (!requestSkus.add(sku)) {
                 throw new BusinessException("Duplicate SKU in request: " + variant.getSku(), HttpStatus.BAD_REQUEST);
+            }
+            if (variant.getId() != null && !requestIds.add(variant.getId())) {
+                throw new BusinessException("Duplicate variant id in request: " + variant.getId(), HttpStatus.BAD_REQUEST);
             }
         }
 
@@ -1081,17 +1124,28 @@ public class ProductServiceImpl implements ProductService {
 
         List<ProductVariantEntity> currentVariants = productVariantRepository.findByProductIdOrderByIdAsc(currentProductId);
         Map<String, Long> currentSkuMap = new HashMap<>();
+        Set<Long> currentVariantIds = new HashSet<>();
         for (ProductVariantEntity entity : currentVariants) {
             currentSkuMap.put(entity.getSku().toLowerCase(Locale.ROOT), entity.getId());
+            currentVariantIds.add(entity.getId());
         }
 
         for (ProductVariantRequest variant : variants) {
+            if (variant.getId() != null && !currentVariantIds.contains(variant.getId())) {
+                throw new BusinessException("Variant not found in product: " + variant.getId(), HttpStatus.BAD_REQUEST);
+            }
             String sku = variant.getSku().trim();
-            boolean existsGlobally = productVariantRepository.existsBySkuIgnoreCase(sku);
-            if (!existsGlobally) {
+            ProductVariantEntity existing = productVariantRepository.findBySkuIgnoreCase(sku).orElse(null);
+            if (existing == null) {
                 continue;
             }
-            if (!currentSkuMap.containsKey(sku.toLowerCase(Locale.ROOT))) {
+            if (currentProductId.equals(existing.getProductId())
+                    && variant.getId() != null
+                    && !existing.getId().equals(variant.getId())) {
+                throw new BusinessException("SKU already exists: " + sku, HttpStatus.CONFLICT);
+            }
+            if (!currentProductId.equals(existing.getProductId())
+                    && !currentSkuMap.containsKey(sku.toLowerCase(Locale.ROOT))) {
                 throw new BusinessException("SKU already exists: " + sku, HttpStatus.CONFLICT);
             }
         }

@@ -39,6 +39,6 @@ public class AdminReturnController {
             @PathVariable Long id,
             @Valid @RequestBody ReturnStatusUpdateRequest request
     ) {
-        return ResponseEntity.ok(returnRequestService.updateStatus(id, request.getStatus()));
+        return ResponseEntity.ok(returnRequestService.updateStatus(id, request.getStatus(), request.getNote()));
     }
 }

@@ -1,42 +1,7 @@
 <template>
   <section class="category-admin-page" v-loading="loading">
-    <header class="management-head">
-      <div>
-        <p class="eyebrow">Admin panel</p>
-        <h2>Category Management</h2>
-        <p class="sub-text">Quản lý danh mục, danh mục cha/con và cấu trúc hiển thị sản phẩm.</p>
-      </div>
-      <div class="head-actions">
-        <el-button @click="loadCategories">Làm mới</el-button>
-        <el-button type="primary" @click="openCreate">+ Thêm danh mục</el-button>
-      </div>
-    </header>
-
-    <div class="overview-grid">
-      <article class="overview-card">
-        <p class="label">Total categories</p>
-        <p class="value">{{ stats.total }}</p>
-        <p class="helper">Tổng số danh mục</p>
-      </article>
-      <article class="overview-card">
-        <p class="label">Root categories</p>
-        <p class="value">{{ stats.root }}</p>
-        <p class="helper">Danh mục cấp cha</p>
-      </article>
-      <article class="overview-card">
-        <p class="label">Child categories</p>
-        <p class="value">{{ stats.child }}</p>
-        <p class="helper">Danh mục có cha</p>
-      </article>
-    </div>
-
     <div class="inventory-panel">
       <div class="panel-header">
-        <div>
-          <h3>Danh sách danh mục</h3>
-          <p>{{ filteredCategories.length }} danh mục phù hợp</p>
-        </div>
-
         <div class="panel-actions">
           <el-input
             v-model="keyword"
@@ -48,6 +13,8 @@
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
+          <el-button @click="loadCategories">Làm mới</el-button>
+          <el-button type="primary" @click="openCreate">+ Thêm danh mục</el-button>
         </div>
       </div>
 
@@ -56,6 +23,7 @@
           :data="filteredCategories"
           border
           stripe
+          size="small"
           class="category-table"
           empty-text="Không có danh mục"
           table-layout="fixed"
@@ -139,7 +107,7 @@ const submitting = ref(false);
 const categories = ref([]);
 const keyword = ref("");
 const page = ref(0);
-const size = ref(20);
+const size = ref(10);
 const totalElements = ref(0);
 
 const drawerVisible = ref(false);
@@ -176,13 +144,6 @@ const filteredCategories = computed(() => {
     const slug = String(item?.slug || "").toLowerCase();
     return name.includes(q) || slug.includes(q);
   });
-});
-
-const stats = computed(() => {
-  const total = categories.value.length;
-  const root = categories.value.filter((item) => !item.parentId).length;
-  const child = total - root;
-  return { total, root, child };
 });
 
 const loadCategories = async () => {
@@ -290,112 +251,24 @@ onMounted(() => {
 .category-admin-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
   width: 100%;
   box-sizing: border-box;
 }
 
-.management-head {
-  padding: 16px;
-  border: 1px solid #dce1e7;
-  background: #fbfbfc;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-
-  h2 {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 800;
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-  }
-
-  .eyebrow {
-    margin: 0 0 6px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 11px;
-    color: #6b7280;
-  }
-
-  .sub-text {
-    margin: 6px 0 0;
-    color: #6b7280;
-    font-size: 13px;
-  }
-}
-
-.head-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.overview-card {
-  border: 1px solid #e2e7ed;
-  padding: 16px;
-  background: #fff;
-
-  .label {
-    margin: 0 0 6px;
-    color: #6b7280;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .value {
-    margin: 0;
-    font-size: 30px;
-    font-weight: 800;
-    color: #111827;
-  }
-
-  .helper {
-    margin: 8px 0 0;
-    color: #9aa2ac;
-    font-size: 12px;
-  }
-}
-
 .inventory-panel {
   border: 1px solid #dce1e7;
-  padding: 16px;
+  padding: 10px;
   background: #fff;
 }
 
-.panel-header {
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  h3 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 800;
-  }
-
-  p {
-    margin: 4px 0 0;
-    color: #6b7280;
-    font-size: 12px;
-  }
-}
+.panel-header { margin-bottom: 10px; }
 
 .panel-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .search-input {
@@ -413,7 +286,7 @@ onMounted(() => {
 }
 
 .pagination-wrap {
-  margin-top: 14px;
+  margin-top: 10px;
   display: flex;
   justify-content: flex-end;
 }
@@ -422,17 +295,6 @@ onMounted(() => {
   :deep(.el-drawer__body) {
     padding: 16px;
     overflow-y: auto;
-  }
-}
-
-@media (max-width: 1000px) {
-  .overview-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .management-head {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }
 

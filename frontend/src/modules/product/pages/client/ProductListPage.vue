@@ -26,11 +26,7 @@
             <el-option label="GIẢM DẦN" value="desc" />
             <el-option label="TĂNG DẦN" value="asc" />
           </el-select>
-          <el-select v-model="store.size" class="size-select" @change="handleSizeChange">
-            <el-option :value="8" label="8 / trang" />
-            <el-option :value="12" label="12 / trang" />
-            <el-option :value="16" label="16 / trang" />
-          </el-select>
+          <el-input model-value="10 / trang" class="size-select" disabled />
         </div>
       </div>
 
@@ -193,10 +189,6 @@ const handlePageChange = (val) => {
 const handleSortChange = () => {
   store.page = 0;
   store.fetchProducts();
-};
-
-const handleSizeChange = (size) => {
-  store.setSize(size);
 };
 
 const handleCategoryFilter = (catId) => {

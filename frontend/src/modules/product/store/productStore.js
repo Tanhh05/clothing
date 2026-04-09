@@ -8,7 +8,7 @@ export const useProductStore = defineStore("productStore", {
     
     // Pagination data
     page: 0,
-    size: 12, // Default size x4 columns
+    size: 10,
     totalElements: 0,
     totalPages: 0,
     
@@ -42,7 +42,7 @@ export const useProductStore = defineStore("productStore", {
         this.totalElements = data.totalElements || 0;
         this.totalPages = data.totalPages || 0;
         this.page = data.page || 0;
-        this.size = data.size || 12;
+        this.size = data.size || 10;
       } catch (error) {
         console.error("Failed to fetch products:", error);
       } finally {

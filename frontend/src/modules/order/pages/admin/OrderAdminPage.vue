@@ -1,38 +1,5 @@
 <template>
   <section class="admin-orders-page" v-loading="loading">
-    <header class="head">
-      <div>
-        <p class="eyebrow">Admin panel</p>
-        <h2>Order Management</h2>
-        <p class="sub-text">Xác nhận và cập nhật trạng thái đơn hàng cho khách.</p>
-      </div>
-      <div class="head-actions">
-        <el-button @click="fetchOrders">Làm mới</el-button>
-        <el-button plain :disabled="!selectedOrderIds.length" @click="exportSelectedInvoices">
-          Xuất hóa đơn
-        </el-button>
-      </div>
-    </header>
-
-    <div class="overview-grid">
-      <article class="overview-card">
-        <p class="label">Total orders</p>
-        <p class="value">{{ stats.total }}</p>
-      </article>
-      <article class="overview-card">
-        <p class="label">Pending</p>
-        <p class="value">{{ stats.pending }}</p>
-      </article>
-      <article class="overview-card">
-        <p class="label">Processing</p>
-        <p class="value">{{ stats.processing }}</p>
-      </article>
-      <article class="overview-card">
-        <p class="label">Delivered</p>
-        <p class="value">{{ stats.delivered }}</p>
-      </article>
-    </div>
-
     <div class="panel">
       <div class="panel-head">
         <div class="filters-row">
@@ -51,6 +18,12 @@
             class="date-filter"
           />
           <el-button @click="clearFilters">Xóa lọc</el-button>
+        </div>
+        <div class="head-actions">
+          <el-button @click="fetchOrders">Làm mới</el-button>
+          <el-button plain :disabled="!selectedOrderIds.length" @click="exportSelectedInvoices">
+            Xuất hóa đơn
+          </el-button>
         </div>
       </div>
 
@@ -71,51 +44,47 @@
           :data="orders"
           border
           stripe
+          size="small"
           class="orders-table"
           empty-text="Chưa có đơn hàng"
-          table-layout="auto"
+          table-layout="fixed"
           @selection-change="handleOrderSelectionChange"
         >
           <el-table-column type="selection" width="48" />
-          <el-table-column prop="id" label="Mã đơn" width="84" />
-          <el-table-column label="Khách hàng" min-width="150">
+          <el-table-column label="Đơn hàng" min-width="220">
             <template #default="{ row }">
-              {{ customerDisplay(row) }}
+              <div class="order-cell">
+                <strong>#{{ row.id }}</strong>
+                <span>{{ customerDisplay(row) }}</span>
+              </div>
             </template>
           </el-table-column>
-          <!-- <el-table-column label="Địa chỉ" min-width="200" show-overflow-tooltip>
-            <template #default="{ row }">{{ row.address || "N/A" }}</template>
-          </el-table-column> -->
-          <el-table-column label="Thanh toán" width="110">
-            <template #default="{ row }">{{ paymentLabel(row.paymentMethod) }}</template>
+          <el-table-column label="Tổng quan" min-width="270">
+            <template #default="{ row }">
+              <div class="summary-cell">
+                <span><strong>TT:</strong> {{ paymentLabel(row.paymentMethod) }}</span>
+                <span><strong>Tổng:</strong> {{ formatCurrency(row.totalPrice) }}</span>
+                <el-tag size="small" :type="statusTagType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+              </div>
+            </template>
           </el-table-column>
-          <el-table-column label="Tổng tiền" width="130">
-            <template #default="{ row }">{{ formatCurrency(row.totalPrice) }}</template>
-          </el-table-column>
-          <el-table-column label="Ngày tạo" width="150">
+          <el-table-column label="Ngày tạo" width="160">
             <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
           </el-table-column>
-          <el-table-column label="Trạng thái hiện tại" width="145">
+          <el-table-column label="Thao tác" width="210">
             <template #default="{ row }">
-              <el-tag>{{ statusLabel(row.status) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="Thao tác" width="104">
-            <template #default="{ row }">
-              <el-button size="small" @click="openDetails(row)">Chi tiết</el-button>
-            </template>
-          </el-table-column>
-          <el-table-column label="Nhanh" width="150">
-            <template #default="{ row }">
-              <el-button
-                size="small"
-                type="primary"
-                :disabled="updatingOrderId === row.id || !nextStatus(row.status)"
-                :loading="updatingOrderId === row.id"
-                @click="updateStatus(row)"
-              >
-                {{ nextStatus(row.status) ? statusLabel(nextStatus(row.status)) : "Hoàn tất" }}
-              </el-button>
+              <div class="action-cell">
+                <el-button size="small" @click="openDetails(row)">Chi tiết</el-button>
+                <el-button
+                  size="small"
+                  type="primary"
+                  :disabled="updatingOrderId === row.id || !nextStatus(row.status)"
+                  :loading="updatingOrderId === row.id"
+                  @click="updateStatus(row)"
+                >
+                  {{ nextStatus(row.status) ? statusLabel(nextStatus(row.status)) : "Hoàn tất" }}
+                </el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -200,7 +169,7 @@
 
           <section class="detail-card">
             <h4 class="card-title">Sản phẩm trong đơn</h4>
-            <el-table :data="selectedOrder.items || []" border size="small" empty-text="Không có sản phẩm">
+            <el-table :data="selectedOrder.items || []" border stripe size="small" table-layout="fixed" empty-text="Không có sản phẩm">
               <el-table-column prop="productName" label="Sản phẩm" min-width="220" />
               <el-table-column prop="sku" label="SKU" width="130" />
               <el-table-column prop="quantity" label="SL" width="80" />
@@ -233,7 +202,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { orderApi } from "@/modules/order/api/orderApi";
 
@@ -247,7 +216,7 @@ const detailsVisible = ref(false);
 const selectedOrder = ref(null);
 const updatingOrderId = ref(null);
 const page = ref(0);
-const size = ref(20);
+const size = ref(10);
 const orderTableRef = ref(null);
 const selectedOrderIds = ref([]);
 const bulkStatus = ref("");
@@ -268,16 +237,6 @@ const statusFilterOptions = [
 ];
 
 const normalizeStatus = (status) => String(status || "").trim().toUpperCase();
-
-const stats = computed(() => {
-  const rows = orders.value;
-  return {
-    total: rows.length,
-    pending: rows.filter((o) => normalizeStatus(o.status) === "PENDING").length,
-    processing: rows.filter((o) => ["PROCESSING", "CONFIRMED", "SHIPPED"].includes(normalizeStatus(o.status))).length,
-    delivered: rows.filter((o) => normalizeStatus(o.status) === "DELIVERED").length
-  };
-});
 
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount || 0);
@@ -318,6 +277,14 @@ const statusLabel = (status) => {
     ON_HOLD: "Tạm giữ"
   };
   return map[value] || value || "N/A";
+};
+
+const statusTagType = (status) => {
+  const value = normalizeStatus(status);
+  if (["DELIVERED", "REFUNDED"].includes(value)) return "success";
+  if (["PENDING", "PROCESSING", "CONFIRMED", "SHIPPED", "RETURN_REQUESTED"].includes(value)) return "warning";
+  if (["FAILED", "FAILED_DELIVERY", "FAILED_INSUFFICIENT_STOCK", "CANCELLED"].includes(value)) return "danger";
+  return "info";
 };
 
 const nextStatus = (currentStatus) => {
@@ -713,92 +680,42 @@ onMounted(() => {
 .admin-orders-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
-.head {
-  padding: 16px;
+.panel {
   border: 1px solid #dce1e7;
-  background: #fbfbfc;
-  display: flex;
-  justify-content: space-between;
+  background: #fff;
+  padding: 10px;
+}
+
+.panel-head {
+  margin-bottom: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+}
 
-  h2 {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 800;
-    text-transform: uppercase;
-  }
-
-  .eyebrow {
-    margin: 0 0 6px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 11px;
-    color: #6b7280;
-  }
-
-  .sub-text {
-    margin: 6px 0 0;
-    color: #6b7280;
-    font-size: 13px;
-  }
+.filters-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 180px 280px auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .head-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.overview-card {
-  border: 1px solid #e2e7ed;
-  padding: 16px;
-  background: #fff;
-
-  .label {
-    margin: 0 0 8px;
-    color: #6b7280;
-    font-size: 12px;
-    text-transform: uppercase;
-  }
-
-  .value {
-    margin: 0;
-    font-size: 30px;
-    font-weight: 800;
-  }
-}
-
-.panel {
-  border: 1px solid #dce1e7;
-  background: #fff;
-  padding: 16px;
-}
-
-.panel-head {
-  margin-bottom: 14px;
-}
-
-.filters-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .bulk-toolbar {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   border: 1px dashed #cfd8e3;
-  padding: 10px;
+  padding: 8px 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -819,15 +736,15 @@ onMounted(() => {
 }
 
 .search-input {
-  width: 320px;
+  width: 100%;
 }
 
 .status-filter {
-  width: 180px;
+  width: 100%;
 }
 
 .date-filter {
-  width: 280px;
+  width: 100%;
 }
 
 .bulk-status-select {
@@ -836,16 +753,45 @@ onMounted(() => {
 
 .table-wrap {
   width: 100%;
-  overflow-x: auto;
 }
 
 .orders-table {
   width: 100%;
-  min-width: 1100px;
+}
+
+.order-cell {
+  display: grid;
+  gap: 2px;
+}
+
+.order-cell strong {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.order-cell span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.summary-cell {
+  display: grid;
+  gap: 4px;
+}
+
+.summary-cell span {
+  font-size: 12px;
+  color: #334155;
+}
+
+.action-cell {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .pagination-wrap {
-  margin-top: 14px;
+  margin-top: 10px;
   display: flex;
   justify-content: flex-end;
 }
@@ -920,22 +866,20 @@ onMounted(() => {
   }
 }
 
-@media (max-width: 1100px) {
-  .overview-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 760px) {
-  .head {
-    flex-direction: column;
-    align-items: flex-start;
+  .panel-head {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .head-actions {
     width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .filters-row {
+    grid-template-columns: 1fr;
   }
 
   .search-input {
@@ -946,10 +890,6 @@ onMounted(() => {
   .date-filter,
   .bulk-status-select {
     width: 100%;
-  }
-
-  .overview-grid {
-    grid-template-columns: 1fr;
   }
 
   .order-detail-drawer {

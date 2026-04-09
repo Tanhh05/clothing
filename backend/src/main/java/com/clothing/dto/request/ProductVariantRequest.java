@@ -11,6 +11,8 @@ import lombok.Setter;
 @Setter
 public class ProductVariantRequest {
 
+    private Long id;
+
     @NotBlank(message = "sku is required")
     @Size(max = 100, message = "sku max length is 100")
     private String sku;

@@ -1,13 +1,11 @@
 package com.clothing.service.impl;
 
-import com.clothing.entity.InventoryLogEntity;
 import com.clothing.entity.NotificationEntity;
 import com.clothing.entity.OrderEntity;
 import com.clothing.entity.OrderItemEntity;
 import com.clothing.entity.OrderStatusHistoryEntity;
 import com.clothing.entity.ProductVariantEntity;
 import com.clothing.entity.UserEntity;
-import com.clothing.repository.InventoryLogRepository;
 import com.clothing.repository.NotificationRepository;
 import com.clothing.repository.OrderItemRepository;
 import com.clothing.repository.OrderRepository;
@@ -15,6 +13,7 @@ import com.clothing.repository.OrderStatusHistoryRepository;
 import com.clothing.repository.ProductVariantRepository;
 import com.clothing.repository.UserRepository;
 import com.clothing.service.EmailService;
+import com.clothing.service.InventoryMovementService;
 import com.clothing.service.OrderAsyncProcessingService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +34,7 @@ public class OrderAsyncProcessingServiceImpl implements OrderAsyncProcessingServ
     private final OrderItemRepository orderItemRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final ProductVariantRepository productVariantRepository;
-    private final InventoryLogRepository inventoryLogRepository;
+    private final InventoryMovementService inventoryMovementService;
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
@@ -45,7 +44,7 @@ public class OrderAsyncProcessingServiceImpl implements OrderAsyncProcessingServ
             OrderItemRepository orderItemRepository,
             OrderStatusHistoryRepository orderStatusHistoryRepository,
             ProductVariantRepository productVariantRepository,
-            InventoryLogRepository inventoryLogRepository,
+            InventoryMovementService inventoryMovementService,
             NotificationRepository notificationRepository,
             UserRepository userRepository,
             EmailService emailService
@@ -54,7 +53,7 @@ public class OrderAsyncProcessingServiceImpl implements OrderAsyncProcessingServ
         this.orderItemRepository = orderItemRepository;
         this.orderStatusHistoryRepository = orderStatusHistoryRepository;
         this.productVariantRepository = productVariantRepository;
-        this.inventoryLogRepository = inventoryLogRepository;
+        this.inventoryMovementService = inventoryMovementService;
         this.notificationRepository = notificationRepository;
         this.userRepository = userRepository;
         this.emailService = emailService;
@@ -103,22 +102,12 @@ public class OrderAsyncProcessingServiceImpl implements OrderAsyncProcessingServ
         }
 
         for (OrderItemEntity item : orderItems) {
-            ProductVariantEntity variant = productVariantRepository.findByIdForUpdate(item.getVariantId())
-                    .orElseThrow();
-            Integer before = variant.getStock();
-            Integer after = before - item.getQuantity();
-            variant.setStock(after);
-            productVariantRepository.save(variant);
-
-            InventoryLogEntity log = new InventoryLogEntity();
-            log.setVariantId(variant.getId());
-            log.setType(TYPE_DEDUCT);
-            log.setQuantity(item.getQuantity());
-            log.setBeforeStock(before);
-            log.setAfterStock(after);
-            log.setNote("Async deduct stock for order #" + order.getId());
-            log.setCreatedAt(LocalDateTime.now());
-            inventoryLogRepository.save(log);
+            inventoryMovementService.deductStockByVariantId(
+                    item.getVariantId(),
+                    item.getQuantity(),
+                    TYPE_DEDUCT,
+                    "Async deduct stock for order #" + order.getId()
+            );
         }
 
         setStatus(order, STATUS_CONFIRMED);

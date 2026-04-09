@@ -1,34 +1,5 @@
 <template>
   <section class="customer-admin-page" v-loading="loading">
-    <header class="management-head">
-      <div>
-        <p class="eyebrow">Admin panel</p>
-        <h2>Customer Management</h2>
-        <p class="sub-text">Quản lý trạng thái tài khoản khách hàng và theo dõi dữ liệu người dùng.</p>
-      </div>
-      <div class="head-actions">
-        <el-button @click="fetchCustomers">Làm mới</el-button>
-      </div>
-    </header>
-
-    <div class="overview-grid">
-      <article class="overview-card">
-        <p class="label">Total users</p>
-        <p class="value">{{ stats.total }}</p>
-        <p class="helper">Tổng tài khoản trong hệ thống</p>
-      </article>
-      <article class="overview-card">
-        <p class="label">Active</p>
-        <p class="value">{{ stats.active }}</p>
-        <p class="helper">Tài khoản đang hoạt động</p>
-      </article>
-      <article class="overview-card">
-        <p class="label">Inactive</p>
-        <p class="value">{{ stats.inactive }}</p>
-        <p class="helper">Tài khoản đã khóa/tạm dừng</p>
-      </article>
-    </div>
-
     <div class="panel">
       <div class="panel-head">
         <el-input
@@ -48,6 +19,7 @@
           <el-option label="INACTIVE" value="INACTIVE" />
         </el-select>
         <el-button type="primary" @click="fetchCustomers">Tìm</el-button>
+        <el-button @click="fetchCustomers">Làm mới</el-button>
       </div>
 
       <div class="table-wrap">
@@ -55,39 +27,45 @@
           :data="customers"
           border
           stripe
+          size="small"
           table-layout="fixed"
           empty-text="Không có khách hàng"
           class="customer-table"
         >
-          <el-table-column prop="id" label="#" width="72" />
-          <el-table-column prop="username" label="Username" min-width="130" show-overflow-tooltip />
-          <el-table-column prop="fullName" label="Họ tên" min-width="150" show-overflow-tooltip />
-          <el-table-column prop="email" label="Email" min-width="210" show-overflow-tooltip />
-          <el-table-column prop="phone" label="SĐT" min-width="120" show-overflow-tooltip />
-          <el-table-column label="Vai trò" min-width="130">
+          <el-table-column label="Khách hàng" min-width="290">
             <template #default="{ row }">
-              <el-tag
-                v-for="role in roleList(row.roles)"
-                :key="`${row.id}-${role}`"
-                size="small"
-                class="role-tag"
-                :type="role === 'ADMIN' ? 'warning' : 'info'"
-              >
-                {{ role }}
-              </el-tag>
+              <div class="customer-cell">
+                <strong>#{{ row.id }} · {{ row.fullName || row.username || "N/A" }}</strong>
+                <span>@{{ row.username || "N/A" }}</span>
+                <span>{{ row.email || "N/A" }}</span>
+                <span>{{ row.phone || "N/A" }}</span>
+              </div>
             </template>
           </el-table-column>
-          <!-- <el-table-column label="Trạng thái" width="120">
+          <el-table-column label="Vai trò / Trạng thái" min-width="180">
             <template #default="{ row }">
-              <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'danger'">
-                {{ row.status || "N/A" }}
-              </el-tag>
+              <div class="role-status-cell">
+                <div class="role-row">
+                  <el-tag
+                    v-for="role in roleList(row.roles)"
+                    :key="`${row.id}-${role}`"
+                    size="small"
+                    class="role-tag"
+                    :type="role === 'ADMIN' ? 'warning' : 'info'"
+                  >
+                    {{ role }}
+                  </el-tag>
+                </div>
+                <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'danger'" size="small">
+                  {{ row.status || "N/A" }}
+                </el-tag>
+              </div>
             </template>
-          </el-table-column> -->
+          </el-table-column>
           <el-table-column label="Ngày tạo" width="162">
             <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
           </el-table-column>
-          <el-table-column label="Thao tác" width="120">
+          <el-table-column label="Thao tác" width="135">
             <template #default="{ row }">
               <el-button
                 size="small"
@@ -156,7 +134,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { onMounted, ref } from "vue";
 import { ElMessage } from "element-plus";
 import { Search } from "@element-plus/icons-vue";
 import { customerApi } from "@/modules/customer/api/customerApi";
@@ -166,21 +144,12 @@ const updatingId = ref(null);
 const customers = ref([]);
 
 const page = ref(0);
-const size = ref(20);
+const size = ref(10);
 const totalElements = ref(0);
 const keyword = ref("");
 const statusFilter = ref("");
 
 const roleList = (roles) => (Array.isArray(roles) ? roles : []);
-
-const stats = computed(() => {
-  const rows = customers.value;
-  return {
-    total: totalElements.value,
-    active: rows.filter((u) => String(u?.status || "").toUpperCase() === "ACTIVE").length,
-    inactive: rows.filter((u) => String(u?.status || "").toUpperCase() === "INACTIVE").length
-  };
-});
 
 const formatDateTime = (value) => {
   if (!value) return "N/A";
@@ -241,84 +210,21 @@ onMounted(() => {
 .customer-admin-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-
-.management-head {
-  padding: 16px;
-  border: 1px solid #dce1e7;
-  background: #fbfbfc;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-
-  h2 {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 800;
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-  }
-
-  .eyebrow {
-    margin: 0 0 6px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 11px;
-    color: #6b7280;
-  }
-
-  .sub-text {
-    margin: 6px 0 0;
-    color: #6b7280;
-    font-size: 13px;
-  }
-}
-
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.overview-card {
-  border: 1px solid #e2e7ed;
-  padding: 16px;
-  background: #fff;
-
-  .label {
-    margin: 0 0 6px;
-    color: #6b7280;
-    font-size: 12px;
-    text-transform: uppercase;
-  }
-
-  .value {
-    margin: 0;
-    font-size: 30px;
-    font-weight: 800;
-    color: #111827;
-  }
-
-  .helper {
-    margin: 8px 0 0;
-    color: #9aa2ac;
-    font-size: 12px;
-  }
+  gap: 10px;
 }
 
 .panel {
   border: 1px solid #dce1e7;
   background: #fff;
-  padding: 16px;
+  padding: 10px;
 }
 
 .panel-head {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
 .search-input {
@@ -328,6 +234,34 @@ onMounted(() => {
 
 .role-tag + .role-tag {
   margin-left: 6px;
+}
+
+.customer-cell {
+  display: grid;
+  gap: 2px;
+}
+
+.customer-cell strong {
+  font-size: 13px;
+  color: #111827;
+  word-break: break-word;
+}
+
+.customer-cell span {
+  font-size: 12px;
+  color: #64748b;
+  word-break: break-word;
+}
+
+.role-status-cell {
+  display: grid;
+  gap: 6px;
+}
+
+.role-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .table-wrap {
@@ -389,21 +323,12 @@ onMounted(() => {
 }
 
 .pagination-wrap {
-  margin-top: 14px;
+  margin-top: 10px;
   display: flex;
   justify-content: flex-end;
 }
 
 @media (max-width: 900px) {
-  .overview-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .management-head {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
   .panel-head {
     flex-wrap: wrap;
   }

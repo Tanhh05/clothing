@@ -10,3 +10,25 @@ body {
 a {
   text-decoration: none;
 }
+
+/* Admin UI consistency */
+.admin-layout .content {
+  .head,
+  .management-head,
+  .panel,
+  .inventory-panel,
+  .filter-panel {
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .el-table {
+    --el-table-border-color: #e5e7eb;
+    --el-table-header-bg-color: #f8fafc;
+    --el-table-row-hover-bg-color: #f9fafb;
+  }
+
+  .el-table .cell {
+    line-height: 1.35;
+  }
+}

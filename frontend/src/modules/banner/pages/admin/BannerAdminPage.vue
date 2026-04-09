@@ -1,35 +1,18 @@
 <template>
   <section class="banner-admin-page" v-loading="loading">
-    <header class="management-head">
-      <div>
-        <p class="eyebrow">Admin panel</p>
-        <h2>Banner Management</h2>
-      </div>
-      <div class="head-actions">
+    <div class="panel">
+      <div class="panel-head">
+        <el-input
+          v-model="keyword"
+          clearable
+          placeholder="Tìm theo tiêu đề / trạng thái"
+          class="search-input"
+        />
         <el-button @click="fetchBanners">Làm mới</el-button>
         <el-button type="primary" @click="openCreate">+ Thêm banner</el-button>
       </div>
-    </header>
-
-    <div class="overview-grid">
-      <article class="overview-card">
-        <p class="label">Total banners</p>
-        <p class="value">{{ stats.total }}</p>
-      </article>
-      <article class="overview-card">
-        <p class="label">Draft</p>
-        <p class="value">{{ stats.draft }}</p>
-      </article>
-      <article class="overview-card">
-        <p class="label">Running</p>
-        <p class="value">{{ stats.running }}</p>
-      </article>
-    </div>
-
-    <div class="panel">
-
       <div class="table-wrap">
-        <el-table :data="pagedBanners" border stripe table-layout="fixed" class="banner-table" empty-text="Không có banner">
+        <el-table :data="pagedBanners" border stripe size="small" table-layout="fixed" class="banner-table" empty-text="Không có banner">
           <el-table-column prop="id" label="#" width="70" />
           <el-table-column label="Desktop" width="120">
             <template #default="{ row }">
@@ -175,15 +158,6 @@ const bannerForm = ref({
 const BANNER_WIDTH = 1600;
 const BANNER_HEIGHT = 520;
 const GRID_GAP = 8;
-
-const stats = computed(() => {
-  const rows = banners.value;
-  return {
-    total: rows.length,
-    draft: rows.filter((b) => b.baseStatus === "DRAFT").length,
-    running: rows.filter((b) => b.status === "ACTIVE").length
-  };
-});
 
 const filteredBanners = computed(() => {
   const q = keyword.value.trim().toLowerCase();
@@ -474,80 +448,16 @@ watch(keyword, () => {
 .banner-admin-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-
-.management-head {
-  padding: 16px;
-  border: 1px solid #dce1e7;
-  background: #fbfbfc;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-
-  h2 {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 800;
-    text-transform: uppercase;
-  }
-
-  .eyebrow {
-    margin: 0 0 6px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 11px;
-    color: #6b7280;
-  }
-
-  .sub-text {
-    margin: 6px 0 0;
-    color: #6b7280;
-    font-size: 13px;
-  }
-}
-
-.head-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.overview-card {
-  border: 1px solid #e2e7ed;
-  padding: 16px;
-  background: #fff;
-
-  .label {
-    margin: 0 0 6px;
-    color: #6b7280;
-    font-size: 12px;
-    text-transform: uppercase;
-  }
-
-  .value {
-    margin: 0;
-    font-size: 30px;
-    font-weight: 800;
-    color: #111827;
-  }
+  gap: 10px;
 }
 
 .panel {
   border: 1px solid #dce1e7;
   background: #fff;
-  padding: 16px;
+  padding: 10px;
 }
 
-.panel-head {
-  margin-bottom: 12px;
-}
+.panel-head { margin-bottom: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
 
 .search-input {
   width: 320px;
@@ -564,7 +474,7 @@ watch(keyword, () => {
 }
 
 .pagination-wrap {
-  margin-top: 14px;
+  margin-top: 10px;
   display: flex;
   justify-content: flex-end;
 }
@@ -627,15 +537,6 @@ watch(keyword, () => {
 }
 
 @media (max-width: 900px) {
-  .overview-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .management-head {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
   .search-input {
     width: 100%;
   }

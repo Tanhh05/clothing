@@ -186,7 +186,19 @@ curl -i http://localhost:8080/api/admin/vouchers
 
 Kỳ vọng: 401 Unauthorized.
 
-### 9.3 UI flow test
+### 9.3 Smoke test API đổi trả (có token thật)
+
+```bash
+cd backend
+./scripts/test_returns_api.sh
+```
+
+Kỳ vọng:
+- `GET /api/returns/my` trả `200`
+- `POST /api/returns` trả `201`
+- POST trùng đơn trả `409` (chặn yêu cầu active trùng)
+
+### 9.4 UI flow test
 
 1. Login admin.
 2. Vào `/admin/settings`, đổi hotline/address/policy, bấm lưu.
@@ -221,4 +233,3 @@ Kỳ vọng: 401 Unauthorized.
 3. `npm run build` frontend thành công.
 4. Test ít nhất 1 API public + 1 API protected (401 khi thiếu token).
 5. Test 1 luồng admin -> client (ví dụ settings hoặc notification).
-

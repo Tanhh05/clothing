@@ -54,6 +54,11 @@ public class AdminWarehouseInboundController {
         return ResponseEntity.ok(warehouseInboundService.getById(id));
     }
 
+    @GetMapping("/skus")
+    public ResponseEntity<List<String>> getSkuSuggestions(@RequestParam(required = false) String q) {
+        return ResponseEntity.ok(warehouseInboundService.getSkuSuggestions(q));
+    }
+
     @PostMapping
     public ResponseEntity<WarehouseInboundResponse> create(@Valid @RequestBody WarehouseInboundCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(warehouseInboundService.create(request));

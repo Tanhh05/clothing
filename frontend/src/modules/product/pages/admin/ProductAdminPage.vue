@@ -1,50 +1,7 @@
 <template>
   <section class="product-admin-page" v-loading="loading">
-    <header class="management-head">
-      <div>
-        <p class="eyebrow">Admin panel</p>
-        <h2>Product Management</h2>
-        <p class="sub-text">Theo dõi tồn kho, trạng thái và cập nhật nhanh sản phẩm.</p>
-      </div>
-      <div class="head-actions">
-        <el-button @click="refreshProducts">Làm mới</el-button>
-        <el-button plain @click="openImportDialog">Import XLSX</el-button>
-        <el-button plain @click="openInventoryDrawer">Tồn kho</el-button>
-        <el-button plain @click="openDeletedDrawer">Đã xóa</el-button>
-        <el-button type="primary" @click="openCreate">+ Thêm sản phẩm</el-button>
-      </div>
-    </header>
-
-    <div class="overview-grid">
-      <article class="overview-card">
-        <p class="label">Total products</p>
-        <p class="value">{{ stats.total }}</p>
-        <p class="helper">Toàn bộ sản phẩm trong hệ thống</p>
-      </article>
-      <article class="overview-card">
-        <p class="label">Active</p>
-        <p class="value">{{ stats.active }}</p>
-        <p class="helper">Đang hiển thị trên cửa hàng</p>
-      </article>
-      <article class="overview-card">
-        <p class="label">Out of stock</p>
-        <p class="value">{{ stats.outOfStock }}</p>
-        <p class="helper">Cần nhập thêm hàng</p>
-      </article>
-      <article class="overview-card">
-        <p class="label">Variants</p>
-        <p class="value">{{ stats.variants }}</p>
-        <p class="helper">Tổng biến thể đang quản lý</p>
-      </article>
-    </div>
-
     <div class="inventory-panel">
       <div class="panel-header">
-        <div>
-          <h3>Danh sách sản phẩm</h3>
-          <p>{{ filteredProducts.length }} sản phẩm phù hợp</p>
-        </div>
-
         <div class="panel-actions">
           <el-input
             v-model="keyword"
@@ -56,6 +13,13 @@
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
+          <div class="action-buttons">
+            <el-button @click="refreshProducts">Làm mới</el-button>
+            <el-button plain @click="openImportDialog">Import XLSX</el-button>
+            <el-button plain @click="openInventoryDrawer">Tồn kho</el-button>
+            <el-button plain @click="openDeletedDrawer">Đã xóa</el-button>
+            <el-button type="primary" @click="openCreate">+ Thêm sản phẩm</el-button>
+          </div>
         </div>
       </div>
 
@@ -75,14 +39,14 @@
           :data="filteredProducts"
           border
           stripe
+          size="small"
           class="inventory-table"
           empty-text="Không có sản phẩm"
-          table-layout="auto"
+          table-layout="fixed"
           @selection-change="handleSelectionChange"
         >
           <el-table-column type="selection" width="48" />
-          <el-table-column prop="id" label="#" width="62" />
-          <el-table-column label="Sản phẩm" min-width="210">
+          <el-table-column label="Sản phẩm" min-width="300">
             <template #default="{ row }">
               <div class="product-cell">
                 <img
@@ -92,29 +56,33 @@
                   @error="onThumbError"
                 />
                 <div>
-                  <p class="name">{{ row.name || "N/A" }}</p>
+                  <p class="name">#{{ row.id }} · {{ row.name || "N/A" }}</p>
                   <p class="meta">{{ row.slug || "-" }}</p>
+                  <p class="meta">{{ row.brand || "Không thương hiệu" }} · {{ row.categoryName || "N/A" }}</p>
                 </div>
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="brand" label="Thương hiệu" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="categoryName" label="Danh mục" min-width="120" show-overflow-tooltip />
-          <el-table-column label="Giá bán" width="120">
-            <template #default="{ row }">{{ formatPrice(readProductPrice(row)) }}</template>
-          </el-table-column>
-          <el-table-column label="Tồn kho" width="90">
-            <template #default="{ row }">{{ readProductStock(row) }}</template>
+          <el-table-column label="Thông số" min-width="210">
+            <template #default="{ row }">
+              <div class="product-stats">
+                <span><strong>Giá:</strong> {{ formatPrice(readProductPrice(row)) }}</span>
+                <span><strong>Tồn kho:</strong> {{ readProductStock(row) }}</span>
+                <span><strong>Biến thể:</strong> {{ Array.isArray(row.variants) ? row.variants.length : 0 }}</span>
+              </div>
+            </template>
           </el-table-column>
           <el-table-column label="Trạng thái" width="118">
             <template #default="{ row }">
               <el-tag :type="readStatusTag(row.status)">{{ row.status || "UNKNOWN" }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="Thao tác" width="150">
+          <el-table-column label="Thao tác" width="165">
             <template #default="{ row }">
-              <el-button size="small" @click="openEdit(row)">Sửa</el-button>
-              <el-button size="small" type="danger" plain @click="deleteItem(row)">Xóa</el-button>
+              <div class="action-cell">
+                <el-button size="small" @click="openEdit(row)">Sửa</el-button>
+                <el-button size="small" type="danger" plain @click="deleteItem(row)">Xóa</el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -375,7 +343,8 @@
           :data="lowStockItems"
           border
           stripe
-          table-layout="auto"
+          size="small"
+          table-layout="fixed"
           empty-text="Không có biến thể nào dưới ngưỡng tồn kho."
         >
           <el-table-column prop="variantId" label="Variant ID" width="110" />
@@ -393,7 +362,7 @@
 
       <section class="inventory-log-box">
         <h4>Lịch sử nhập/xuất</h4>
-        <el-table :data="inventoryLogs" border size="small" table-layout="auto" empty-text="Chưa có log">
+        <el-table :data="inventoryLogs" border stripe size="small" table-layout="fixed" empty-text="Chưa có log">
           <el-table-column prop="createdAt" label="Thời gian" min-width="165">
             <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
           </el-table-column>
@@ -447,7 +416,7 @@
           <el-tag type="success">Thành công: {{ importResult.successCount || 0 }}</el-tag>
           <el-tag type="danger">Thất bại: {{ importResult.failedCount || 0 }}</el-tag>
         </div>
-        <el-table :data="importResult.results || []" border size="small" max-height="320">
+        <el-table :data="importResult.results || []" border stripe size="small" table-layout="fixed" max-height="320">
           <el-table-column prop="rowNumber" label="Dòng" width="72" />
           <el-table-column prop="name" label="Tên sản phẩm" min-width="180" />
           <el-table-column label="Trạng thái" width="120">
@@ -481,7 +450,7 @@ const loading = computed(() => store.loading);
 const products = computed(() => store.products || []);
 const totalElements = computed(() => Number(store.totalElements || 0));
 const currentPage = computed(() => Number(store.page || 0) + 1);
-const pageSize = ref(20);
+const pageSize = ref(10);
 const keyword = ref("");
 const fallbackImage = "https://via.placeholder.com/64x64?text=IMG";
 const productTableRef = ref(null);
@@ -533,6 +502,7 @@ const generateAutoSku = (variant, index) => {
 };
 
 const createEmptyVariant = () => ({
+  id: null,
   sku: "",
   autoSku: true,
   price: 0,
@@ -574,20 +544,6 @@ const readStatusTag = (status) => {
   if (status === "INACTIVE") return "info";
   return "warning";
 };
-
-const stats = computed(() => {
-  const rows = products.value;
-  const active = rows.filter((p) => p.status === "ACTIVE").length;
-  const outOfStock = rows.filter((p) => readProductStock(p) <= 0).length;
-  const variants = rows.reduce((sum, p) => sum + (Array.isArray(p.variants) ? p.variants.length : 0), 0);
-
-  return {
-    total: rows.length,
-    active,
-    outOfStock,
-    variants
-  };
-});
 
 const filteredProducts = computed(() => products.value);
 
@@ -813,6 +769,7 @@ const mapToPayload = () => {
       const size = upsertOptionValue(sizeOptions, variant?.size);
       const color = upsertOptionValue(colorOptions, variant?.color);
       return {
+        id: variant?.id ?? null,
         sku: String(variant?.sku || "").trim(),
         price: Number(variant?.price || 0),
         stock: Number(variant?.stock || 0),
@@ -929,6 +886,7 @@ const openEdit = (item) => {
           .filter((file) => file.url)
       : [],
     variants: itemVariants.map((variant, index) => ({
+      id: variant?.id ?? null,
       sku: variant?.sku || `${(item.slug || "SKU").toUpperCase()}-${index + 1}`,
       autoSku: false,
       price: Number(variant?.price || 0),
@@ -1173,122 +1131,41 @@ watch(
 .product-admin-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
   width: 100%;
   box-sizing: border-box;
 }
 
-.management-head {
-  padding: 16px;
-  border: 1px solid #dce1e7;
-  background: #fbfbfc;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-
-  h2 {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 800;
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-  }
-
-  .eyebrow {
-    margin: 0 0 6px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 11px;
-    color: #6b7280;
-  }
-
-  .sub-text {
-    margin: 6px 0 0;
-    color: #6b7280;
-    font-size: 13px;
-  }
-}
-
-.head-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  align-items: stretch;
-}
-
-.overview-card {
-  border: 1px solid #e2e7ed;
-  padding: 16px;
-  background: #fff;
-  min-height: 138px;
-  box-sizing: border-box;
-
-  .label {
-    margin: 0 0 6px;
-    color: #6b7280;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .value {
-    margin: 0;
-    font-size: 32px;
-    font-weight: 800;
-    color: #111827;
-  }
-
-  .helper {
-    margin: 8px 0 0;
-    color: #9aa2ac;
-    font-size: 12px;
-  }
-}
-
 .inventory-panel {
   border: 1px solid #dce1e7;
-  padding: 16px;
+  padding: 10px;
   background: #fff;
   box-sizing: border-box;
 }
 
 .panel-header {
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  h3 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 800;
-  }
-
-  p {
-    margin: 4px 0 0;
-    color: #6b7280;
-    font-size: 12px;
-  }
+  margin-bottom: 10px;
 }
 
 .panel-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .bulk-toolbar {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   border: 1px dashed #cfd8e3;
-  padding: 10px;
+  padding: 8px 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1313,16 +1190,14 @@ watch(
 
 .table-wrap {
   width: 100%;
-  overflow-x: auto;
 }
 
 .inventory-table {
   width: 100%;
-  min-width: 980px;
 }
 
 .pagination-wrap {
-  margin-top: 14px;
+  margin-top: 10px;
   display: flex;
   justify-content: flex-end;
 }
@@ -1583,6 +1458,22 @@ watch(
   }
 }
 
+.product-stats {
+  display: grid;
+  gap: 3px;
+}
+
+.product-stats span {
+  font-size: 12px;
+  color: #334155;
+}
+
+.action-cell {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .import-guide {
   margin-bottom: 12px;
   color: #374151;
@@ -1627,17 +1518,9 @@ watch(
 }
 
 @media (max-width: 1100px) {
-  .overview-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .management-head {
+  .panel-actions {
     flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .head-actions {
-    width: 100%;
+    align-items: stretch;
   }
 }
 
@@ -1658,13 +1541,9 @@ watch(
     width: 100%;
   }
 
-  .overview-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .head-actions {
-    display: grid;
+  .action-buttons {
     width: 100%;
+    display: grid;
     grid-template-columns: 1fr 1fr;
   }
 

@@ -220,7 +220,7 @@ const summary = ref({
 const auditLogs = ref([]);
 const logDrawerVisible = ref(false);
 const recentOrdersPage = ref(1);
-const recentOrdersPageSize = ref(8);
+const recentOrdersPageSize = ref(10);
 const auditLogsPage = ref(1);
 const auditLogsPageSize = ref(10);
 

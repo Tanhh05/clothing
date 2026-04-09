@@ -22,6 +22,11 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariantEn
 
     List<ProductVariantEntity> findBySkuIn(List<String> skus);
 
+    @Query("select v from ProductVariantEntity v where lower(v.sku) in :skusLower")
+    List<ProductVariantEntity> findBySkuLowerIn(@Param("skusLower") List<String> skusLower);
+
+    List<ProductVariantEntity> findTop200BySkuContainingIgnoreCaseOrderBySkuAsc(String q);
+
     List<ProductVariantEntity> findByStockLessThanEqualOrderByStockAsc(Integer stock);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

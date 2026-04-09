@@ -5,18 +5,18 @@ import com.clothing.dto.response.PageResponse;
 import com.clothing.dto.response.WarehouseInboundDetailResponse;
 import com.clothing.dto.response.WarehouseInboundItemResponse;
 import com.clothing.dto.response.WarehouseInboundResponse;
-import com.clothing.entity.InventoryLogEntity;
 import com.clothing.entity.ProductVariantEntity;
 import com.clothing.entity.WarehouseInboundEntity;
 import com.clothing.entity.WarehouseInboundItemEntity;
 import com.clothing.exception.BusinessException;
 import com.clothing.repository.InboundQuantityProjection;
-import com.clothing.repository.InventoryLogRepository;
 import com.clothing.repository.ProductVariantRepository;
 import com.clothing.repository.WarehouseInboundItemRepository;
 import com.clothing.repository.WarehouseInboundRepository;
 import com.clothing.service.AuditLogService;
+import com.clothing.service.InventoryMovementService;
 import com.clothing.service.WarehouseInboundService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -43,20 +43,20 @@ public class WarehouseInboundServiceImpl implements WarehouseInboundService {
     private final WarehouseInboundRepository warehouseInboundRepository;
     private final WarehouseInboundItemRepository warehouseInboundItemRepository;
     private final ProductVariantRepository productVariantRepository;
-    private final InventoryLogRepository inventoryLogRepository;
+    private final InventoryMovementService inventoryMovementService;
     private final AuditLogService auditLogService;
 
     public WarehouseInboundServiceImpl(
             WarehouseInboundRepository warehouseInboundRepository,
             WarehouseInboundItemRepository warehouseInboundItemRepository,
             ProductVariantRepository productVariantRepository,
-            InventoryLogRepository inventoryLogRepository,
+            InventoryMovementService inventoryMovementService,
             AuditLogService auditLogService
     ) {
         this.warehouseInboundRepository = warehouseInboundRepository;
         this.warehouseInboundItemRepository = warehouseInboundItemRepository;
         this.productVariantRepository = productVariantRepository;
-        this.inventoryLogRepository = inventoryLogRepository;
+        this.inventoryMovementService = inventoryMovementService;
         this.auditLogService = auditLogService;
     }
 
@@ -131,9 +131,10 @@ public class WarehouseInboundServiceImpl implements WarehouseInboundService {
                 .distinct()
                 .toList();
 
-        Map<String, Integer> stockBySku = productVariantRepository.findBySkuIn(skus).stream()
+        List<String> skusLower = skus.stream().map(sku -> sku.toLowerCase(Locale.ROOT)).toList();
+        Map<String, Integer> stockBySku = productVariantRepository.findBySkuLowerIn(skusLower).stream()
                 .collect(Collectors.toMap(
-                        ProductVariantEntity::getSku,
+                        variant -> variant.getSku().toLowerCase(Locale.ROOT),
                         variant -> variant.getStock() == null ? 0 : variant.getStock(),
                         (v1, v2) -> v1
                 ));
@@ -143,13 +144,14 @@ public class WarehouseInboundServiceImpl implements WarehouseInboundService {
         for (WarehouseInboundItemEntity itemEntity : itemEntities) {
             int quantity = itemEntity.getQuantity() == null ? 0 : itemEntity.getQuantity();
             totalQuantity += quantity;
+            String itemSkuKey = itemEntity.getSku() == null ? "" : itemEntity.getSku().toLowerCase(Locale.ROOT);
             items.add(WarehouseInboundItemResponse.builder()
                     .id(itemEntity.getId())
                     .sku(itemEntity.getSku())
                     .quantity(quantity)
                     .unitCost(itemEntity.getUnitCost())
                     .lineTotal(itemEntity.getLineTotal())
-                    .currentStock(stockBySku.getOrDefault(itemEntity.getSku(), 0))
+                    .currentStock(stockBySku.getOrDefault(itemSkuKey, 0))
                     .build());
         }
 
@@ -163,6 +165,15 @@ public class WarehouseInboundServiceImpl implements WarehouseInboundService {
                 .totalCost(inbound.getTotalCost())
                 .items(items)
                 .build();
+    }
+
+    @Override
+    public List<String> getSkuSuggestions(String q) {
+        String keyword = q == null ? "" : q.trim();
+        return productVariantRepository.findTop200BySkuContainingIgnoreCaseOrderBySkuAsc(keyword).stream()
+                .map(ProductVariantEntity::getSku)
+                .filter(sku -> sku != null && !sku.isBlank())
+                .toList();
     }
 
     @Override
@@ -191,12 +202,14 @@ public class WarehouseInboundServiceImpl implements WarehouseInboundService {
 
         inbound.setItemCount(normalizedItems.size());
         inbound.setTotalCost(totalCost);
-        WarehouseInboundEntity savedInbound = warehouseInboundRepository.save(inbound);
+        WarehouseInboundEntity savedInbound;
+        try {
+            savedInbound = warehouseInboundRepository.saveAndFlush(inbound);
+        } catch (DataIntegrityViolationException ex) {
+            throw new BusinessException("Inbound code already exists", HttpStatus.BAD_REQUEST);
+        }
 
         for (NormalizedInboundItem item : normalizedItems) {
-            ProductVariantEntity variant = productVariantRepository.findBySkuIgnoreCaseForUpdate(item.sku)
-                    .orElseThrow(() -> new BusinessException("SKU not found: " + item.getSku(), HttpStatus.BAD_REQUEST));
-
             WarehouseInboundItemEntity detail = new WarehouseInboundItemEntity();
             detail.setInboundId(savedInbound.getId());
             detail.setSku(item.sku);
@@ -205,20 +218,12 @@ public class WarehouseInboundServiceImpl implements WarehouseInboundService {
             detail.setLineTotal(item.lineTotal);
             warehouseInboundItemRepository.save(detail);
 
-            int beforeStock = variant.getStock() == null ? 0 : variant.getStock();
-            int afterStock = beforeStock + item.quantity;
-            variant.setStock(afterStock);
-            productVariantRepository.save(variant);
-
-            InventoryLogEntity log = new InventoryLogEntity();
-            log.setVariantId(variant.getId());
-            log.setType("IN");
-            log.setQuantity(item.quantity);
-            log.setBeforeStock(beforeStock);
-            log.setAfterStock(afterStock);
-            log.setNote("Inbound " + savedInbound.getCode() + " - " + savedInbound.getSupplier());
-            log.setCreatedAt(LocalDateTime.now());
-            inventoryLogRepository.save(log);
+            inventoryMovementService.increaseStockBySku(
+                    item.sku,
+                    item.quantity,
+                    "IN",
+                    "Inbound " + savedInbound.getCode() + " - " + savedInbound.getSupplier()
+            );
         }
 
         auditLogService.log(

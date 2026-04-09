@@ -10,6 +10,9 @@ export const warehouseApi = {
   getInboundReceiptById(id) {
     return api.get(`/admin/warehouse-inbounds/${id}`);
   },
+  getSkuSuggestions(q = "") {
+    return api.get("/admin/warehouse-inbounds/skus", { params: { q } });
+  },
   createInboundReceipt(payload) {
     return api.post("/admin/warehouse-inbounds", payload);
   }

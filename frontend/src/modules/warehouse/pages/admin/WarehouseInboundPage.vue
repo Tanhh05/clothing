@@ -1,33 +1,5 @@
 <template>
   <section class="warehouse-page">
-    <header class="head">
-      <div>
-        <p class="eyebrow">Admin panel</p>
-        <h2>Warehouse Inbound</h2>
-        <p class="sub-text">Quản lý phiếu nhập kho, kiểm soát số lượng và chi phí nhập.</p>
-      </div>
-      <el-button type="primary" :icon="Plus" @click="openCreate">Tạo phiếu nhập</el-button>
-    </header>
-
-    <section class="stats-grid">
-      <article class="stat-card">
-        <p class="stat-label">Số phiếu trên trang</p>
-        <h3>{{ pageData.content.length }}</h3>
-      </article>
-      <article class="stat-card">
-        <p class="stat-label">Tổng dòng nhập</p>
-        <h3>{{ stats.totalLines }}</h3>
-      </article>
-      <article class="stat-card">
-        <p class="stat-label">Tổng SL nhập</p>
-        <h3>{{ formatNumber(stats.totalQuantity) }}</h3>
-      </article>
-      <article class="stat-card">
-        <p class="stat-label">Tổng chi phí</p>
-        <h3>{{ formatCurrency(stats.totalCost) }}</h3>
-      </article>
-    </section>
-
     <section class="panel filter-panel">
       <div class="toolbar">
         <el-input
@@ -51,11 +23,20 @@
         />
         <el-button :icon="Search" type="primary" @click="handleSearch">Lọc</el-button>
         <el-button :icon="RefreshRight" @click="resetFilters">Làm mới</el-button>
+        <el-button type="primary" @click="openCreate">Tạo phiếu nhập</el-button>
       </div>
     </section>
 
     <section class="panel">
-      <el-table v-loading="loading" :data="pageData.content" border stripe empty-text="Chưa có phiếu nhập">
+      <el-table
+        v-loading="loading"
+        :data="pageData.content"
+        border
+        stripe
+        size="small"
+        table-layout="fixed"
+        empty-text="Chưa có phiếu nhập"
+      >
         <el-table-column prop="code" label="Mã phiếu" min-width="130" />
         <el-table-column prop="supplier" label="Nhà cung cấp" min-width="180" />
         <el-table-column prop="createdAt" label="Ngày nhập" min-width="170">
@@ -78,91 +59,158 @@
       <div class="pagination-wrap">
         <el-pagination
           v-model:current-page="page"
-          v-model:page-size="size"
-          layout="total, prev, pager, next, sizes"
+          layout="total, prev, pager, next"
           :total="pageData.totalElements"
-          :page-sizes="[10, 20, 50]"
           @current-change="fetchReceipts"
-          @size-change="handleSizeChange"
         />
       </div>
     </section>
 
-    <el-drawer v-model="createDrawerVisible" title="Tạo phiếu nhập kho" direction="rtl" size="44%">
-      <el-form label-position="top">
-        <el-row :gutter="12">
-          <el-col :span="12">
+    <el-drawer v-model="createDrawerVisible" title="Tạo phiếu nhập kho" direction="rtl" size="56%">
+      <el-form label-position="top" class="create-form">
+        <section class="create-meta-card">
+          <div class="create-meta-grid">
             <el-form-item label="Mã phiếu">
-              <el-input v-model="createForm.code" placeholder="VD: NK-2026-001" />
+              <el-input v-model="createForm.code" placeholder="VD: NK-2026-001">
+                <template #append>
+                  <el-button @click="generateCode">Tạo nhanh</el-button>
+                </template>
+              </el-input>
             </el-form-item>
-          </el-col>
-          <el-col :span="12" class="align-end">
-            <el-button @click="generateCode">Tạo mã nhanh</el-button>
-          </el-col>
-        </el-row>
-
-        <el-form-item label="Nhà cung cấp">
-          <el-input v-model="createForm.supplier" placeholder="Tên nhà cung cấp" />
-        </el-form-item>
-
-        <el-form-item label="Ngày nhập">
-          <el-date-picker
-            v-model="createForm.createdAt"
-            type="datetime"
-            style="width: 100%"
-            format="DD/MM/YYYY HH:mm:ss"
-          />
-        </el-form-item>
+            <el-form-item label="Nhà cung cấp">
+              <el-input v-model="createForm.supplier" placeholder="Tên nhà cung cấp" />
+            </el-form-item>
+            <el-form-item label="Ngày nhập">
+              <el-date-picker
+                v-model="createForm.createdAt"
+                type="datetime"
+                style="width: 100%"
+                format="DD/MM/YYYY HH:mm:ss"
+              />
+            </el-form-item>
+          </div>
+        </section>
 
         <div class="item-head">
-          <h4>Danh sách SKU nhập</h4>
-          <el-button size="small" @click="addLine">+ Dòng</el-button>
+          <h4>Dòng nhập kho</h4>
+          <div class="line-actions">
+            <el-button size="small" @click="addLine">+ Thêm dòng</el-button>
+            <el-button
+              size="small"
+              plain
+              @click="createForm.items = [{ sku: '', quantity: 1, cost: 0 }]"
+            >
+              Reset dòng
+            </el-button>
+          </div>
         </div>
 
-        <article v-for="(line, index) in createForm.items" :key="index" class="line-item">
-          <el-row :gutter="10">
-            <el-col :span="11">
-              <el-input v-model="line.sku" placeholder="SKU" />
-            </el-col>
-            <el-col :span="5">
+        <div class="line-table">
+          <div v-for="(line, index) in createForm.items" :key="index" class="line-row">
+            <div class="line-index">#{{ index + 1 }}</div>
+            <div class="line-col sku">
+              <label>SKU</label>
+              <el-select
+                v-model="line.sku"
+                placeholder="Nhập hoặc chọn SKU"
+                filterable
+                remote
+                reserve-keyword
+                clearable
+                :remote-method="handleSkuQuery"
+                @visible-change="handleSkuVisibleChange"
+              >
+                <el-option
+                  v-for="sku in visibleSkuSuggestions"
+                  :key="sku"
+                  :label="sku"
+                  :value="sku"
+                />
+              </el-select>
+            </div>
+            <div class="line-col qty">
+              <label>Số lượng</label>
               <el-input-number v-model="line.quantity" :min="1" :step="1" style="width: 100%" />
-            </el-col>
-            <el-col :span="6">
+            </div>
+            <div class="line-col cost">
+              <label>Đơn giá</label>
               <el-input-number v-model="line.cost" :min="0" :step="1000" style="width: 100%" />
-            </el-col>
-            <el-col :span="2">
-              <el-button text type="danger" @click="removeLine(index)">X</el-button>
-            </el-col>
-          </el-row>
-        </article>
+            </div>
+            <div class="line-col total">
+              <label>Thành tiền</label>
+              <div class="line-total">{{ formatCurrency(calcLineTotal(line)) }}</div>
+            </div>
+            <div class="line-col action">
+              <el-button text type="danger" :disabled="createForm.items.length <= 1" @click="removeLine(index)">
+                Xóa
+              </el-button>
+            </div>
+          </div>
+        </div>
 
         <div class="draft-summary">
-          <span>Dòng: {{ createForm.items.length }}</span>
-          <span>SL: {{ formatNumber(draftTotals.totalQuantity) }}</span>
-          <span>Chi phí: {{ formatCurrency(draftTotals.totalCost) }}</span>
+          <div class="summary-item">
+            <p>Dòng nhập</p>
+            <strong>{{ createForm.items.length }}</strong>
+          </div>
+          <div class="summary-item">
+            <p>Tổng số lượng</p>
+            <strong>{{ formatNumber(draftTotals.totalQuantity) }}</strong>
+          </div>
+          <div class="summary-item">
+            <p>Tổng chi phí</p>
+            <strong>{{ formatCurrency(draftTotals.totalCost) }}</strong>
+          </div>
         </div>
       </el-form>
 
       <template #footer>
-        <el-button @click="createDrawerVisible = false">Hủy</el-button>
-        <el-button type="primary" :loading="creating" @click="saveReceipt">Lưu phiếu</el-button>
+        <div class="drawer-footer">
+          <el-button @click="createDrawerVisible = false">Hủy</el-button>
+          <el-button type="primary" :loading="creating" @click="saveReceipt">Lưu phiếu</el-button>
+        </div>
       </template>
     </el-drawer>
 
-    <el-drawer v-model="detailDrawerVisible" title="Chi tiết phiếu nhập" direction="rtl" size="46%">
+    <el-drawer v-model="detailDrawerVisible" title="Chi tiết phiếu nhập" direction="rtl" size="52%">
       <template v-if="detailLoading">
         <el-skeleton :rows="6" animated />
       </template>
       <template v-else-if="detailData">
-        <div class="detail-meta">
-          <p><strong>Mã phiếu:</strong> {{ detailData.code }}</p>
-          <p><strong>Nhà cung cấp:</strong> {{ detailData.supplier }}</p>
-          <p><strong>Ngày nhập:</strong> {{ formatDateTime(detailData.createdAt) }}</p>
-          <p><strong>Số dòng:</strong> {{ detailData.itemCount }}</p>
-          <p><strong>Tổng SL:</strong> {{ formatNumber(detailData.totalQuantity) }}</p>
-          <p><strong>Tổng chi phí:</strong> {{ formatCurrency(detailData.totalCost) }}</p>
-        </div>
-        <el-table :data="detailData.items || []" border stripe>
+        <section class="detail-overview">
+          <div class="meta-block">
+            <p class="meta-key">Mã phiếu</p>
+            <h4>{{ detailData.code }}</h4>
+          </div>
+          <div class="meta-block">
+            <p class="meta-key">Nhà cung cấp</p>
+            <h4>{{ detailData.supplier }}</h4>
+          </div>
+          <div class="meta-block">
+            <p class="meta-key">Ngày nhập</p>
+            <h4>{{ formatDateTime(detailData.createdAt) }}</h4>
+          </div>
+        </section>
+
+        <section class="detail-stats">
+          <article class="mini-stat">
+            <p>Số dòng</p>
+            <h5>{{ detailData.itemCount || 0 }}</h5>
+          </article>
+          <article class="mini-stat">
+            <p>Tổng số lượng</p>
+            <h5>{{ formatNumber(detailData.totalQuantity) }}</h5>
+          </article>
+          <article class="mini-stat">
+            <p>Tổng chi phí</p>
+            <h5>{{ formatCurrency(detailData.totalCost) }}</h5>
+          </article>
+        </section>
+
+        <el-table :data="detailData.items || []" border stripe size="small" table-layout="fixed">
+          <el-table-column label="#" width="56">
+            <template #default="{ $index }">{{ $index + 1 }}</template>
+          </el-table-column>
           <el-table-column prop="sku" label="SKU" min-width="140" />
           <el-table-column prop="quantity" label="SL nhập" width="100" />
           <el-table-column prop="unitCost" label="Đơn giá" min-width="140">
@@ -171,7 +219,7 @@
           <el-table-column prop="lineTotal" label="Thành tiền" min-width="140">
             <template #default="{ row }">{{ formatCurrency(row.lineTotal) }}</template>
           </el-table-column>
-          <el-table-column prop="currentStock" label="Tồn hiện tại" width="120" />
+          <el-table-column prop="currentStock" label="Tồn hiện tại" width="120" align="right" />
         </el-table>
       </template>
       <template v-else>
@@ -184,7 +232,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage } from "element-plus";
-import { Plus, RefreshRight, Search, View } from "@element-plus/icons-vue";
+import { RefreshRight, Search, View } from "@element-plus/icons-vue";
 import { warehouseApi } from "@/modules/warehouse/api/warehouseApi";
 
 const loading = ref(false);
@@ -206,6 +254,8 @@ const createDrawerVisible = ref(false);
 const detailDrawerVisible = ref(false);
 const detailLoading = ref(false);
 const detailData = ref(null);
+const skuSuggestions = ref([]);
+const skuKeyword = ref("");
 
 const defaultCreateForm = () => ({
   code: "",
@@ -215,13 +265,6 @@ const defaultCreateForm = () => ({
 });
 
 const createForm = ref(defaultCreateForm());
-
-const stats = computed(() => {
-  const totalLines = pageData.content.reduce((sum, item) => sum + Number(item.itemCount || 0), 0);
-  const totalQuantity = pageData.content.reduce((sum, item) => sum + Number(item.totalQuantity || 0), 0);
-  const totalCost = pageData.content.reduce((sum, item) => sum + Number(item.totalCost || 0), 0);
-  return { totalLines, totalQuantity, totalCost };
-});
 
 const draftTotals = computed(() => {
   const lines = Array.isArray(createForm.value.items) ? createForm.value.items : [];
@@ -234,6 +277,7 @@ const formatCurrency = (value) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(Number(value) || 0);
 const formatNumber = (value) => new Intl.NumberFormat("vi-VN").format(Number(value) || 0);
 const formatDateTime = (value) => (value ? new Date(value).toLocaleString("vi-VN") : "N/A");
+const calcLineTotal = (line) => Number(line?.quantity || 0) * Number(line?.cost || 0);
 
 const toLocalDateTime = (value) => {
   if (!value) return null;
@@ -283,6 +327,40 @@ const fetchReceipts = async () => {
   }
 };
 
+const preloadSkuSuggestions = async (keyword = "") => {
+  try {
+    const { data } = await warehouseApi.getSkuSuggestions(keyword);
+    skuSuggestions.value = Array.isArray(data) ? data.filter(Boolean) : [];
+  } catch (error) {
+    skuSuggestions.value = [];
+  }
+};
+
+const filteredSkuSuggestions = computed(() => {
+  const lower = skuKeyword.value.toLowerCase();
+  return skuSuggestions.value.filter((sku) =>
+    lower ? String(sku).toLowerCase().includes(lower) : true
+  );
+});
+
+const visibleSkuSuggestions = computed(() => filteredSkuSuggestions.value);
+
+const handleSkuQuery = async (queryString) => {
+  const keyword = String(queryString || "").trim();
+  skuKeyword.value = keyword;
+  if (!skuSuggestions.value.length || keyword.length >= 2) {
+    await preloadSkuSuggestions(keyword);
+  }
+};
+
+const handleSkuVisibleChange = async (visible) => {
+  if (!visible) return;
+  skuKeyword.value = "";
+  if (!skuSuggestions.value.length) {
+    await preloadSkuSuggestions("");
+  }
+};
+
 const handleSearch = async () => {
   page.value = 1;
   await fetchReceipts();
@@ -291,12 +369,6 @@ const handleSearch = async () => {
 const resetFilters = async () => {
   filters.q = "";
   filters.range = [];
-  page.value = 1;
-  await fetchReceipts();
-};
-
-const handleSizeChange = async (nextSize) => {
-  size.value = nextSize;
   page.value = 1;
   await fetchReceipts();
 };
@@ -316,7 +388,22 @@ const openCreate = () => {
 };
 
 const addLine = () => {
-  createForm.value.items.push({ sku: "", quantity: 1, cost: 0 });
+  createForm.value.items.push({
+    sku: "",
+    quantity: 1,
+    cost: 0
+  });
+};
+
+const checkSkuExists = async (sku) => {
+  try {
+    const { data } = await warehouseApi.getSkuSuggestions(sku);
+    const list = Array.isArray(data) ? data : [];
+    const target = String(sku || "").trim().toUpperCase();
+    return list.some((item) => String(item || "").trim().toUpperCase() === target);
+  } catch (error) {
+    return false;
+  }
 };
 
 const removeLine = (index) => {
@@ -387,6 +474,14 @@ const saveReceipt = async () => {
 
   creating.value = true;
   try {
+    const uniqueSkus = [...new Set(payload.items.map((item) => item.sku))];
+    const skuChecks = await Promise.all(uniqueSkus.map((sku) => checkSkuExists(sku)));
+    const missingSkus = uniqueSkus.filter((_, index) => !skuChecks[index]);
+    if (missingSkus.length) {
+      ElMessage.error(`SKU chưa tồn tại trong hệ thống: ${missingSkus.join(", ")}`);
+      return;
+    }
+
     await warehouseApi.createInboundReceipt(payload);
     createDrawerVisible.value = false;
     ElMessage.success("Đã tạo phiếu nhập kho");
@@ -412,39 +507,60 @@ const openDetail = async (id) => {
   }
 };
 
-onMounted(fetchReceipts);
+onMounted(async () => {
+  await Promise.all([fetchReceipts(), preloadSkuSuggestions("")]);
+});
 </script>
 
 <style scoped lang="scss">
-.warehouse-page { display: flex; flex-direction: column; gap: 16px; }
-.head { padding: 16px; border: 1px solid #dce1e7; background: #fbfbfc; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.head h2 { margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase; }
-.eyebrow { margin: 0 0 6px; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; color: #6b7280; }
-.sub-text { margin: 6px 0 0; color: #6b7280; font-size: 13px; }
+.warehouse-page { display: flex; flex-direction: column; gap: 10px; }
 
-.panel { border: 1px solid #dce1e7; background: #fff; padding: 14px; }
+.panel { border: 1px solid #dce1e7; background: #fff; padding: 10px; }
 .filter-panel { padding-bottom: 10px; }
 
-.stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.stat-card { border: 1px solid #dce1e7; background: #fff; padding: 14px; }
-.stat-label { margin: 0; font-size: 12px; color: #6b7280; text-transform: uppercase; }
-.stat-card h3 { margin: 8px 0 0; font-size: 20px; }
-
-.toolbar { display: grid; grid-template-columns: 1.6fr 1fr auto auto; gap: 8px; align-items: center; }
+.toolbar { display: grid; grid-template-columns: 1.6fr 1fr auto auto auto; gap: 8px; align-items: center; }
 .search-input, .date-range { width: 100%; }
-.pagination-wrap { margin-top: 14px; display: flex; justify-content: flex-end; }
+.pagination-wrap { margin-top: 10px; display: flex; justify-content: flex-end; }
 
-.align-end { display: flex; align-items: flex-end; justify-content: flex-end; }
-.item-head { margin: 12px 0 8px; display: flex; justify-content: space-between; align-items: center; }
+.create-form { display: flex; flex-direction: column; gap: 12px; }
+.create-meta-card { border: 1px solid #e5e7eb; background: #fbfdff; border-radius: 10px; padding: 12px; }
+.create-meta-grid { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 10px 12px; align-items: end; }
+.item-head { margin: 2px 0 0; display: flex; justify-content: space-between; align-items: center; }
 .item-head h4 { margin: 0; font-size: 13px; text-transform: uppercase; }
-.line-item { border: 1px solid #e5e7eb; padding: 10px; margin-bottom: 8px; border-radius: 8px; }
-.draft-summary { margin-top: 10px; display: flex; gap: 16px; font-size: 13px; color: #111827; }
-.detail-meta { margin-bottom: 12px; display: grid; gap: 6px; }
-.detail-meta p { margin: 0; }
+.line-actions { display: flex; gap: 8px; }
+
+.line-table { display: flex; flex-direction: column; gap: 8px; }
+.line-row { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; display: grid; grid-template-columns: auto minmax(220px, 2.2fr) 1fr 1fr 1.1fr auto; gap: 8px; align-items: end; background: #fff; }
+.line-index { width: 30px; height: 30px; border-radius: 999px; background: #f3f4f6; color: #4b5563; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+.line-col { display: flex; flex-direction: column; gap: 6px; }
+.line-col label { font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+.line-col.action { align-items: flex-end; justify-content: flex-end; padding-bottom: 2px; }
+.line-total { height: 32px; display: flex; align-items: center; font-weight: 700; color: #111827; background: #f8fafc; border: 1px dashed #d1d5db; border-radius: 6px; padding: 0 10px; }
+.draft-summary { margin-top: 6px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; }
+.summary-item p { margin: 0; font-size: 11px; text-transform: uppercase; color: #6b7280; letter-spacing: 0.4px; }
+.summary-item strong { margin-top: 4px; display: block; font-size: 16px; color: #111827; }
+.drawer-footer { display: flex; justify-content: flex-end; gap: 10px; width: 100%; }
+
+.detail-overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+.meta-block { border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; padding: 10px 12px; }
+.meta-key { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; }
+.meta-block h4 { margin: 6px 0 0; font-size: 14px; color: #111827; line-height: 1.3; }
+.detail-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.mini-stat { border: 1px solid #dbe4f0; background: linear-gradient(180deg, #f8fbff 0%, #f5f8fd 100%); border-radius: 10px; padding: 10px 12px; }
+.mini-stat p { margin: 0; font-size: 11px; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px; }
+.mini-stat h5 { margin: 6px 0 0; font-size: 17px; }
 
 @media (max-width: 1000px) {
-  .stats-grid { grid-template-columns: 1fr 1fr; }
   .toolbar { grid-template-columns: 1fr; }
   .pagination-wrap { justify-content: center; }
+  .create-meta-grid { grid-template-columns: 1fr; }
+  .line-actions { width: 100%; }
+  .line-actions .el-button { flex: 1; }
+  .line-row { grid-template-columns: 1fr; }
+  .line-index { width: 26px; height: 26px; }
+  .line-col.action { align-items: flex-start; }
+  .draft-summary { grid-template-columns: 1fr; gap: 8px; }
+  .detail-overview { grid-template-columns: 1fr; }
+  .detail-stats { grid-template-columns: 1fr; }
 }
 </style>
