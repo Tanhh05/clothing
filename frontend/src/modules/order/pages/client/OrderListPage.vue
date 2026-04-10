@@ -235,15 +235,20 @@
           placeholder="Mô tả trải nghiệm sử dụng sản phẩm"
         />
       </el-form-item>
-      <el-form-item label="Ảnh đánh giá (mỗi dòng 1 URL)">
-        <el-input
-          v-model="reviewForm.imageUrlsText"
-          type="textarea"
-          :rows="3"
-          maxlength="2500"
-          show-word-limit
-          placeholder="https://...&#10;https://..."
-        />
+      <el-form-item label="Ảnh đánh giá">
+        <el-upload
+          v-model:file-list="reviewUploadFiles"
+          list-type="picture-card"
+          :auto-upload="false"
+          :multiple="true"
+          :limit="5"
+          accept="image/*"
+          :before-upload="beforeReviewUpload"
+          :on-exceed="handleReviewUploadExceed"
+        >
+          <el-icon><Plus /></el-icon>
+        </el-upload>
+        <p class="upload-note">Tối đa 5 ảnh, mỗi ảnh không quá 5MB.</p>
       </el-form-item>
     </el-form>
     <template #footer>
@@ -256,11 +261,12 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
-import { Refresh, Search } from "@element-plus/icons-vue";
+import { Plus, Refresh, Search } from "@element-plus/icons-vue";
 import { useOrderStore } from "@/modules/order/store/orderStore";
 import { orderApi } from "@/modules/order/api/orderApi";
 import { reviewApi } from "@/modules/product/api/reviewApi";
 import { returnApi } from "@/modules/returns/api/returnApi";
+import { uploadApi } from "@/modules/upload/api/uploadApi";
 
 const store = useOrderStore();
 
@@ -273,13 +279,13 @@ const returnDialogVisible = ref(false);
 const returnSubmitting = ref(false);
 const reviewDialogVisible = ref(false);
 const reviewSubmitting = ref(false);
+const reviewUploadFiles = ref([]);
 const reviewForm = ref({
   orderId: null,
   productId: null,
   productName: "",
   rating: 5,
-  comment: "",
-  imageUrlsText: ""
+  comment: ""
 });
 const returnForm = ref({
   orderId: null,
@@ -494,10 +500,37 @@ const openReviewDialog = (order, item) => {
     productId: item?.productId || null,
     productName: item?.productName || "Sản phẩm",
     rating: 5,
-    comment: "",
-    imageUrlsText: ""
+    comment: ""
   };
+  reviewUploadFiles.value = [];
   reviewDialogVisible.value = true;
+};
+
+const beforeReviewUpload = (rawFile) => {
+  const isImage = String(rawFile?.type || "").startsWith("image/");
+  if (!isImage) {
+    ElMessage.warning("Chỉ hỗ trợ file ảnh");
+    return false;
+  }
+  const maxSize = 5 * 1024 * 1024;
+  if (Number(rawFile?.size || 0) > maxSize) {
+    ElMessage.warning("Mỗi ảnh tối đa 5MB");
+    return false;
+  }
+  return true;
+};
+
+const handleReviewUploadExceed = () => {
+  ElMessage.warning("Bạn chỉ có thể chọn tối đa 5 ảnh");
+};
+
+const uploadReviewImages = async () => {
+  const rawFiles = (Array.isArray(reviewUploadFiles.value) ? reviewUploadFiles.value : [])
+    .map((item) => item?.raw)
+    .filter(Boolean)
+    .slice(0, 5);
+  if (!rawFiles.length) return [];
+  return uploadApi.uploadReviewFiles(rawFiles);
 };
 
 const submitReview = async () => {
@@ -506,11 +539,7 @@ const submitReview = async () => {
     productId: Number(reviewForm.value.productId || 0),
     rating: Number(reviewForm.value.rating || 5),
     comment: String(reviewForm.value.comment || "").trim(),
-    imageUrls: String(reviewForm.value.imageUrlsText || "")
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .slice(0, 5)
+    imageUrls: []
   };
   if (!payload.orderId || !payload.productId) {
     ElMessage.warning("Thiếu dữ liệu đánh giá");
@@ -518,9 +547,11 @@ const submitReview = async () => {
   }
   reviewSubmitting.value = true;
   try {
+    payload.imageUrls = await uploadReviewImages();
     await reviewApi.create(payload);
     ElMessage.success("Gửi đánh giá thành công");
     reviewDialogVisible.value = false;
+    reviewUploadFiles.value = [];
   } catch (error) {
     ElMessage.error(error?.response?.data?.message || "Không thể gửi đánh giá");
   } finally {
@@ -901,6 +932,12 @@ onMounted(async () => {
   border: 1px solid #e2e8f0;
   border-radius: 0;
   background: #f8fafc;
+}
+
+.upload-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #64748b;
 }
 
 .return-item-row {

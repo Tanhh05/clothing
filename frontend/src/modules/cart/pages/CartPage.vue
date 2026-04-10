@@ -219,14 +219,12 @@ const calculateDiscount = (voucher, subTotal) => {
 const appliedVoucherDiscount = computed(() => {
   const subTotal = Number(cartStore.totalPrice || 0);
   if (subTotal <= 0) return 0;
+  if (!selectedVoucherCode.value) return 0;
   if (selectedVoucherCode.value && bestVoucher.value?.code === selectedVoucherCode.value) {
     return Number(bestVoucher.value?.discountAmount || 0);
   }
   if (selectedVoucher.value) {
     return calculateDiscount(selectedVoucher.value, subTotal);
-  }
-  if (bestVoucher.value?.code) {
-    return Number(bestVoucher.value?.discountAmount || 0);
   }
   return 0;
 });

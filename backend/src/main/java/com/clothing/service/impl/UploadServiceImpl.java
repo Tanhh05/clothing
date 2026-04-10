@@ -78,6 +78,15 @@ public class UploadServiceImpl implements UploadService {
 
     @Override
     public List<String> uploadProductFiles(List<MultipartFile> files) {
+        return uploadFiles(files, "products");
+    }
+
+    @Override
+    public List<String> uploadReviewFiles(List<MultipartFile> files) {
+        return uploadFiles(files, "reviews");
+    }
+
+    private List<String> uploadFiles(List<MultipartFile> files, String folder) {
         if (files == null || files.isEmpty()) {
             throw new BusinessException("At least one file is required", HttpStatus.BAD_REQUEST);
         }
@@ -89,7 +98,7 @@ public class UploadServiceImpl implements UploadService {
             }
 
             validateFile(file);
-            String objectKey = buildObjectKey("products", extractExtension(file.getOriginalFilename()));
+            String objectKey = buildObjectKey(folder, extractExtension(file.getOriginalFilename()));
             String contentType = normalizeContentType(file.getContentType());
 
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()

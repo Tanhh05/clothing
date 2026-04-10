@@ -11,4 +11,6 @@ public interface UploadService {
     UploadPresignResponse createPresignedUploadUrl(UploadPresignRequest request);
 
     List<String> uploadProductFiles(List<MultipartFile> files);
+
+    List<String> uploadReviewFiles(List<MultipartFile> files);
 }

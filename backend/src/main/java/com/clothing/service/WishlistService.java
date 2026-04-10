@@ -16,4 +16,6 @@ public interface WishlistService {
     void upsertPriceAlert(String username, Long productId, Long targetPrice);
 
     List<WishlistDealResponse> getDeals(String username);
+
+    void notifyPriceDrop(Long productId, Long oldMinPrice, Long newMinPrice);
 }

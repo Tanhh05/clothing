@@ -90,8 +90,19 @@
               THÊM VÀO GIỎ HÀNG <el-icon class="el-icon--right"><ShoppingBag /></el-icon>
             </el-button>
             <el-button class="buy-now-btn" :disabled="!canAddToCart" @click="handleBuyNow">MUA NGAY</el-button>
-            <button type="button" class="wishlist-btn" @click="handleToggleWishlist">
-              <el-icon><StarFilled v-if="isWishlisted" /><Star v-else /></el-icon>
+            <button
+              type="button"
+              class="wishlist-btn"
+              :class="{ active: isWishlisted }"
+              @click="handleToggleWishlist"
+              aria-label="Thêm vào yêu thích"
+            >
+              <svg v-if="!isWishlisted" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+              <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
             </button>
           </div>
           <div v-if="selectedColor && selectedSize && !canAddToCart" class="stock-alert-action">
@@ -209,7 +220,7 @@ import { ref, onMounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { productApi } from '../../api/productApi';
 import { reviewApi } from '../../api/reviewApi';
-import { ShoppingBag, Star, StarFilled, InfoFilled, Right } from '@element-plus/icons-vue';
+import { ShoppingBag, InfoFilled, Right } from '@element-plus/icons-vue';
 import { useCartStore } from '@/store/cartStore';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { ElMessage } from 'element-plus';
@@ -689,9 +700,19 @@ watch(selectedColor, () => {
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      font-size: 20px;
+      color: #111;
+      transition: color 0.2s, transform 0.2s;
       
-      &:hover { border-color: #000; }
+      &:hover {
+        border-color: #000;
+        color: #d33;
+        transform: scale(1.03);
+      }
+
+      &.active {
+        color: #d33;
+        border-color: #000;
+      }
     }
 
     .buy-now-btn {

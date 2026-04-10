@@ -3,7 +3,7 @@
     <div class="container">
       <div class="header">
         <h1>SẢN PHẨM YÊU THÍCH</h1>
-        <p v-if="!loading">{{ products.length }} sản phẩm</p>
+        <p v-if="!loading">{{ products.length }} sản phẩm • Tự động cảnh báo khi giảm giá</p>
       </div>
 
       <div v-if="loading" class="loading-state">ĐANG TẢI...</div>
@@ -25,22 +25,41 @@
       </div>
 
       <div v-if="products.length" class="price-alerts">
-        <h3>Thiết lập cảnh báo giá</h3>
+        <h3>Wishlist thông minh: cảnh báo giảm giá</h3>
         <div class="alert-list">
           <div v-for="product in products" :key="`alert-${product.id}`" class="alert-item">
-            <span>{{ product.name }}</span>
-            <el-input-number v-model="priceAlertTargets[product.id]" :min="0" :step="10000" />
-            <el-button @click="savePriceAlert(product.id)">Lưu</el-button>
+            <div class="alert-meta">
+              <strong>{{ product.name }}</strong>
+              <p>Giá hiện tại: {{ formatCurrency(getCurrentMinPrice(product)) }}</p>
+            </div>
+            <el-input-number
+              v-model="priceAlertTargets[product.id]"
+              :min="0"
+              :step="10000"
+              :controls="false"
+              placeholder="Nhập giá mục tiêu"
+            />
+            <el-button @click="applySmartTarget(product)">Đề xuất</el-button>
+            <el-button type="primary" @click="savePriceAlert(product.id)">Lưu</el-button>
           </div>
         </div>
       </div>
 
       <div v-if="wishlistDeals.length" class="deal-box">
-        <h3>Deal theo wishlist</h3>
-        <p v-for="deal in wishlistDeals" :key="`deal-${deal.productId}`">
-          {{ deal.productName }} đang giảm còn {{ formatCurrency(deal.currentMinPrice) }}
-          (mục tiêu {{ formatCurrency(deal.targetPrice) }})
-        </p>
+        <h3>Deal đang giảm theo wishlist của bạn</h3>
+        <article v-for="deal in wishlistDeals" :key="`deal-${deal.productId}`" class="deal-item">
+          <div>
+            <strong>{{ deal.productName }}</strong>
+            <p>
+              Đã giảm còn {{ formatCurrency(deal.currentMinPrice) }}
+              • mục tiêu {{ formatCurrency(deal.targetPrice) }}
+              • thấp hơn {{ formatCurrency(deal.diff) }}
+            </p>
+          </div>
+          <router-link :to="`/products/${deal.productSlug || deal.productId}`">
+            <el-button type="primary" plain>Xem ngay</el-button>
+          </router-link>
+        </article>
       </div>
     </div>
   </div>
@@ -61,6 +80,31 @@ const priceAlertTargets = ref({});
 const wishlistDeals = ref([]);
 
 const formatCurrency = (value) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(Number(value) || 0);
+const getCurrentMinPrice = (product) => {
+  if (!product?.variants?.length) return 0;
+  return product.variants
+    .map((item) => Number(item?.price || 0))
+    .filter((price) => Number.isFinite(price) && price >= 0)
+    .reduce((min, price) => (price < min ? price : min), Number.MAX_SAFE_INTEGER) || 0;
+};
+const suggestTarget = (product) => {
+  const minPrice = getCurrentMinPrice(product);
+  if (minPrice <= 0) return 0;
+  const suggested = Math.floor((minPrice * 0.9) / 10000) * 10000;
+  return Math.max(0, suggested);
+};
+const hydrateTargets = () => {
+  const nextTargets = { ...priceAlertTargets.value };
+  products.value.forEach((product) => {
+    const stored = wishlistStore.getAlertTarget(product.id);
+    if (nextTargets[product.id] == null) {
+      nextTargets[product.id] = stored > 0 ? stored : suggestTarget(product);
+    } else if (stored > 0) {
+      nextTargets[product.id] = stored;
+    }
+  });
+  priceAlertTargets.value = nextTargets;
+};
 
 const loadWishlistProducts = async () => {
   loading.value = true;
@@ -77,11 +121,7 @@ const loadWishlistProducts = async () => {
     products.value = ids
       .map((id) => mapped.find((p) => p.id === id))
       .filter(Boolean);
-    products.value.forEach((product) => {
-      if (priceAlertTargets.value[product.id] == null) {
-        priceAlertTargets.value[product.id] = 0;
-      }
-    });
+    hydrateTargets();
     await loadDeals();
   } catch (error) {
     console.error("Failed to load wishlist products:", error);
@@ -93,12 +133,19 @@ const loadWishlistProducts = async () => {
 
 const savePriceAlert = async (productId) => {
   try {
-    await wishlistApi.upsertPriceAlert(productId, Number(priceAlertTargets.value[productId] || 0));
+    const targetPrice = Math.max(0, Number(priceAlertTargets.value[productId] || 0));
+    await wishlistStore.upsertPriceAlert(productId, targetPrice);
+    priceAlertTargets.value[productId] = targetPrice;
     ElMessage.success("Đã lưu cảnh báo giá");
     await loadDeals();
   } catch (error) {
     ElMessage.error(error?.response?.data?.message || "Không thể lưu cảnh báo giá");
   }
+};
+
+const applySmartTarget = (product) => {
+  const nextTarget = suggestTarget(product);
+  priceAlertTargets.value[product.id] = nextTarget;
 };
 
 const loadDeals = async () => {
@@ -213,9 +260,42 @@ onMounted(() => {
 
 .alert-item {
   display: grid;
-  grid-template-columns: 1fr 180px auto;
+  grid-template-columns: minmax(220px, 1fr) 180px auto auto;
   gap: 8px;
   align-items: center;
+}
+
+.alert-meta {
+  strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+
+  p {
+    margin: 0;
+    color: #64748b;
+    font-size: 13px;
+  }
+}
+
+.deal-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px dashed #e5e7eb;
+
+  &:first-of-type {
+    border-top: none;
+    padding-top: 0;
+  }
+
+  p {
+    margin: 4px 0 0;
+    color: #374151;
+  }
 }
 
 @media (max-width: 768px) {
@@ -238,6 +318,15 @@ onMounted(() => {
 
   .empty-state {
     padding: 52px 12px;
+  }
+
+  .alert-item {
+    grid-template-columns: 1fr;
+  }
+
+  .deal-item {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

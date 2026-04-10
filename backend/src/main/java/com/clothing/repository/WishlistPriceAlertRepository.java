@@ -11,4 +11,8 @@ public interface WishlistPriceAlertRepository extends JpaRepository<WishlistPric
     Optional<WishlistPriceAlertEntity> findByUserIdAndProductId(Long userId, Long productId);
 
     List<WishlistPriceAlertEntity> findByUserIdOrderByIdDesc(Long userId);
+
+    List<WishlistPriceAlertEntity> findByProductIdAndUserIdInOrderByIdDesc(Long productId, List<Long> userIds);
+
+    void deleteByUserIdAndProductId(Long userId, Long productId);
 }

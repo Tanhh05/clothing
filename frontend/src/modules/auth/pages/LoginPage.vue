@@ -1,28 +1,45 @@
 <template>
-  <section>
-    <h1>Login</h1>
-    <form class="stack" @submit.prevent="onSubmit">
-      <BaseInput v-model="form.usernameOrEmail" type="text" />
-      <BaseInput v-model="form.password" type="password" />
-      <BaseButton type="submit">Login</BaseButton>
-    </form>
-    <div class="or-divider">OR</div>
-    <div ref="googleButtonRef"></div>
-    <RouterLink to="/auth/register">Create account</RouterLink>
+  <section class="login-page">
+    <el-card shadow="never" class="login-card">
+      <div class="head">
+        <h1>Đăng nhập</h1>
+        <p>Đăng nhập để tiếp tục mua sắm và theo dõi đơn hàng.</p>
+      </div>
+
+      <el-form label-position="top" @submit.prevent="onSubmit">
+        <el-form-item label="Tên đăng nhập hoặc Email">
+          <el-input v-model="form.usernameOrEmail" placeholder="Nhập tên đăng nhập hoặc email" clearable />
+        </el-form-item>
+        <el-form-item label="Mật khẩu">
+          <el-input v-model="form.password" type="password" show-password placeholder="Nhập mật khẩu" />
+        </el-form-item>
+        <el-button type="primary" class="submit-btn" :loading="submitting" @click="onSubmit">Đăng nhập</el-button>
+      </el-form>
+
+      <el-divider>HOẶC</el-divider>
+      <div class="google-wrap">
+        <div ref="googleButtonRef"></div>
+      </div>
+
+      <p class="register-link">
+        Chưa có tài khoản?
+        <RouterLink to="/auth/register">Tạo tài khoản</RouterLink>
+      </p>
+    </el-card>
   </section>
 </template>
 
 <script setup>
 import { onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
-import BaseButton from "@/components/base/BaseButton.vue";
-import BaseInput from "@/components/base/BaseInput.vue";
+import { ElMessage } from "element-plus";
 import { useAuthStore } from "@/store/authStore";
 
 const router = useRouter();
 const authStore = useAuthStore();
 const googleButtonRef = ref(null);
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const submitting = ref(false);
 
 const form = reactive({
   usernameOrEmail: "",
@@ -30,16 +47,35 @@ const form = reactive({
 });
 
 async function onSubmit() {
-  await authStore.login(form);
-  router.push("/products");
+  if (!String(form.usernameOrEmail || "").trim()) {
+    ElMessage.warning("Vui lòng nhập tên đăng nhập hoặc email");
+    return;
+  }
+  if (!String(form.password || "").trim()) {
+    ElMessage.warning("Vui lòng nhập mật khẩu");
+    return;
+  }
+  submitting.value = true;
+  try {
+    await authStore.login(form);
+    router.push("/products");
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || "Đăng nhập thất bại");
+  } finally {
+    submitting.value = false;
+  }
 }
 
 async function handleGoogleCredential(response) {
   if (!response?.credential) {
     return;
   }
-  await authStore.loginWithGoogle(response.credential);
-  router.push("/products");
+  try {
+    await authStore.loginWithGoogle(response.credential);
+    router.push("/products");
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || "Đăng nhập Google thất bại");
+  }
 }
 
 onMounted(() => {
@@ -89,3 +125,65 @@ function loadGoogleScript() {
   });
 }
 </script>
+
+<style scoped lang="scss">
+.login-page {
+  min-height: calc(100vh - 140px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 12px 40px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 460px;
+  border-radius: 0;
+
+  :deep(.el-card__body) {
+    padding: 22px;
+  }
+}
+
+.head {
+  margin-bottom: 8px;
+
+  h1 {
+    margin: 0 0 6px;
+    font-size: 30px;
+    font-weight: 900;
+    letter-spacing: -0.4px;
+  }
+
+  p {
+    margin: 0;
+    color: #64748b;
+    font-size: 14px;
+  }
+}
+
+.submit-btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.google-wrap {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.register-link {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: 14px;
+  color: #475569;
+
+  a {
+    margin-left: 4px;
+    color: #111827;
+    font-weight: 700;
+    text-decoration: none;
+  }
+}
+</style>

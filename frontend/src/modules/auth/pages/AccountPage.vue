@@ -1,16 +1,26 @@
 <template>
   <section class="account-page">
-    <el-card shadow="never" class="header-card">
-      <h1>Thông tin cá nhân</h1>
-      <p>Quản lý hồ sơ và địa chỉ giao hàng trên cùng một trang.</p>
+    <el-card shadow="never" class="hero-card">
+      <div class="hero-content">
+        <div>
+          <p class="hero-eyebrow">TRANG TÀI KHOẢN</p>
+          <h1>Thông tin cá nhân</h1>
+          <p class="hero-sub">Quản lý hồ sơ, địa chỉ giao hàng và thông tin nhận hàng tại một nơi.</p>
+        </div>
+        <div class="hero-badges">
+          <el-tag type="info" effect="plain">Tài khoản: {{ authStore.profile?.username || authStore.username || "N/A" }}</el-tag>
+          <el-tag type="success" effect="plain">Địa chỉ: {{ addresses.length }}</el-tag>
+        </div>
+      </div>
     </el-card>
 
     <el-row :gutter="16">
       <el-col :xs="24" :lg="14">
-        <el-card shadow="hover">
+        <el-card shadow="never" class="surface-card">
           <template #header>
             <div class="card-head">
               <span>Hồ sơ tài khoản</span>
+              <el-tag size="small" type="primary" effect="plain">Cập nhật nhanh</el-tag>
             </div>
           </template>
           <el-form label-position="top" class="profile-form">
@@ -38,24 +48,25 @@
       </el-col>
 
       <el-col :xs="24" :lg="10">
-        <el-card shadow="hover" class="summary-card">
+        <el-card shadow="never" class="summary-card surface-card">
           <template #header>
             <div class="card-head">
               <span>Tổng quan địa chỉ</span>
             </div>
           </template>
           <div class="summary-number">{{ addresses.length }}</div>
-          <p class="summary-text">Địa chỉ đã lưu</p>
+          <p class="summary-text">Địa chỉ đã lưu trong tài khoản</p>
           <el-tag v-if="defaultAddress" type="success" effect="plain">Mặc định: {{ defaultAddress.recipientName }}</el-tag>
           <el-button type="primary" class="summary-btn" @click="openCreate">Thêm địa chỉ mới</el-button>
         </el-card>
       </el-col>
     </el-row>
 
-    <el-card shadow="hover" class="address-panel">
+    <el-card shadow="never" class="address-panel surface-card">
       <template #header>
         <div class="card-head">
           <span>Danh sách địa chỉ giao hàng</span>
+          <el-button type="primary" link @click="openCreate">+ Thêm địa chỉ</el-button>
         </div>
       </template>
 
@@ -387,25 +398,75 @@ onMounted(async () => {
   max-width: 1080px;
   margin: 0 auto;
   padding: 24px 16px 48px;
+  background:
+    radial-gradient(circle at top right, rgba(64, 158, 255, 0.08), transparent 40%),
+    radial-gradient(circle at 10% 40%, rgba(103, 194, 58, 0.07), transparent 28%);
+  border-radius: 0;
 }
 
-.header-card {
+.hero-card {
   margin-bottom: 16px;
+}
+
+.hero-content {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
 
   h1 {
     margin: 0 0 6px;
-    font-size: 28px;
-    font-weight: 700;
-  }
-
-  p {
-    margin: 0;
-    color: var(--el-text-color-secondary);
+    font-size: 30px;
+    font-weight: 900;
+    letter-spacing: -0.5px;
   }
 }
 
+.hero-eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: #64748b;
+}
+
+.hero-sub {
+  margin: 0;
+  color: var(--el-text-color-secondary);
+}
+
+.hero-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.surface-card {
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.surface-card :deep(.el-card__header) {
+  border-bottom: none;
+  padding-bottom: 6px;
+}
+
+.surface-card :deep(.el-card__body) {
+  padding-top: 12px;
+}
+
+.account-page :deep(.el-card) {
+  border: none;
+  box-shadow: none !important;
+}
+
 .card-head {
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
 }
 
 .summary-card {
@@ -440,13 +501,16 @@ onMounted(async () => {
 }
 
 .address-card {
-  border: 1px solid var(--el-border-color);
-  border-radius: 10px;
-  padding: 12px;
+  border: none;
+  border-radius: 0;
+  padding: 14px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 10px;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  box-shadow: none;
+  border-left: 3px solid #0f172a;
 }
 
 .name-line {
@@ -472,7 +536,45 @@ onMounted(async () => {
   width: 100%;
 }
 
+.account-page :deep(.el-input__wrapper),
+.account-page :deep(.el-textarea__inner),
+.account-page :deep(.el-select__wrapper) {
+  box-shadow: none;
+  border: none;
+  background: #f5f7fb;
+}
+
+.account-page :deep(.el-input__wrapper.is-focus),
+.account-page :deep(.el-select__wrapper.is-focused) {
+  box-shadow: 0 0 0 1px rgba(64, 158, 255, 0.38);
+}
+
+.account-page :deep(.el-card),
+.account-page :deep(.el-card__header),
+.account-page :deep(.el-card__body),
+.account-page :deep(.el-card__footer),
+.account-page :deep(.el-input__wrapper),
+.account-page :deep(.el-select__wrapper),
+.account-page :deep(.el-textarea__inner),
+.account-page :deep(.el-button),
+.account-page :deep(.el-tag),
+.account-page :deep(.el-dialog),
+.account-page :deep(.el-dialog__header),
+.account-page :deep(.el-dialog__body),
+.account-page :deep(.el-dialog__footer) {
+  border-radius: 0 !important;
+}
+
 @media (max-width: 768px) {
+  .hero-content {
+    flex-direction: column;
+  }
+
+  .hero-badges {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
   .address-card {
     flex-direction: column;
   }

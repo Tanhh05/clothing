@@ -34,6 +34,7 @@ import com.clothing.service.ProductService;
 import com.clothing.service.ProductSearchService;
 import com.clothing.service.AuditLogService;
 import com.clothing.service.InventoryMovementService;
+import com.clothing.service.WishlistService;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
@@ -104,6 +105,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductSearchService productSearchService;
     private final AuditLogService auditLogService;
     private final InventoryMovementService inventoryMovementService;
+    private final WishlistService wishlistService;
 
     public ProductServiceImpl(
             ProductRepository productRepository,
@@ -117,7 +119,8 @@ public class ProductServiceImpl implements ProductService {
             VariantAttributeValueRepository variantAttributeValueRepository,
             ProductSearchService productSearchService,
             AuditLogService auditLogService,
-            InventoryMovementService inventoryMovementService
+            InventoryMovementService inventoryMovementService,
+            WishlistService wishlistService
     ) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
@@ -131,6 +134,7 @@ public class ProductServiceImpl implements ProductService {
         this.productSearchService = productSearchService;
         this.auditLogService = auditLogService;
         this.inventoryMovementService = inventoryMovementService;
+        this.wishlistService = wishlistService;
     }
 
     @Override
@@ -180,6 +184,7 @@ public class ProductServiceImpl implements ProductService {
         CategoryEntity category = getCategory(request.getCategoryId());
         String slug = resolveSlug(request.getSlug(), request.getName(), id);
         validateVariantSkus(request.getVariants(), id);
+        Long oldMinPrice = findCurrentMinPrice(id);
 
         product.setName(request.getName().trim());
         product.setSlug(slug);
@@ -194,6 +199,8 @@ public class ProductServiceImpl implements ProductService {
 
         saveImages(id, request.getImages());
         upsertVariants(id, request.getVariants());
+        Long newMinPrice = findCurrentMinPrice(id);
+        wishlistService.notifyPriceDrop(id, oldMinPrice, newMinPrice);
         productSearchService.indexProduct(id);
         auditLogService.log(
                 "PRODUCT_UPDATED",
@@ -1041,6 +1048,14 @@ public class ProductServiceImpl implements ProductService {
             existing.setStatus("INACTIVE");
             productVariantRepository.save(existing);
         }
+    }
+
+    private Long findCurrentMinPrice(Long productId) {
+        return productVariantRepository.findByProductIdOrderByIdAsc(productId).stream()
+                .map(ProductVariantEntity::getPrice)
+                .filter(price -> price != null && price >= 0L)
+                .min(Long::compareTo)
+                .orElse(0L);
     }
 
     private ProductVariantEntity resolveVariantForUpsert(

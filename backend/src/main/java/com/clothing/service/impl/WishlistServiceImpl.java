@@ -2,12 +2,14 @@ package com.clothing.service.impl;
 
 import com.clothing.dto.response.WishlistResponse;
 import com.clothing.dto.response.WishlistDealResponse;
+import com.clothing.entity.NotificationEntity;
 import com.clothing.entity.ProductEntity;
 import com.clothing.entity.UserEntity;
 import com.clothing.entity.WishlistEntity;
 import com.clothing.entity.WishlistItemEntity;
 import com.clothing.entity.WishlistPriceAlertEntity;
 import com.clothing.exception.BusinessException;
+import com.clothing.repository.NotificationRepository;
 import com.clothing.repository.ProductRepository;
 import com.clothing.repository.ProductVariantRepository;
 import com.clothing.repository.UserRepository;
@@ -19,8 +21,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 public class WishlistServiceImpl implements WishlistService {
@@ -31,6 +37,7 @@ public class WishlistServiceImpl implements WishlistService {
     private final WishlistRepository wishlistRepository;
     private final WishlistItemRepository wishlistItemRepository;
     private final WishlistPriceAlertRepository wishlistPriceAlertRepository;
+    private final NotificationRepository notificationRepository;
 
     public WishlistServiceImpl(
             UserRepository userRepository,
@@ -38,7 +45,8 @@ public class WishlistServiceImpl implements WishlistService {
             ProductVariantRepository productVariantRepository,
             WishlistRepository wishlistRepository,
             WishlistItemRepository wishlistItemRepository,
-            WishlistPriceAlertRepository wishlistPriceAlertRepository
+            WishlistPriceAlertRepository wishlistPriceAlertRepository,
+            NotificationRepository notificationRepository
     ) {
         this.userRepository = userRepository;
         this.productRepository = productRepository;
@@ -46,6 +54,7 @@ public class WishlistServiceImpl implements WishlistService {
         this.wishlistRepository = wishlistRepository;
         this.wishlistItemRepository = wishlistItemRepository;
         this.wishlistPriceAlertRepository = wishlistPriceAlertRepository;
+        this.notificationRepository = notificationRepository;
     }
 
     @Override
@@ -80,7 +89,10 @@ public class WishlistServiceImpl implements WishlistService {
         WishlistEntity wishlist = getOrCreateWishlist(user.getId());
 
         wishlistItemRepository.findByWishlistIdAndProductId(wishlist.getId(), productId)
-                .ifPresent(wishlistItemRepository::delete);
+                .ifPresent(item -> {
+                    wishlistItemRepository.delete(item);
+                    wishlistPriceAlertRepository.deleteByUserIdAndProductId(user.getId(), productId);
+                });
 
         return buildResponse(wishlist, user.getId());
     }
@@ -89,7 +101,12 @@ public class WishlistServiceImpl implements WishlistService {
     @Transactional
     public void upsertPriceAlert(String username, Long productId, Long targetPrice) {
         UserEntity user = getUser(username);
+        WishlistEntity wishlist = getOrCreateWishlist(user.getId());
         ensureProductExists(productId);
+        boolean wished = wishlistItemRepository.findByWishlistIdAndProductId(wishlist.getId(), productId).isPresent();
+        if (!wished) {
+            throw new BusinessException("Product is not in wishlist", HttpStatus.BAD_REQUEST);
+        }
         long normalizedTarget = targetPrice == null ? 0L : Math.max(0L, targetPrice);
         WishlistPriceAlertEntity entity = wishlistPriceAlertRepository.findByUserIdAndProductId(user.getId(), productId)
                 .orElseGet(() -> {
@@ -101,6 +118,53 @@ public class WishlistServiceImpl implements WishlistService {
                 });
         entity.setTargetPrice(normalizedTarget);
         wishlistPriceAlertRepository.save(entity);
+    }
+
+    @Override
+    @Transactional
+    public void notifyPriceDrop(Long productId, Long oldMinPrice, Long newMinPrice) {
+        if (productId == null) return;
+        long oldPrice = oldMinPrice == null ? 0L : oldMinPrice;
+        long newPrice = newMinPrice == null ? 0L : newMinPrice;
+        if (newPrice <= 0 || oldPrice <= newPrice) return;
+
+        ProductEntity product = productRepository.findById(productId).orElse(null);
+        if (product == null || Boolean.TRUE.equals(product.getDeleted())) return;
+
+        List<Long> userIds = wishlistRepository.findDistinctUserIdsByProductId(productId);
+        if (userIds.isEmpty()) return;
+
+        Map<Long, Long> alertTargetsByUser = new HashMap<>();
+        wishlistPriceAlertRepository.findByProductIdAndUserIdInOrderByIdDesc(productId, userIds)
+                .forEach(alert -> {
+                    if (!alertTargetsByUser.containsKey(alert.getUserId())) {
+                        alertTargetsByUser.put(alert.getUserId(), Math.max(0L, alert.getTargetPrice() == null ? 0L : alert.getTargetPrice()));
+                    }
+                });
+
+        LocalDateTime now = LocalDateTime.now();
+        List<NotificationEntity> notifications = userIds.stream()
+                .filter(userId -> shouldNotify(alertTargetsByUser.get(userId), oldPrice, newPrice))
+                .map(userId -> {
+                    Long target = alertTargetsByUser.getOrDefault(userId, 0L);
+                    NotificationEntity entity = new NotificationEntity();
+                    entity.setUserId(userId);
+                    entity.setTitle("Sản phẩm yêu thích vừa giảm giá");
+                    entity.setContent(buildPriceDropContent(product, oldPrice, newPrice, target));
+                    entity.setType("WISHLIST_PRICE_DROP");
+                    entity.setAudience("USER");
+                    entity.setChannel("IN_APP");
+                    entity.setStatus("SENT");
+                    entity.setScheduledAt(null);
+                    entity.setIsRead(false);
+                    entity.setCreatedAt(now);
+                    return entity;
+                })
+                .toList();
+
+        if (!notifications.isEmpty()) {
+            notificationRepository.saveAll(notifications);
+        }
     }
 
     @Override
@@ -134,12 +198,52 @@ public class WishlistServiceImpl implements WishlistService {
         List<Long> productIds = wishlistItemRepository.findByWishlistIdOrderByIdAsc(wishlist.getId()).stream()
                 .map(WishlistItemEntity::getProductId)
                 .toList();
+        Set<Long> productIdSet = new HashSet<>(productIds);
+        Map<Long, Long> priceAlertTargets = wishlistPriceAlertRepository.findByUserIdOrderByIdDesc(userId).stream()
+                .filter(item -> item.getProductId() != null && productIdSet.contains(item.getProductId()))
+                .collect(
+                        HashMap::new,
+                        (map, item) -> map.putIfAbsent(item.getProductId(), Math.max(0L, item.getTargetPrice() == null ? 0L : item.getTargetPrice())),
+                        HashMap::putAll
+                );
 
         return WishlistResponse.builder()
                 .wishlistId(wishlist.getId())
                 .userId(userId)
                 .productIds(productIds)
+                .priceAlertTargets(priceAlertTargets)
                 .build();
+    }
+
+    private boolean shouldNotify(Long targetPrice, long oldPrice, long newPrice) {
+        long target = targetPrice == null ? 0L : Math.max(0L, targetPrice);
+        if (target <= 0L) {
+            return true;
+        }
+        return oldPrice > target && newPrice <= target;
+    }
+
+    private String buildPriceDropContent(ProductEntity product, long oldPrice, long newPrice, Long targetPrice) {
+        String slugOrId = product.getSlug() == null || product.getSlug().isBlank()
+                ? String.valueOf(product.getId())
+                : product.getSlug();
+        StringBuilder builder = new StringBuilder();
+        builder.append("“")
+                .append(product.getName())
+                .append("” giảm từ ")
+                .append(formatPrice(oldPrice))
+                .append(" còn ")
+                .append(formatPrice(newPrice));
+        long target = targetPrice == null ? 0L : Math.max(0L, targetPrice);
+        if (target > 0L) {
+            builder.append(" (mục tiêu ").append(formatPrice(target)).append(")");
+        }
+        builder.append(". Xem ngay: /products/").append(slugOrId);
+        return builder.toString();
+    }
+
+    private String formatPrice(long price) {
+        return String.format("%,d ₫", Math.max(0L, price)).replace(',', '.');
     }
 
     private WishlistEntity getOrCreateWishlist(Long userId) {

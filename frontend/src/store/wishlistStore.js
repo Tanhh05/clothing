@@ -6,6 +6,7 @@ import { ElMessage } from "element-plus";
 export const useWishlistStore = defineStore("wishlistStore", {
   state: () => ({
     serverProductIds: [],
+    priceAlertTargets: {},
     loading: false,
     loadedServer: false,
     fetchPromise: null
@@ -16,9 +17,34 @@ export const useWishlistStore = defineStore("wishlistStore", {
     },
     productIdSet() {
       return new Set(this.productIds);
+    },
+    targetPriceByProduct(state) {
+      return state.priceAlertTargets || {};
     }
   },
   actions: {
+    applyWishlistPayload(data) {
+      this.serverProductIds = (data?.productIds || [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id));
+      const nextTargets = {};
+      Object.entries(data?.priceAlertTargets || {}).forEach(([productId, targetPrice]) => {
+        const normalizedProductId = Number(productId);
+        const normalizedTarget = Number(targetPrice || 0);
+        if (Number.isFinite(normalizedProductId) && Number.isFinite(normalizedTarget)) {
+          nextTargets[normalizedProductId] = Math.max(0, normalizedTarget);
+        }
+      });
+      this.priceAlertTargets = nextTargets;
+      this.loadedServer = true;
+    },
+
+    getAlertTarget(productId) {
+      const normalizedId = Number(productId);
+      if (!Number.isFinite(normalizedId)) return 0;
+      return Number(this.priceAlertTargets?.[normalizedId] || 0);
+    },
+
     isWishlisted(productId) {
       return this.productIdSet.has(Number(productId));
     },
@@ -42,10 +68,7 @@ export const useWishlistStore = defineStore("wishlistStore", {
         this.loading = true;
         try {
           const { data } = await wishlistApi.getWishlist();
-          this.serverProductIds = (data?.productIds || [])
-            .map((id) => Number(id))
-            .filter((id) => Number.isFinite(id));
-          this.loadedServer = true;
+          this.applyWishlistPayload(data);
         } finally {
           this.loading = false;
         }
@@ -80,10 +103,7 @@ export const useWishlistStore = defineStore("wishlistStore", {
 
       try {
         const { data } = await wishlistApi.addItem(normalizedId);
-        this.serverProductIds = (data?.productIds || [])
-          .map((id) => Number(id))
-          .filter((id) => Number.isFinite(id));
-        this.loadedServer = true;
+        this.applyWishlistPayload(data);
         if (!silent) ElMessage.success("Đã thêm vào yêu thích");
       } catch (error) {
         if (!silent) ElMessage.error("Không thể thêm sản phẩm yêu thích");
@@ -103,10 +123,7 @@ export const useWishlistStore = defineStore("wishlistStore", {
 
       try {
         const { data } = await wishlistApi.removeItem(normalizedId);
-        this.serverProductIds = (data?.productIds || [])
-          .map((id) => Number(id))
-          .filter((id) => Number.isFinite(id));
-        this.loadedServer = true;
+        this.applyWishlistPayload(data);
         if (!silent) ElMessage.info("Đã bỏ khỏi yêu thích");
       } catch (error) {
         if (!silent) ElMessage.error("Không thể bỏ yêu thích");
@@ -128,8 +145,20 @@ export const useWishlistStore = defineStore("wishlistStore", {
       await this.fetchWishlist(true);
     },
 
+    async upsertPriceAlert(productId, targetPrice) {
+      const normalizedId = Number(productId);
+      const normalizedTarget = Math.max(0, Number(targetPrice || 0));
+      if (!Number.isFinite(normalizedId)) return;
+      await wishlistApi.upsertPriceAlert(normalizedId, normalizedTarget);
+      this.priceAlertTargets = {
+        ...this.priceAlertTargets,
+        [normalizedId]: normalizedTarget
+      };
+    },
+
     resetServerState() {
       this.serverProductIds = [];
+      this.priceAlertTargets = {};
       this.loadedServer = false;
       this.fetchPromise = null;
       this.loading = false;

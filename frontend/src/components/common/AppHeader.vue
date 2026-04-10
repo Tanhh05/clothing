@@ -184,7 +184,9 @@
             </div>
           </el-popover>
 
-          <el-icon class="action-icon" @click="isAuthDrawerOpen = true"><User /></el-icon>
+          <button type="button" class="action-icon icon-btn" @click="goToAccount" aria-label="Tài khoản">
+            <el-icon><User /></el-icon>
+          </button>
           <el-badge :value="wishlistCount" :hidden="wishlistCount === 0" class="wishlist-badge">
             <button type="button" class="action-icon icon-btn" @click="goToWishlist" aria-label="Yêu thích">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
@@ -202,8 +204,6 @@
       </div>
     </el-menu>
 
-    <!-- Auth Drawer -->
-    <AuthDrawer v-model="isAuthDrawerOpen" />
   </header>
 </template>
 
@@ -216,11 +216,9 @@ import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { notificationClientApi } from '@/modules/notification/api/notificationClientApi';
-import AuthDrawer from '@/components/auth/AuthDrawer.vue';
 
 const router = useRouter();
 const isPromoOpen = ref(false);
-const isAuthDrawerOpen = ref(false);
 const searchQuery = ref('');
 const isSearchOverlayOpen = ref(false);
 const searchResults = ref({ products: [], suggestions: [] });
@@ -297,11 +295,15 @@ const goToSearch = () => {
 };
 
 const goToWishlist = () => {
-  if (!authStore.isAuthenticated) {
-    isAuthDrawerOpen.value = true;
+  router.push('/wishlist');
+};
+
+const goToAccount = () => {
+  if (authStore.isAuthenticated) {
+    router.push('/account');
     return;
   }
-  router.push('/wishlist');
+  router.push('/auth/login');
 };
 
 const categoriesByParent = computed(() => {
