@@ -27,6 +27,21 @@ public class OrderEntity {
     @Column(name = "total_price")
     private Long totalPrice;
 
+    @Column(name = "sub_total")
+    private Long subTotal;
+
+    @Column(name = "shipping_fee")
+    private Long shippingFee;
+
+    @Column(name = "discount_amount")
+    private Long discountAmount;
+
+    @Column(name = "coupon_id")
+    private Long couponId;
+
+    @Column(name = "coupon_code", length = 50)
+    private String couponCode;
+
     @Column(length = 50)
     private String status;
 

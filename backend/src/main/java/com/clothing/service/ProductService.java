@@ -42,6 +42,8 @@ public interface ProductService {
 
     List<InventoryLogResponse> getInventoryLogs(Long variantId);
 
+    List<ProductResponse> getRecommendations(List<Long> productIds, int limit);
+
     ProductImportResponse importFromXlsx(MultipartFile file, boolean dryRun, boolean upsertBySku);
 
     byte[] generateImportTemplateXlsx();

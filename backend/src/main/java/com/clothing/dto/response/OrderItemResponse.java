@@ -8,6 +8,7 @@ import lombok.Getter;
 public class OrderItemResponse {
 
     private Long id;
+    private Long productId;
     private Long variantId;
     private String sku;
     private String productName;

@@ -4,6 +4,12 @@ export const voucherApi = {
   getAdminVouchers() {
     return api.get("/admin/vouchers");
   },
+  getPublicVouchers() {
+    return api.get("/vouchers");
+  },
+  getBestVoucher(subTotal) {
+    return api.get("/vouchers/best", { params: { subTotal } });
+  },
   createVoucher(payload) {
     return api.post("/admin/vouchers", payload);
   },

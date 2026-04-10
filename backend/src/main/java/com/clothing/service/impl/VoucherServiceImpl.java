@@ -1,6 +1,7 @@
 package com.clothing.service.impl;
 
 import com.clothing.dto.request.VoucherUpsertRequest;
+import com.clothing.dto.response.VoucherBestResponse;
 import com.clothing.dto.response.VoucherResponse;
 import com.clothing.entity.CouponEntity;
 import com.clothing.exception.BusinessException;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -65,6 +67,56 @@ public class VoucherServiceImpl implements VoucherService {
         auditLogService.log("VOUCHER_DELETED", "COUPON", id, "Deleted voucher " + entity.getCode());
     }
 
+    @Override
+    public List<VoucherResponse> getPublicActive() {
+        LocalDateTime now = LocalDateTime.now();
+        return couponRepository.findAll().stream()
+                .filter(coupon -> "ACTIVE".equalsIgnoreCase(String.valueOf(coupon.getStatus())))
+                .filter(coupon -> coupon.getStartDate() == null || !coupon.getStartDate().isAfter(now))
+                .filter(coupon -> coupon.getEndDate() == null || !coupon.getEndDate().isBefore(now))
+                .sorted((a, b) -> Long.compare(b.getId(), a.getId()))
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
+    public VoucherBestResponse suggestBest(Long subTotal) {
+        long value = subTotal == null ? 0L : Math.max(0L, subTotal);
+        if (value <= 0) {
+            return VoucherBestResponse.builder()
+                    .code(null)
+                    .discountAmount(0L)
+                    .finalTotal(0L)
+                    .autoApplied(false)
+                    .build();
+        }
+        LocalDateTime now = LocalDateTime.now();
+        CouponEntity best = couponRepository.findAll().stream()
+                .filter(coupon -> "ACTIVE".equalsIgnoreCase(String.valueOf(coupon.getStatus())))
+                .filter(coupon -> coupon.getStartDate() == null || !coupon.getStartDate().isAfter(now))
+                .filter(coupon -> coupon.getEndDate() == null || !coupon.getEndDate().isBefore(now))
+                .filter(coupon -> coupon.getMinOrderValue() == null || value >= coupon.getMinOrderValue())
+                .filter(coupon -> coupon.getQuantity() == null || (coupon.getUsedCount() == null ? 0 : coupon.getUsedCount()) < coupon.getQuantity())
+                .max(Comparator.comparingLong(coupon -> calculateDiscount(coupon, value)))
+                .orElse(null);
+
+        if (best == null) {
+            return VoucherBestResponse.builder()
+                    .code(null)
+                    .discountAmount(0L)
+                    .finalTotal(value)
+                    .autoApplied(false)
+                    .build();
+        }
+        long discount = calculateDiscount(best, value);
+        return VoucherBestResponse.builder()
+                .code(best.getCode())
+                .discountAmount(discount)
+                .finalTotal(Math.max(0L, value - discount))
+                .autoApplied(true)
+                .build();
+    }
+
     private void apply(CouponEntity entity, VoucherUpsertRequest request) {
         entity.setCode(request.getCode().trim().toUpperCase(Locale.ROOT));
         entity.setDiscountType(request.getDiscountType().trim().toUpperCase(Locale.ROOT));
@@ -104,5 +156,17 @@ public class VoucherServiceImpl implements VoucherService {
                 .status(entity.getStatus())
                 .createdAt(entity.getCreatedAt())
                 .build();
+    }
+
+    private long calculateDiscount(CouponEntity coupon, long subTotal) {
+        String type = String.valueOf(coupon.getDiscountType()).trim().toUpperCase(Locale.ROOT);
+        long value = coupon.getDiscountValue() == null ? 0L : coupon.getDiscountValue();
+        if (value <= 0) return 0L;
+        long discount = "PERCENT".equals(type)
+                ? Math.round(subTotal * (value / 100.0d))
+                : ("AMOUNT".equals(type) ? value : 0L);
+        long max = coupon.getMaxDiscountValue() == null ? Long.MAX_VALUE : Math.max(0L, coupon.getMaxDiscountValue());
+        discount = Math.min(discount, max);
+        return Math.max(0L, Math.min(discount, subTotal));
     }
 }

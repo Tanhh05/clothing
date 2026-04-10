@@ -7,6 +7,9 @@ export const orderApi = {
   getMyOrders() {
     return api.get("/orders/my");
   },
+  reorder(orderId) {
+    return api.post(`/orders/my/${orderId}/reorder`);
+  },
   getAllOrders() {
     return api.get("/orders");
   },

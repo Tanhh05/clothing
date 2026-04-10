@@ -7,6 +7,7 @@ export const useCartStore = defineStore('cartStore', {
   state: () => ({
     cartData: null,
     localItems: JSON.parse(localStorage.getItem('cart_local_items') || '[]'),
+    preferredVoucherCode: localStorage.getItem('cart_preferred_voucher_code') || '',
     loading: false
   }),
   getters: {
@@ -36,6 +37,7 @@ export const useCartStore = defineStore('cartStore', {
       try {
         const response = await cartApi.getCart();
         this.cartData = response.data;
+        if ((this.cartData?.items || []).length === 0) this.clearPreferredVoucherCode();
         console.log('Cart fetched from server:', this.cartData);
       } catch (error) {
         console.error('Failed to fetch cart:', error);
@@ -96,6 +98,7 @@ export const useCartStore = defineStore('cartStore', {
         try {
           const response = await cartApi.updateItem(itemId, quantity);
           this.cartData = response.data;
+          if ((this.cartData?.items || []).length === 0) this.clearPreferredVoucherCode();
         } catch (error) {
           ElMessage.error('Không thể cập nhật số lượng trên máy chủ');
         }
@@ -117,12 +120,14 @@ export const useCartStore = defineStore('cartStore', {
         try {
           const response = await cartApi.removeItem(itemId);
           this.cartData = response.data;
+          if ((this.cartData?.items || []).length === 0) this.clearPreferredVoucherCode();
         } catch (error) {
           ElMessage.error('Không thể xóa trên máy chủ');
         }
       } else {
         this.localItems = this.localItems.filter(i => i.id !== itemId);
         this.saveLocal();
+        if (this.localItems.length === 0) this.clearPreferredVoucherCode();
       }
     },
 
@@ -169,6 +174,22 @@ export const useCartStore = defineStore('cartStore', {
       this.localItems = [];
       this.cartData = null;
       localStorage.removeItem('cart_local_items');
+      this.clearPreferredVoucherCode();
+    },
+
+    setPreferredVoucherCode(code) {
+      const normalized = String(code || '').trim().toUpperCase();
+      this.preferredVoucherCode = normalized;
+      if (normalized) {
+        localStorage.setItem('cart_preferred_voucher_code', normalized);
+      } else {
+        localStorage.removeItem('cart_preferred_voucher_code');
+      }
+    },
+
+    clearPreferredVoucherCode() {
+      this.preferredVoucherCode = '';
+      localStorage.removeItem('cart_preferred_voucher_code');
     }
   }
 });

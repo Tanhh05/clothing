@@ -70,6 +70,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.LinkedHashSet;
 
 @Service
 public class ProductServiceImpl implements ProductService {
@@ -311,6 +312,44 @@ public class ProductServiceImpl implements ProductService {
                 .first(productPage.isFirst())
                 .last(productPage.isLast())
                 .build();
+    }
+
+    @Override
+    public List<ProductResponse> getRecommendations(List<Long> productIds, int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 20));
+        List<Long> baseIds = productIds == null ? List.of() : productIds.stream().filter(id -> id != null && id > 0).toList();
+        if (baseIds.isEmpty()) {
+            return productRepository.findAllByOrderByIdDesc().stream()
+                    .filter(product -> !Boolean.TRUE.equals(product.getDeleted()))
+                    .filter(product -> "ACTIVE".equalsIgnoreCase(String.valueOf(product.getStatus())))
+                    .limit(safeLimit)
+                    .map(product -> toResponse(product, false))
+                    .toList();
+        }
+
+        Set<Long> categoryIds = new LinkedHashSet<>();
+        for (Long productId : baseIds) {
+            ProductEntity product = productRepository.findById(productId).orElse(null);
+            if (product != null && product.getCategoryId() != null) {
+                categoryIds.add(product.getCategoryId());
+            }
+        }
+        Set<Long> excluded = new HashSet<>(baseIds);
+
+        List<ProductEntity> pool = productRepository.findAllByOrderByIdDesc();
+        return pool.stream()
+                .filter(product -> !Boolean.TRUE.equals(product.getDeleted()))
+                .filter(product -> "ACTIVE".equalsIgnoreCase(String.valueOf(product.getStatus())))
+                .filter(product -> !excluded.contains(product.getId()))
+                .sorted((a, b) -> {
+                    boolean aMatch = categoryIds.contains(a.getCategoryId());
+                    boolean bMatch = categoryIds.contains(b.getCategoryId());
+                    if (aMatch != bMatch) return aMatch ? -1 : 1;
+                    return Long.compare(b.getId(), a.getId());
+                })
+                .limit(safeLimit)
+                .map(product -> toResponse(product, false))
+                .toList();
     }
 
     @Override

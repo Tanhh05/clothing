@@ -3,30 +3,12 @@
     <div class="container-fluid">
       <div class="list-controls">
         <div class="list-stats">
-          <span v-if="!store.loading">{{ store.totalElements }} SẢN PHẨM</span>
+          <span v-if="!store.loading">{{ resultSummary }}</span>
           <span v-else>ĐANG TẢI...</span>
         </div>
 
         <div class="list-actions">
-          <el-input
-            v-model="searchKeyword"
-            class="search-input"
-            placeholder="Tìm theo tên sản phẩm"
-            clearable
-            @keyup.enter="applySearch"
-            @clear="applySearch"
-          />
-          <el-button class="search-btn" @click="applySearch">TÌM</el-button>
-          <el-select v-model="store.filters.sortBy" class="sort-select" @change="handleSortChange">
-            <el-option label="MỚI NHẤT" value="id" />
-            <el-option label="GIÁ" value="price" />
-            <el-option label="TÊN" value="name" />
-          </el-select>
-          <el-select v-model="store.filters.direction" class="direction-select" @change="handleSortChange">
-            <el-option label="GIẢM DẦN" value="desc" />
-            <el-option label="TĂNG DẦN" value="asc" />
-          </el-select>
-          <el-input model-value="10 / trang" class="size-select" disabled />
+
         </div>
       </div>
 
@@ -53,23 +35,23 @@
             <div v-for="n in 8" :key="n" class="skeleton-card"></div>
           </div>
 
-          <div v-else-if="store.products.length === 0" class="empty-state">
+          <div v-else-if="displayProducts.length === 0" class="empty-state">
             <h3>KHÔNG TÌM THẤY SẢN PHẨM</h3>
             <p>Chúng tôi không tìm thấy kết quả phù hợp với lựa chọn của bạn. Vui lòng thử lại với các bộ lọc khác.</p>
             <el-button @click="resetFilters">XÓA TẤT CẢ BỘ LỌC</el-button>
           </div>
 
           <div v-else class="product-grid">
-            <div v-for="product in store.products" :key="product.id" class="product-card-wrap">
+            <div v-for="product in displayProducts" :key="product.id" class="product-card-wrap">
+              <ProductCard :product="product" />
               <button
                 type="button"
                 class="compare-toggle"
                 :class="{ active: isCompared(product.id) }"
                 @click.stop="toggleCompare(product)"
               >
-                {{ isCompared(product.id) ? "Đã chọn so sánh" : "So sánh" }}
+                {{ isCompared(product.id) ? "Bỏ so sánh" : "Thêm so sánh" }}
               </button>
-              <ProductCard :product="product" />
             </div>
           </div>
 
@@ -154,6 +136,8 @@ const router = useRouter();
 const categories = ref([]);
 const searchKeyword = ref("");
 const compareDialogVisible = ref(false);
+const inStockOnly = ref(false);
+const pageSizeOptions = [10, 20, 30, 40];
 
 const COMPARE_KEY = "clothing_compare_products";
 const MAX_COMPARE_COUNT = 3;
@@ -181,14 +165,53 @@ const currentPage = computed({
   }
 });
 
+const isProductInStock = (product) => {
+  const variants = Array.isArray(product?.variants) ? product.variants : [];
+  return variants.some((variant) => Number(variant?.stock || 0) > 0);
+};
+
+const displayProducts = computed(() => {
+  if (!inStockOnly.value) return store.products;
+  return store.products.filter(isProductInStock);
+});
+const resultSummary = computed(() => {
+  if (inStockOnly.value) {
+    return `${displayProducts.value.length} / ${store.totalElements} SẢN PHẨM`;
+  }
+  return `${store.totalElements} SẢN PHẨM`;
+});
+
+const updateQuery = (patch = {}, resetPage = false) => {
+  const nextQuery = { ...route.query, ...patch };
+  if (resetPage) delete nextQuery.page;
+  Object.keys(nextQuery).forEach((key) => {
+    const value = nextQuery[key];
+    if (value == null || value === "" || value === false) delete nextQuery[key];
+  });
+  router.push({ path: "/products", query: nextQuery });
+};
+
 const handlePageChange = (val) => {
-  store.setPage(val - 1);
+  updateQuery({ page: val > 1 ? String(val) : null });
   window.scrollTo({ top: 0, behavior: "smooth" });
 };
 
 const handleSortChange = () => {
-  store.page = 0;
-  store.fetchProducts();
+  updateQuery(
+    {
+      sortBy: store.filters.sortBy !== "id" ? store.filters.sortBy : null,
+      direction: store.filters.direction !== "desc" ? store.filters.direction : null
+    },
+    true
+  );
+};
+
+const handleStockFilterChange = () => {
+  updateQuery({ stock: inStockOnly.value ? "1" : null }, true);
+};
+
+const handleSizeChange = () => {
+  updateQuery({ size: store.size !== 10 ? String(store.size) : null }, true);
 };
 
 const handleCategoryFilter = (catId) => {
@@ -203,21 +226,16 @@ const handleCategoryFilter = (catId) => {
 };
 
 const applySearch = () => {
-  const nextQuery = { ...route.query };
   const term = searchKeyword.value.trim();
-  if (term) {
-    nextQuery.q = term;
-  } else {
-    delete nextQuery.q;
-  }
-  router.push({ path: "/products", query: nextQuery });
+  updateQuery({ q: term || null }, true);
 };
 
 const resetFilters = () => {
   store.filters.sortBy = "id";
   store.filters.direction = "desc";
-  store.page = 0;
+  store.size = 10;
   searchKeyword.value = "";
+  inStockOnly.value = false;
   router.push({ path: "/products", query: {} });
 };
 
@@ -233,13 +251,25 @@ const fetchCategories = async () => {
 const syncFiltersFromRoute = () => {
   const categoryQuery = Array.isArray(route.query.category) ? route.query.category[0] : route.query.category;
   const qQuery = Array.isArray(route.query.q) ? route.query.q[0] : route.query.q;
+  const sortByQuery = Array.isArray(route.query.sortBy) ? route.query.sortBy[0] : route.query.sortBy;
+  const directionQuery = Array.isArray(route.query.direction) ? route.query.direction[0] : route.query.direction;
+  const sizeQuery = Array.isArray(route.query.size) ? route.query.size[0] : route.query.size;
+  const pageQuery = Array.isArray(route.query.page) ? route.query.page[0] : route.query.page;
+  const stockQuery = Array.isArray(route.query.stock) ? route.query.stock[0] : route.query.stock;
 
   const hasCategory = typeof categoryQuery === "string" && categoryQuery.trim() !== "";
   const parsedCategory = hasCategory ? Number(categoryQuery) : NaN;
+  const parsedSize = Number(sizeQuery);
+  const parsedPage = Number(pageQuery);
+
   store.filters.category = Number.isFinite(parsedCategory) ? parsedCategory : null;
   store.filters.q = typeof qQuery === "string" ? qQuery.trim() : "";
+  store.filters.sortBy = typeof sortByQuery === "string" && sortByQuery.trim() ? sortByQuery.trim() : "id";
+  store.filters.direction = directionQuery === "asc" ? "asc" : "desc";
+  store.size = Number.isFinite(parsedSize) && parsedSize > 0 ? parsedSize : 10;
+  store.page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage - 1 : 0;
   searchKeyword.value = store.filters.q;
-  store.page = 0;
+  inStockOnly.value = stockQuery === "1";
   store.fetchProducts();
 };
 
@@ -316,7 +346,7 @@ onMounted(() => {
 .list-controls {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
   margin-bottom: 30px;
   border-bottom: 1px solid #ebedee;
   padding-bottom: 20px;
@@ -331,10 +361,12 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .search-input {
-    width: 220px;
+    width: 260px;
   }
 
   .search-btn {
@@ -361,7 +393,13 @@ onMounted(() => {
   }
 
   .size-select {
-    width: 120px;
+    width: 130px;
+  }
+
+  .stock-toggle {
+    font-size: 12px;
+    font-weight: 700;
+    color: #111827;
   }
 }
 
@@ -411,36 +449,37 @@ onMounted(() => {
   .product-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 15px;
-    row-gap: 40px;
+    gap: 18px;
+    row-gap: 30px;
   }
 
   .product-card-wrap {
-    position: relative;
+    padding: 8px 10px 12px;
+    border: 1px solid #eef2f7;
+    background: #fff;
   }
 
   .compare-toggle {
-    position: absolute;
-    z-index: 4;
-    left: 12px;
-    bottom: 16px;
+    margin-top: 4px;
+    width: 100%;
     border: 1px solid #d1d5db;
-    background: rgba(255, 255, 255, 0.94);
+    background: #f8fafc;
     color: #0f172a;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
-    padding: 6px 10px;
+    padding: 8px 10px;
     cursor: pointer;
     transition: all 0.2s ease;
 
     &:hover {
-      border-color: #000;
+      border-color: #64748b;
+      background: #f1f5f9;
     }
 
     &.active {
-      background: #000;
+      background: #111827;
       color: #fff;
-      border-color: #000;
+      border-color: #111827;
     }
   }
 
@@ -640,6 +679,7 @@ onMounted(() => {
   .list-controls .list-actions {
     width: 100%;
     flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
   .list-controls .search-input {

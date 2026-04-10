@@ -9,5 +9,11 @@ export const wishlistApi = {
   },
   removeItem(productId) {
     return api.delete(`/wishlist/items/${productId}`);
+  },
+  upsertPriceAlert(productId, targetPrice) {
+    return api.post("/wishlist/price-alerts", { productId, targetPrice });
+  },
+  getDeals() {
+    return api.get("/wishlist/deals");
   }
 };

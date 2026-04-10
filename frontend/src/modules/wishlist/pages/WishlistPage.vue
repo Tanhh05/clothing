@@ -23,6 +23,25 @@
           :product="product"
         />
       </div>
+
+      <div v-if="products.length" class="price-alerts">
+        <h3>Thiết lập cảnh báo giá</h3>
+        <div class="alert-list">
+          <div v-for="product in products" :key="`alert-${product.id}`" class="alert-item">
+            <span>{{ product.name }}</span>
+            <el-input-number v-model="priceAlertTargets[product.id]" :min="0" :step="10000" />
+            <el-button @click="savePriceAlert(product.id)">Lưu</el-button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="wishlistDeals.length" class="deal-box">
+        <h3>Deal theo wishlist</h3>
+        <p v-for="deal in wishlistDeals" :key="`deal-${deal.productId}`">
+          {{ deal.productName }} đang giảm còn {{ formatCurrency(deal.currentMinPrice) }}
+          (mục tiêu {{ formatCurrency(deal.targetPrice) }})
+        </p>
+      </div>
     </div>
   </div>
 </template>
@@ -33,10 +52,15 @@ import { ElMessage } from "element-plus";
 import ProductCard from "@/modules/product/components/ProductCard.vue";
 import { useWishlistStore } from "@/store/wishlistStore";
 import { productApi } from "@/modules/product/api/productApi";
+import { wishlistApi } from "@/modules/wishlist/api/wishlistApi";
 
 const wishlistStore = useWishlistStore();
 const loading = ref(false);
 const products = ref([]);
+const priceAlertTargets = ref({});
+const wishlistDeals = ref([]);
+
+const formatCurrency = (value) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(Number(value) || 0);
 
 const loadWishlistProducts = async () => {
   loading.value = true;
@@ -53,11 +77,36 @@ const loadWishlistProducts = async () => {
     products.value = ids
       .map((id) => mapped.find((p) => p.id === id))
       .filter(Boolean);
+    products.value.forEach((product) => {
+      if (priceAlertTargets.value[product.id] == null) {
+        priceAlertTargets.value[product.id] = 0;
+      }
+    });
+    await loadDeals();
   } catch (error) {
     console.error("Failed to load wishlist products:", error);
     ElMessage.error("Không thể tải danh sách yêu thích");
   } finally {
     loading.value = false;
+  }
+};
+
+const savePriceAlert = async (productId) => {
+  try {
+    await wishlistApi.upsertPriceAlert(productId, Number(priceAlertTargets.value[productId] || 0));
+    ElMessage.success("Đã lưu cảnh báo giá");
+    await loadDeals();
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || "Không thể lưu cảnh báo giá");
+  }
+};
+
+const loadDeals = async () => {
+  try {
+    const { data } = await wishlistApi.getDeals();
+    wishlistDeals.value = Array.isArray(data) ? data : [];
+  } catch {
+    wishlistDeals.value = [];
   }
 };
 
@@ -148,6 +197,25 @@ onMounted(() => {
   @media (max-width: 640px) {
     grid-template-columns: 1fr;
   }
+}
+
+.price-alerts,
+.deal-box {
+  margin-top: 18px;
+  border: 1px solid #e5e7eb;
+  padding: 12px;
+}
+
+.alert-list {
+  display: grid;
+  gap: 8px;
+}
+
+.alert-item {
+  display: grid;
+  grid-template-columns: 1fr 180px auto;
+  gap: 8px;
+  align-items: center;
 }
 
 @media (max-width: 768px) {

@@ -80,6 +80,11 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getMyOrderById(authentication.getName(), orderId));
     }
 
+    @PostMapping("/my/{orderId}/reorder")
+    public ResponseEntity<OrderResponse> reorder(Authentication authentication, @PathVariable Long orderId) {
+        return ResponseEntity.ok(orderService.reorder(authentication.getName(), orderId));
+    }
+
     @PatchMapping("/{orderId}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<OrderResponse> updateOrderStatus(

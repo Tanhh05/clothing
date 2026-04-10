@@ -60,6 +60,14 @@ public class ProductController {
         return ResponseEntity.ok(productService.getAll(page, size, sortBy, direction, category, q));
     }
 
+    @GetMapping("/recommendations")
+    public ResponseEntity<List<ProductResponse>> getRecommendations(
+            @RequestParam(required = false) List<Long> productIds,
+            @RequestParam(defaultValue = "4") int limit
+    ) {
+        return ResponseEntity.ok(productService.getRecommendations(productIds, limit));
+    }
+
     @GetMapping("/variant-options")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<String>> getVariantOptions(@RequestParam String type) {

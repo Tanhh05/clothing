@@ -95,118 +95,60 @@
               <span>{{ formatCurrency(cartStore.totalPrice) }}</span>
             </div>
             <div class="sum-row">
-              <span>Giao hàng</span>
-              <span>{{ shippingFee === 0 ? "Miễn phí" : formatCurrency(shippingFee) }}</span>
+              <span>Phí ship tạm tính</span>
+              <span>{{ estimatedShippingFee === 0 ? "Miễn phí" : formatCurrency(estimatedShippingFee) }}</span>
+            </div>
+
+            <div class="free-ship-progress">
+              <div class="progress-head">
+                <span>Tiến độ miễn phí ship</span>
+                <strong>{{ freeShipProgress }}%</strong>
+              </div>
+              <el-progress :percentage="freeShipProgress" :stroke-width="8" :show-text="false" />
+              <p v-if="remainingForFreeShip > 0">
+                Mua thêm {{ formatCurrency(remainingForFreeShip) }} để được miễn phí ship.
+              </p>
+              <p v-else>Bạn đã đạt ưu đãi miễn phí ship.</p>
             </div>
             
             <div class="sum-total">
-              <span class="total-label">Tổng</span>
-              <span class="total-value">{{ formatCurrency(grandTotal) }}</span>
+              <span class="total-label">Tạm tính</span>
+              <span class="total-value">{{ formatCurrency(estimatedGrandTotalAfterDiscount) }}</span>
             </div>
             <p class="tax-note">(Đã bao gồm thuế)</p>
-            <p class="tax-note" v-if="shippingFee > 0">
+            <p class="tax-note" v-if="estimatedShippingFee > 0">
               Miễn phí ship từ {{ formatCurrency(storeSettingsStore.freeShippingThreshold) }}
-            </p>
-            <p class="tax-note" v-if="shippingFee > 0 && selectedProvinceName">
-              Khu vực giao hàng: {{ isNearProvince(selectedProvinceName) ? 'Gần' : 'Xa' }}
             </p>
             <p class="tax-note">{{ storeSettingsStore.shippingPolicy }}</p>
 
             <div class="promo-link">
               <el-icon><Ticket /></el-icon>
-              <a href="#">Sử dụng mã khuyến mãi</a>
+              <span v-if="bestVoucher?.code">
+                Đề xuất mã tốt nhất: <strong>{{ bestVoucher.code }}</strong>
+                (giảm {{ formatCurrency(bestVoucher.discountAmount || 0) }})
+              </span>
+              <span v-else>Chưa có mã khuyến mãi phù hợp</span>
             </div>
-
-            <div class="checkout-form">
-              <label class="checkout-label">Phương thức thanh toán</label>
-              <el-select v-model="paymentMethod" class="checkout-select">
-                <el-option
-                  v-for="option in paymentMethodOptions"
-                  :key="option.value"
-                  :label="option.label"
-                  :value="option.value"
-                />
-              </el-select>
-              <div v-if="paymentMethod === 'MOMO'" class="selected-payment-hint">
-                <img :src="momoLogo" alt="MoMo" class="selected-payment-logo">
-                <span>Thanh toán qua ví điện tử MoMo</span>
-              </div>
-
-              <label class="checkout-label">Tỉnh / Thành</label>
-              <el-select
-                v-model="selectedProvinceId"
-                class="checkout-select"
-                placeholder="Chọn tỉnh / thành"
-                :loading="addressLoading.provinces"
-                filterable
-              >
-                <el-option
-                  v-for="p in provinces"
-                  :key="p.id"
-                  :label="p.name"
-                  :value="p.id"
-                />
-              </el-select>
-
-              <label class="checkout-label">Quận / Huyện</label>
-              <el-select
-                v-model="selectedDistrictId"
-                class="checkout-select"
-                placeholder="Chọn quận / huyện"
-                :disabled="!selectedProvinceId"
-                :loading="addressLoading.districts"
-                filterable
-              >
-                <el-option
-                  v-for="d in districts"
-                  :key="d.id"
-                  :label="d.name"
-                  :value="d.id"
-                />
-              </el-select>
-
-              <label class="checkout-label">Phường / Xã</label>
-              <el-select
-                v-model="selectedWardId"
-                class="checkout-select"
-                placeholder="Chọn phường / xã"
-                :disabled="!selectedDistrictId"
-                :loading="addressLoading.wards"
-                filterable
-              >
-                <el-option
-                  v-for="w in wards"
-                  :key="w.id"
-                  :label="w.name"
-                  :value="w.id"
-                />
-              </el-select>
-
-              <label class="checkout-label">Số nhà, tên đường</label>
-              <el-input
-                v-model="shippingAddressLine"
-                type="textarea"
-                :rows="2"
-                placeholder="Ví dụ: 123 Nguyễn Trãi"
+            <el-select
+              v-model="selectedVoucherCode"
+              class="checkout-select"
+              clearable
+              placeholder="Chọn mã khuyến mãi"
+              @change="handleVoucherChange"
+            >
+              <el-option
+                v-for="voucher in eligibleVouchers"
+                :key="voucher.id"
+                :label="`${voucher.code}${voucher.minOrderValue ? ` - Tối thiểu ${formatCurrency(voucher.minOrderValue)}` : ''}`"
+                :value="voucher.code"
               />
-            </div>
-
-            <el-button type="primary" class="checkout-submit-btn" @click="submitCheckout" :loading="submittingOrder">
-              THANH TOÁN <el-icon class="el-icon--right"><Right /></el-icon>
+            </el-select>
+            <p class="tax-note" v-if="selectedVoucherCode">
+              Đang áp dụng: <strong>{{ selectedVoucherCode }}</strong> (giảm {{ formatCurrency(appliedVoucherDiscount) }})
+            </p>
+            <el-button type="primary" class="checkout-submit-btn" @click="goCheckout">
+              ĐẾN TRANG THANH TOÁN <el-icon class="el-icon--right"><Right /></el-icon>
             </el-button>
-
-            <div class="payment-trust">
-              <p class="trust-label">PHƯƠNG THỨC THANH TOÁN ĐƯỢC CHẤP NHẬN</p>
-              <div class="trust-logos">
-                <img
-                  v-for="method in paymentMethods"
-                  :key="method.alt"
-                  :src="method.src"
-                  :alt="method.alt"
-                  :title="method.alt"
-                >
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -231,95 +173,77 @@ import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import api from '@/services/api';
 import { useWishlistStore } from '@/store/wishlistStore';
-import { useAuthStore } from '@/store/authStore';
-import { orderApi } from '@/modules/order/api/orderApi';
-import { addressApi } from '@/modules/address/api/addressApi';
 import { useStoreSettingsStore } from '@/store/storeSettingsStore';
-import visaLogo from '@/assets/payments/visa.svg';
-import mastercardLogo from '@/assets/payments/mastercard.svg';
-import jcbLogo from '@/assets/payments/jcb.svg';
-import momoLogo from '@/assets/payments/momo.svg';
+import { voucherApi } from '@/modules/voucher/api/voucherApi';
 
 const cartStore = useCartStore();
 const wishlistStore = useWishlistStore();
-const authStore = useAuthStore();
 const storeSettingsStore = useStoreSettingsStore();
 const router = useRouter();
 const productCatalog = ref([]);
-const paymentMethod = ref('COD');
-const shippingAddressLine = ref('');
-const submittingOrder = ref(false);
-const provinces = ref([]);
-const districts = ref([]);
-const wards = ref([]);
-const selectedProvinceId = ref('');
-const selectedDistrictId = ref('');
-const selectedWardId = ref('');
-const addressLoading = ref({
-  provinces: false,
-  districts: false,
-  wards: false
-});
-
-const paymentMethods = [
-  { alt: 'Visa', src: visaLogo },
-  { alt: 'Mastercard', src: mastercardLogo },
-  { alt: 'JCB', src: jcbLogo },
-  { alt: 'MoMo', src: momoLogo }
-];
-
-const paymentMethodOptions = computed(() => {
-  const options = [];
-  if (storeSettingsStore.enableCOD) {
-    options.push({ label: "Thanh toán khi nhận hàng (COD)", value: "COD" });
-  }
-  if (storeSettingsStore.enableMomo) {
-    options.push({ label: "Ví điện tử MoMo", value: "MOMO" });
-  }
-  return options;
-});
-
-const FAR_DISTANCE_SURCHARGE = 20000;
-const NEAR_PROVINCES = new Set([
-  'ho chi minh',
-  'binh duong',
-  'dong nai',
-  'long an',
-  'tay ninh',
-  'ba ria vung tau'
-]);
-
-const normalizeProvince = (province) => {
-  if (!province) return '';
-  let normalized = province
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (normalized.startsWith('thanh pho ')) normalized = normalized.slice('thanh pho '.length).trim();
-  else if (normalized.startsWith('tp ')) normalized = normalized.slice('tp '.length).trim();
-  else if (normalized.startsWith('tinh ')) normalized = normalized.slice('tinh '.length).trim();
-  return normalized;
-};
-
-const isNearProvince = (province) => NEAR_PROVINCES.has(normalizeProvince(province));
-
-const shippingFee = computed(() => {
+const bestVoucher = ref(null);
+const availableVouchers = ref([]);
+const estimatedShippingFee = computed(() => {
   const baseFee = storeSettingsStore.defaultShippingFee;
   const threshold = storeSettingsStore.freeShippingThreshold;
   if (!Number.isFinite(baseFee) || baseFee < 0) return 0;
-  if (!Number.isFinite(threshold) || threshold <= 0) {
-    if (!selectedProvinceName.value) return baseFee;
-    return isNearProvince(selectedProvinceName.value) ? baseFee : baseFee + FAR_DISTANCE_SURCHARGE;
-  }
+  if (!Number.isFinite(threshold) || threshold <= 0) return baseFee;
   if (cartStore.totalPrice >= threshold) return 0;
-  if (!selectedProvinceName.value) return baseFee;
-  return isNearProvince(selectedProvinceName.value) ? baseFee : baseFee + FAR_DISTANCE_SURCHARGE;
+  return baseFee;
 });
 
-const grandTotal = computed(() => cartStore.totalPrice + shippingFee.value);
+const estimatedGrandTotal = computed(() => cartStore.totalPrice + estimatedShippingFee.value);
+const selectedVoucherCode = computed({
+  get: () => cartStore.preferredVoucherCode || '',
+  set: (value) => cartStore.setPreferredVoucherCode(value)
+});
+const eligibleVouchers = computed(() => {
+  const subTotal = Number(cartStore.totalPrice || 0);
+  return availableVouchers.value.filter((voucher) => {
+    if (String(voucher?.status || '').toUpperCase() !== 'ACTIVE') return false;
+    return Number(voucher?.minOrderValue || 0) <= subTotal;
+  });
+});
+const selectedVoucher = computed(() =>
+  eligibleVouchers.value.find((voucher) => voucher.code === selectedVoucherCode.value) || null
+);
+const calculateDiscount = (voucher, subTotal) => {
+  if (!voucher || subTotal <= 0) return 0;
+  const discountType = String(voucher.discountType || '').trim().toUpperCase();
+  const discountValue = Number(voucher.discountValue || 0);
+  if (discountValue <= 0) return 0;
+  if (discountType === 'PERCENT') return Math.min(subTotal, Math.round(subTotal * (discountValue / 100)));
+  if (discountType === 'AMOUNT') return Math.min(subTotal, discountValue);
+  return 0;
+};
+const appliedVoucherDiscount = computed(() => {
+  const subTotal = Number(cartStore.totalPrice || 0);
+  if (subTotal <= 0) return 0;
+  if (selectedVoucherCode.value && bestVoucher.value?.code === selectedVoucherCode.value) {
+    return Number(bestVoucher.value?.discountAmount || 0);
+  }
+  if (selectedVoucher.value) {
+    return calculateDiscount(selectedVoucher.value, subTotal);
+  }
+  if (bestVoucher.value?.code) {
+    return Number(bestVoucher.value?.discountAmount || 0);
+  }
+  return 0;
+});
+const estimatedGrandTotalAfterDiscount = computed(() =>
+  Math.max(0, estimatedGrandTotal.value - appliedVoucherDiscount.value)
+);
+const remainingForFreeShip = computed(() => {
+  const threshold = Number(storeSettingsStore.freeShippingThreshold || 0);
+  if (!Number.isFinite(threshold) || threshold <= 0) return 0;
+  return Math.max(0, threshold - Number(cartStore.totalPrice || 0));
+});
+const freeShipProgress = computed(() => {
+  const threshold = Number(storeSettingsStore.freeShippingThreshold || 0);
+  if (!Number.isFinite(threshold) || threshold <= 0) return 100;
+  const percent = Math.round((Number(cartStore.totalPrice || 0) / threshold) * 100);
+  return Math.max(0, Math.min(100, percent));
+});
 
 const variantLookup = computed(() => {
   const lookup = new Map();
@@ -349,29 +273,25 @@ const displayCartItems = computed(() => {
 });
 
 const recommendedProducts = computed(() => {
-  const cartProductIds = new Set(displayCartItems.value.map(item => item.productId).filter(Boolean));
+  const cartProductIds = new Set(displayCartItems.value.map((item) => item.productId).filter(Boolean));
   const cartCategoryIds = new Set(
     displayCartItems.value
-      .map(item => {
+      .map((item) => {
         const matched = variantLookup.value.get(item.variantId);
         return matched?.product?.categoryId;
       })
       .filter(Boolean)
   );
 
-  const scored = productCatalog.value
-    .filter(product => !cartProductIds.has(product.id))
-    .map(product => {
+  return productCatalog.value
+    .filter((product) => !cartProductIds.has(product.id))
+    .map((product) => {
       let score = 0;
-      if (cartCategoryIds.has(product.categoryId)) {
-        score += 10;
-      }
-      if (String(product.status || '').toUpperCase() === 'ACTIVE') {
-        score += 1;
-      }
+      if (cartCategoryIds.has(product.categoryId)) score += 10;
+      if (String(product.status || '').toUpperCase() === 'ACTIVE') score += 1;
       return { product, score };
     })
-    .sort((a, b) => b.score - a.score || b.product.id - a.product.id)
+    .sort((a, b) => b.score - a.score || Number(b.product.id || 0) - Number(a.product.id || 0))
     .slice(0, 4)
     .map(({ product }) => ({
       id: product.id,
@@ -380,8 +300,6 @@ const recommendedProducts = computed(() => {
       price: product.variants?.[0]?.price ?? 0,
       image: product.images?.[0]?.url ?? ''
     }));
-
-  return scored;
 });
 
 const formatCurrency = (value) => {
@@ -405,115 +323,7 @@ const handleRemove = async (itemId) => {
   }
 };
 
-const selectedProvinceName = computed(() => provinces.value.find((p) => p.id === selectedProvinceId.value)?.name || '');
-const selectedDistrictName = computed(() => districts.value.find((d) => d.id === selectedDistrictId.value)?.name || '');
-const selectedWardName = computed(() => wards.value.find((w) => w.id === selectedWardId.value)?.name || '');
-
-const fetchProvinces = async () => {
-  try {
-    addressLoading.value.provinces = true;
-    const { data } = await addressApi.getProvinces();
-    provinces.value = Array.isArray(data) ? data : [];
-  } catch (error) {
-    ElMessage.error('Không thể tải danh sách tỉnh/thành');
-  } finally {
-    addressLoading.value.provinces = false;
-  }
-};
-
-const fetchDistricts = async (provinceId) => {
-  if (!provinceId) {
-    districts.value = [];
-    return;
-  }
-  try {
-    addressLoading.value.districts = true;
-    const { data } = await addressApi.getDistricts(provinceId);
-    districts.value = Array.isArray(data) ? data : [];
-  } catch (error) {
-    ElMessage.error('Không thể tải danh sách quận/huyện');
-    districts.value = [];
-  } finally {
-    addressLoading.value.districts = false;
-  }
-};
-
-const fetchWards = async (districtId) => {
-  if (!districtId) {
-    wards.value = [];
-    return;
-  }
-  try {
-    addressLoading.value.wards = true;
-    const { data } = await addressApi.getWards(districtId);
-    wards.value = Array.isArray(data) ? data : [];
-  } catch (error) {
-    ElMessage.error('Không thể tải danh sách phường/xã');
-    wards.value = [];
-  } finally {
-    addressLoading.value.wards = false;
-  }
-};
-
-const submitCheckout = async () => {
-  if (!authStore.isAuthenticated) {
-    ElMessage.warning('Vui lòng đăng nhập để thanh toán');
-    router.push('/auth/login');
-    return;
-  }
-
-  if (!selectedProvinceId.value || !selectedDistrictId.value || !selectedWardId.value) {
-    ElMessage.warning('Vui lòng chọn đầy đủ tỉnh/huyện/xã');
-    return;
-  }
-
-  if (!shippingAddressLine.value.trim()) {
-    ElMessage.warning('Vui lòng nhập số nhà, tên đường');
-    return;
-  }
-  if (!paymentMethod.value) {
-    ElMessage.warning('Hiện chưa có phương thức thanh toán khả dụng');
-    return;
-  }
-
-  try {
-    submittingOrder.value = true;
-    const fullAddress = [
-      shippingAddressLine.value.trim(),
-      selectedWardName.value,
-      selectedDistrictName.value,
-      selectedProvinceName.value
-    ].filter(Boolean).join(', ');
-
-    const payload = {
-      paymentMethod: paymentMethod.value,
-      address: fullAddress,
-      province: selectedProvinceName.value
-    };
-    const { data } = await orderApi.createOrder(payload);
-    ElMessage.success(`Đặt hàng thành công. Mã đơn #${data?.id ?? ''}`);
-    if (paymentMethod.value === 'MOMO' && data?.paymentUrl) {
-      window.location.href = data.paymentUrl;
-      return;
-    }
-    if (paymentMethod.value === 'MOMO' && !data?.paymentUrl) {
-      ElMessage.error('Không lấy được link thanh toán MoMo');
-      return;
-    }
-    shippingAddressLine.value = '';
-    selectedProvinceId.value = '';
-    selectedDistrictId.value = '';
-    selectedWardId.value = '';
-    districts.value = [];
-    wards.value = [];
-    await cartStore.fetchCart();
-    router.push('/orders');
-  } catch (error) {
-    ElMessage.error(error.response?.data?.message || 'Không thể tạo đơn hàng');
-  } finally {
-    submittingOrder.value = false;
-  }
-};
+const goCheckout = () => router.push('/checkout');
 
 const isWishlisted = (productId) => {
   if (!productId) return false;
@@ -532,44 +342,62 @@ const handleToggleWishlist = async (productId) => {
 const fetchCatalogProducts = async () => {
   try {
     const response = await api.get('/products', {
-      params: { page: 0, size: 100, sortBy: 'id', direction: 'desc' }
+      params: { page: 0, size: 120, sortBy: 'id', direction: 'desc' }
     });
-    productCatalog.value = response.data?.content || [];
+    productCatalog.value = Array.isArray(response.data?.content) ? response.data.content : [];
   } catch (error) {
-    console.error('Failed to fetch product catalog for recommendations:', error);
+    console.error('Failed to fetch product catalog:', error);
   }
+};
+
+const fetchBestVoucher = async () => {
+  try {
+    const { data } = await voucherApi.getBestVoucher(cartStore.totalPrice || 0);
+    bestVoucher.value = data || null;
+    if (!selectedVoucherCode.value && bestVoucher.value?.code) {
+      selectedVoucherCode.value = bestVoucher.value.code;
+    }
+  } catch (error) {
+    bestVoucher.value = null;
+  }
+};
+
+const fetchAvailableVouchers = async () => {
+  try {
+    const { data } = await voucherApi.getPublicVouchers();
+    availableVouchers.value = Array.isArray(data) ? data : [];
+  } catch (_error) {
+    availableVouchers.value = [];
+  }
+};
+
+const handleVoucherChange = (value) => {
+  selectedVoucherCode.value = String(value || '').trim().toUpperCase();
 };
 
 onMounted(async () => {
   await storeSettingsStore.fetchPublicSettings();
-  if (!paymentMethodOptions.value.some((item) => item.value === paymentMethod.value)) {
-    paymentMethod.value = paymentMethodOptions.value[0]?.value || 'COD';
-  }
   await wishlistStore.ensureLoaded();
   await Promise.all([
     cartStore.fetchCart(),
     fetchCatalogProducts(),
-    fetchProvinces()
+    fetchAvailableVouchers()
   ]);
+  await fetchBestVoucher();
 });
 
-watch(selectedProvinceId, async (value) => {
-  selectedDistrictId.value = '';
-  selectedWardId.value = '';
-  wards.value = [];
-  await fetchDistricts(value);
-});
-
-watch(selectedDistrictId, async (value) => {
-  selectedWardId.value = '';
-  await fetchWards(value);
-});
-
-watch(paymentMethodOptions, (options) => {
-  if (!options.some((item) => item.value === paymentMethod.value)) {
-    paymentMethod.value = options[0]?.value || '';
+watch(
+  () => cartStore.totalPrice,
+  async () => {
+    await Promise.all([fetchBestVoucher(), fetchCatalogProducts(), fetchAvailableVouchers()]);
+    if (selectedVoucherCode.value && !eligibleVouchers.value.some((voucher) => voucher.code === selectedVoucherCode.value)) {
+      selectedVoucherCode.value = bestVoucher.value?.code || '';
+    }
+    if (!selectedVoucherCode.value && bestVoucher.value?.code) {
+      selectedVoucherCode.value = bestVoucher.value.code;
+    }
   }
-});
+);
 </script>
 
 <style scoped lang="scss">
@@ -751,6 +579,29 @@ watch(paymentMethodOptions, (options) => {
     .total-value { font-size: 18px; font-weight: 900; }
   }
 
+  .free-ship-progress {
+    margin: 6px 0 18px;
+    padding: 10px 12px;
+    border: 1px solid #ebedee;
+    background: #f8fafc;
+
+    .progress-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: #334155;
+      font-weight: 700;
+    }
+
+    p {
+      margin: 8px 0 0;
+      font-size: 12px;
+      color: #475569;
+    }
+  }
+
   .tax-note {
     font-size: 12px;
     color: #666;
@@ -761,7 +612,7 @@ watch(paymentMethodOptions, (options) => {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 40px;
+    margin-bottom: 14px;
     
     a {
       font-size: 14px;
@@ -772,6 +623,11 @@ watch(paymentMethodOptions, (options) => {
     }
     
     .el-icon { font-size: 18px; }
+  }
+
+  .checkout-select {
+    width: 100%;
+    margin-bottom: 12px;
   }
 
   .checkout-form {

@@ -18,58 +18,24 @@
     <div class="drawer-content" v-loading="loading">
       <!-- AUTHENTICATED VIEW -->
       <div v-if="authStore.isAuthenticated" class="view-authenticated fade-in">
-        <template v-if="accountView === 'menu'">
-          <h1 class="auth-title">HỒ SƠ CỦA TÔI</h1>
-          <div class="profile-summary">
-            <div class="avatar">{{ profileInitial }}</div>
-            <div class="summary-content">
-              <p class="welcome-text">XIN CHÀO, <span>{{ displayName.toUpperCase() }}</span></p>
-              <p class="welcome-sub">Rất vui được gặp lại bạn!</p>
-            </div>
+        <h1 class="auth-title">HỒ SƠ CỦA TÔI</h1>
+        <div class="profile-summary">
+          <div class="avatar">{{ profileInitial }}</div>
+          <div class="summary-content">
+            <p class="welcome-text">XIN CHÀO, <span>{{ displayName.toUpperCase() }}</span></p>
+            <p class="welcome-sub">Rất vui được gặp lại bạn!</p>
           </div>
+        </div>
 
-          <div class="account-menu compact">
-            <button type="button" class="menu-item" @click="openProfileView">Thông tin cá nhân</button>
-            <button type="button" class="menu-item" @click="goToOrders">Đơn hàng của tôi</button>
-            <button type="button" class="menu-item" @click="goToWishlist">Sản phẩm yêu thích</button>
-          </div>
+        <div class="account-menu compact">
+          <button type="button" class="menu-item" @click="goToAccount">Thông tin cá nhân</button>
+          <button type="button" class="menu-item" @click="goToOrders">Đơn hàng của tôi</button>
+          <button type="button" class="menu-item" @click="goToWishlist">Sản phẩm yêu thích</button>
+        </div>
 
-          <el-button type="primary" class="submit-btn logout-btn" @click="handleLogout">
-            ĐĂNG XUẤT <el-icon class="el-icon--right"><Right /></el-icon>
-          </el-button>
-        </template>
-
-        <template v-else>
-          <div class="profile-head">
-            <button type="button" class="back-profile-btn" @click="accountView = 'menu'">
-              <el-icon><Back /></el-icon>
-            </button>
-            <h1 class="auth-title">THÔNG TIN CÁ NHÂN</h1>
-          </div>
-
-          <el-form :model="profileForm" class="auth-form profile-form" @submit.prevent="saveProfile">
-            <div class="form-group">
-              <label>HỌ VÀ TÊN</label>
-              <el-input v-model="profileForm.fullName" />
-            </div>
-            <div class="form-group">
-              <label>SỐ ĐIỆN THOẠI</label>
-              <el-input v-model="profileForm.phone" />
-            </div>
-            <div class="form-group">
-              <label>EMAIL</label>
-              <el-input :model-value="authStore.profile?.email || ''" disabled />
-            </div>
-            <div class="form-group">
-              <label>TÊN ĐĂNG NHẬP</label>
-              <el-input :model-value="authStore.profile?.username || authStore.username || ''" disabled />
-            </div>
-
-            <el-button type="primary" class="submit-btn" native-type="submit" :loading="loading">
-              LƯU THÔNG TIN <el-icon class="el-icon--right"><Right /></el-icon>
-            </el-button>
-          </el-form>
-        </template>
+        <el-button type="primary" class="submit-btn logout-btn" @click="handleLogout">
+          ĐĂNG XUẤT <el-icon class="el-icon--right"><Right /></el-icon>
+        </el-button>
       </div>
 
       <!-- GUEST VIEWS -->
@@ -206,7 +172,6 @@ const loading = ref(false);
 const googleReady = ref(false);
 const googleButtonRef = ref(null);
 const authMode = ref('select'); // select | login | register
-const accountView = ref('menu'); // menu | profile
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 const visible = computed({
@@ -233,11 +198,6 @@ const agreements = reactive({
   terms: false
 });
 
-const profileForm = reactive({
-  fullName: '',
-  phone: ''
-});
-
 const displayName = computed(() => {
   return authStore.profile?.fullName?.trim()
     || authStore.profile?.username
@@ -252,7 +212,6 @@ const profileInitial = computed(() => {
 
 const resetMode = () => {
   authMode.value = 'select';
-  accountView.value = 'menu';
   loginForm.usernameOrEmail = '';
   loginForm.password = '';
 };
@@ -277,40 +236,9 @@ const goToOrders = () => {
   router.push('/orders');
 };
 
-const hydrateProfileForm = () => {
-  profileForm.fullName = authStore.profile?.fullName || '';
-  profileForm.phone = authStore.profile?.phone || '';
-};
-
-const openProfileView = async () => {
-  try {
-    loading.value = true;
-    await authStore.fetchProfile();
-    hydrateProfileForm();
-    accountView.value = 'profile';
-  } catch (error) {
-    ElMessage.error('Không thể tải thông tin cá nhân');
-  } finally {
-    loading.value = false;
-  }
-};
-
-const saveProfile = async () => {
-  try {
-    loading.value = true;
-    const payload = {
-      fullName: profileForm.fullName?.trim() || null,
-      phone: profileForm.phone?.trim() || null
-    };
-    await authStore.updateProfile(payload);
-    hydrateProfileForm();
-    ElMessage.success('Đã cập nhật thông tin cá nhân');
-    accountView.value = 'menu';
-  } catch (error) {
-    ElMessage.error(error.response?.data?.message || 'Không thể cập nhật thông tin cá nhân');
-  } finally {
-    loading.value = false;
-  }
+const goToAccount = () => {
+  visible.value = false;
+  router.push('/account');
 };
 
 // --- GOOGLE LOGIN LOGIC ---
@@ -398,7 +326,6 @@ watch(
     if (!isOpen || !isAuthenticated) return;
     try {
       await authStore.fetchProfile();
-      hydrateProfileForm();
     } catch (error) {
       // skip noisy toast on drawer open
     }

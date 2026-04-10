@@ -32,6 +32,8 @@ public interface OrderService {
 
     OrderResponse getMyOrderById(String username, Long orderId);
 
+    OrderResponse reorder(String username, Long orderId);
+
     OrderResponse updateOrderStatus(Long orderId, UpdateOrderStatusRequest request);
 
     int bulkUpdateStatus(List<Long> ids, String status);

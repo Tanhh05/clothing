@@ -14,8 +14,8 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Entity
-@Table(name = "reviews")
-public class ReviewEntity {
+@Table(name = "stock_alert_subscriptions")
+public class StockAlertSubscriptionEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,22 +27,14 @@ public class ReviewEntity {
     @Column(name = "product_id")
     private Long productId;
 
-    @Column(name = "order_id")
-    private Long orderId;
-
-    private Integer rating;
-
-    @Column(columnDefinition = "TEXT")
-    private String comment;
-
-    @Column(length = 50)
+    @Column(name = "size", length = 50)
     private String size;
 
-    @Column(length = 80)
+    @Column(name = "color", length = 80)
     private String color;
 
-    @Column(name = "image_urls", columnDefinition = "TEXT")
-    private String imageUrls;
+    @Column(name = "notified")
+    private Boolean notified;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

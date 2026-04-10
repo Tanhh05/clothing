@@ -104,6 +104,14 @@
                     <span>{{ item.sku || "-" }}</span>
                   </div>
                   <div class="item-side">
+                    <el-button
+                      v-if="String(order.status || '').toUpperCase() === 'DELIVERED'"
+                      size="small"
+                      text
+                      @click="openReviewDialog(order, item)"
+                    >
+                      Đánh giá
+                    </el-button>
                     <span>x{{ item.quantity }}</span>
                     <strong>{{ formatCurrency(item.lineTotal) }}</strong>
                   </div>
@@ -112,16 +120,25 @@
             </div>
 
             <div class="order-foot">
-              <el-button
-                v-if="canRequestReturn(order)"
-                type="warning"
-                round
-                @click="openReturnDialog(order)"
-              >
-                Trả hàng / Hoàn tiền
-              </el-button>
-              <span v-else-if="String(order.status || '').toUpperCase() === 'DELIVERED'" class="return-note">
+              <div class="foot-actions">
+                <el-button plain @click="handleReorder(order)">Mua lại</el-button>
+                <el-button
+                  v-if="canRequestReturn(order)"
+                  type="warning"
+                  round
+                  @click="openReturnDialog(order)"
+                >
+                  Trả hàng / Hoàn tiền
+                </el-button>
+              </div>
+              <span v-if="!canRequestReturn(order) && String(order.status || '').toUpperCase() === 'DELIVERED'" class="return-note">
                 Hết thời gian đổi trả hoặc đã có yêu cầu
+              </span>
+            </div>
+
+            <div class="status-timeline">
+              <span v-for="(step, idx) in sortedHistory(order.statusHistory)" :key="`${order.id}-${idx}-${step.status}`">
+                {{ statusLabel(step.status) }} · {{ formatDateTime(step.changedAt) }}
               </span>
             </div>
           </el-card>
@@ -199,6 +216,41 @@
       <el-button type="primary" :loading="returnSubmitting" @click="submitReturnRequest">Gửi yêu cầu</el-button>
     </template>
   </el-dialog>
+
+  <el-dialog v-model="reviewDialogVisible" title="Đánh giá sản phẩm" width="560px" destroy-on-close>
+    <el-form label-position="top">
+      <el-form-item label="Sản phẩm">
+        <el-input :model-value="reviewForm.productName" disabled />
+      </el-form-item>
+      <el-form-item label="Số sao">
+        <el-rate v-model="reviewForm.rating" />
+      </el-form-item>
+      <el-form-item label="Nội dung">
+        <el-input
+          v-model="reviewForm.comment"
+          type="textarea"
+          :rows="4"
+          maxlength="1000"
+          show-word-limit
+          placeholder="Mô tả trải nghiệm sử dụng sản phẩm"
+        />
+      </el-form-item>
+      <el-form-item label="Ảnh đánh giá (mỗi dòng 1 URL)">
+        <el-input
+          v-model="reviewForm.imageUrlsText"
+          type="textarea"
+          :rows="3"
+          maxlength="2500"
+          show-word-limit
+          placeholder="https://...&#10;https://..."
+        />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="reviewDialogVisible = false">Hủy</el-button>
+      <el-button type="primary" :loading="reviewSubmitting" @click="submitReview">Gửi đánh giá</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -206,6 +258,8 @@ import { computed, onMounted, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import { Refresh, Search } from "@element-plus/icons-vue";
 import { useOrderStore } from "@/modules/order/store/orderStore";
+import { orderApi } from "@/modules/order/api/orderApi";
+import { reviewApi } from "@/modules/product/api/reviewApi";
 import { returnApi } from "@/modules/returns/api/returnApi";
 
 const store = useOrderStore();
@@ -217,6 +271,16 @@ const currentPage = ref(1);
 const returnRequests = ref([]);
 const returnDialogVisible = ref(false);
 const returnSubmitting = ref(false);
+const reviewDialogVisible = ref(false);
+const reviewSubmitting = ref(false);
+const reviewForm = ref({
+  orderId: null,
+  productId: null,
+  productName: "",
+  rating: 5,
+  comment: "",
+  imageUrlsText: ""
+});
 const returnForm = ref({
   orderId: null,
   returnType: "REFUND",
@@ -408,6 +472,60 @@ const canRequestReturn = (order) => {
 const itemCount = (order) => {
   if (!Array.isArray(order?.items)) return 0;
   return order.items.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
+};
+
+const sortedHistory = (history) => {
+  const rows = Array.isArray(history) ? [...history] : [];
+  return rows.sort((a, b) => new Date(a?.changedAt || 0).getTime() - new Date(b?.changedAt || 0).getTime());
+};
+
+const handleReorder = async (order) => {
+  try {
+    await orderApi.reorder(order.id);
+    ElMessage.success("Đã thêm lại sản phẩm của đơn vào giỏ hàng");
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || "Không thể mua lại đơn hàng này");
+  }
+};
+
+const openReviewDialog = (order, item) => {
+  reviewForm.value = {
+    orderId: order?.id || null,
+    productId: item?.productId || null,
+    productName: item?.productName || "Sản phẩm",
+    rating: 5,
+    comment: "",
+    imageUrlsText: ""
+  };
+  reviewDialogVisible.value = true;
+};
+
+const submitReview = async () => {
+  const payload = {
+    orderId: Number(reviewForm.value.orderId || 0),
+    productId: Number(reviewForm.value.productId || 0),
+    rating: Number(reviewForm.value.rating || 5),
+    comment: String(reviewForm.value.comment || "").trim(),
+    imageUrls: String(reviewForm.value.imageUrlsText || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 5)
+  };
+  if (!payload.orderId || !payload.productId) {
+    ElMessage.warning("Thiếu dữ liệu đánh giá");
+    return;
+  }
+  reviewSubmitting.value = true;
+  try {
+    await reviewApi.create(payload);
+    ElMessage.success("Gửi đánh giá thành công");
+    reviewDialogVisible.value = false;
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || "Không thể gửi đánh giá");
+  } finally {
+    reviewSubmitting.value = false;
+  }
 };
 
 const handlePageChange = (page) => {
@@ -741,9 +859,33 @@ onMounted(async () => {
   align-items: center;
 }
 
+.foot-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .return-note {
   font-size: 12px;
   color: #6b7280;
+}
+
+.status-timeline {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #e2e8f0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  span {
+    font-size: 11px;
+    color: #64748b;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 4px 6px;
+  }
 }
 
 .pagination-wrap {

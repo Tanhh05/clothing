@@ -20,6 +20,10 @@ public class OrderResponse {
     private String paymentMethod;
     private String paymentUrl;
     private String address;
+    private Long subTotal;
+    private Long shippingFee;
+    private Long discountAmount;
+    private String appliedVoucherCode;
     private LocalDateTime createdAt;
     private List<OrderItemResponse> items;
     private List<OrderStatusHistoryResponse> statusHistory;

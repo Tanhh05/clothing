@@ -26,6 +26,11 @@ const routes = [
         component: () => import("@/modules/cart/pages/CartPage.vue")
       },
       {
+        path: "checkout",
+        component: () => import("@/modules/cart/pages/CheckoutPage.vue"),
+        meta: { requiresAuth: true }
+      },
+      {
         path: "search",
         component: () => import("@/modules/search/pages/SearchPage.vue")
       },

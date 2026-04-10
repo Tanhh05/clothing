@@ -6,13 +6,23 @@ import com.clothing.dto.response.CartItemResponse;
 import com.clothing.dto.response.CartResponse;
 import com.clothing.entity.CartEntity;
 import com.clothing.entity.CartItemEntity;
+import com.clothing.entity.ProductEntity;
+import com.clothing.entity.ProductImageEntity;
 import com.clothing.entity.ProductVariantEntity;
+import com.clothing.entity.AttributeEntity;
+import com.clothing.entity.AttributeValueEntity;
+import com.clothing.entity.VariantAttributeValueEntity;
 import com.clothing.entity.UserEntity;
 import com.clothing.exception.BusinessException;
+import com.clothing.repository.AttributeRepository;
+import com.clothing.repository.AttributeValueRepository;
 import com.clothing.repository.CartItemRepository;
 import com.clothing.repository.CartRepository;
+import com.clothing.repository.ProductImageRepository;
+import com.clothing.repository.ProductRepository;
 import com.clothing.repository.ProductVariantRepository;
 import com.clothing.repository.UserRepository;
+import com.clothing.repository.VariantAttributeValueRepository;
 import com.clothing.service.CartService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -20,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 @Service
 public class CartServiceImpl implements CartService {
@@ -28,17 +40,32 @@ public class CartServiceImpl implements CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final ProductRepository productRepository;
+    private final ProductImageRepository productImageRepository;
+    private final VariantAttributeValueRepository variantAttributeValueRepository;
+    private final AttributeValueRepository attributeValueRepository;
+    private final AttributeRepository attributeRepository;
 
     public CartServiceImpl(
             UserRepository userRepository,
             CartRepository cartRepository,
             CartItemRepository cartItemRepository,
-            ProductVariantRepository productVariantRepository
+            ProductVariantRepository productVariantRepository,
+            ProductRepository productRepository,
+            ProductImageRepository productImageRepository,
+            VariantAttributeValueRepository variantAttributeValueRepository,
+            AttributeValueRepository attributeValueRepository,
+            AttributeRepository attributeRepository
     ) {
         this.userRepository = userRepository;
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
         this.productVariantRepository = productVariantRepository;
+        this.productRepository = productRepository;
+        this.productImageRepository = productImageRepository;
+        this.variantAttributeValueRepository = variantAttributeValueRepository;
+        this.attributeValueRepository = attributeValueRepository;
+        this.attributeRepository = attributeRepository;
     }
 
     @Override
@@ -110,11 +137,20 @@ public class CartServiceImpl implements CartService {
         List<CartItemEntity> items = cartItemRepository.findByCartIdOrderByIdAsc(cart.getId());
         List<CartItemResponse> responses = items.stream().map(item -> {
             ProductVariantEntity variant = getVariant(item.getVariantId());
+            ProductEntity product = productRepository.findById(variant.getProductId()).orElse(null);
+            Map<String, String> attributes = resolveVariantAttributes(variant.getId());
+            String image = resolveProductImage(variant.getProductId());
             long lineTotal = variant.getPrice() * item.getQuantity();
             return CartItemResponse.builder()
                     .id(item.getId())
+                    .productId(variant.getProductId())
+                    .productSlug(product == null ? null : product.getSlug())
+                    .productName(product == null ? variant.getSku() : product.getName())
+                    .productImage(image)
                     .variantId(item.getVariantId())
                     .sku(variant.getSku())
+                    .size(attributes.get("size"))
+                    .color(attributes.get("color"))
                     .price(variant.getPrice())
                     .quantity(item.getQuantity())
                     .lineTotal(lineTotal)
@@ -154,5 +190,42 @@ public class CartServiceImpl implements CartService {
         if (quantity > variant.getStock()) {
             throw new BusinessException("Not enough stock for variant: " + variant.getSku(), HttpStatus.BAD_REQUEST);
         }
+    }
+
+    private Map<String, String> resolveVariantAttributes(Long variantId) {
+        String size = "";
+        String color = "";
+        List<VariantAttributeValueEntity> links = variantAttributeValueRepository.findByVariantId(variantId);
+        for (VariantAttributeValueEntity link : links) {
+            AttributeValueEntity value = attributeValueRepository.findById(link.getAttributeValueId()).orElse(null);
+            if (value == null || value.getAttributeId() == null) {
+                continue;
+            }
+            AttributeEntity attribute = attributeRepository.findById(value.getAttributeId()).orElse(null);
+            if (attribute == null || attribute.getName() == null) {
+                continue;
+            }
+            String attrName = attribute.getName().trim().toLowerCase(Locale.ROOT);
+            if ("size".equals(attrName)) {
+                size = value.getValue() == null ? "" : value.getValue();
+            } else if ("color".equals(attrName)) {
+                color = value.getValue() == null ? "" : value.getValue();
+            }
+        }
+        return Map.of("size", size, "color", color);
+    }
+
+    private String resolveProductImage(Long productId) {
+        List<ProductImageEntity> images = productImageRepository.findByProductIdOrderByIdAsc(productId);
+        for (ProductImageEntity image : images) {
+            if (Boolean.TRUE.equals(image.getIsMain()) && image.getUrl() != null && !image.getUrl().isBlank()) {
+                return image.getUrl();
+            }
+        }
+        return images.stream()
+                .map(ProductImageEntity::getUrl)
+                .filter(url -> url != null && !url.isBlank())
+                .findFirst()
+                .orElse("");
     }
 }

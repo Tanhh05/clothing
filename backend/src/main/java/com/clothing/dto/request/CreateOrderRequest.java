@@ -18,4 +18,7 @@ public class CreateOrderRequest {
 
     @Size(max = 100, message = "province max length is 100")
     private String province;
+
+    @Size(max = 50, message = "voucherCode max length is 50")
+    private String voucherCode;
 }

@@ -10,6 +10,8 @@ import com.clothing.dto.response.PageResponse;
 import com.clothing.dto.response.ProductSalesStatResponse;
 import com.clothing.entity.CartEntity;
 import com.clothing.entity.CartItemEntity;
+import com.clothing.entity.CouponEntity;
+import com.clothing.entity.CouponUsageEntity;
 import com.clothing.entity.OrderEntity;
 import com.clothing.entity.OrderItemEntity;
 import com.clothing.entity.OrderStatusHistoryEntity;
@@ -20,6 +22,8 @@ import com.clothing.exception.BusinessException;
 import com.clothing.messaging.publisher.OrderEventPublisher;
 import com.clothing.repository.CartItemRepository;
 import com.clothing.repository.CartRepository;
+import com.clothing.repository.CouponRepository;
+import com.clothing.repository.CouponUsageRepository;
 import com.clothing.repository.OrderItemRepository;
 import com.clothing.repository.OrderRepository;
 import com.clothing.repository.OrderStatusHistoryRepository;
@@ -48,6 +52,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.text.Normalizer;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -73,6 +78,8 @@ public class OrderServiceImpl implements OrderService {
     private final UserRepository userRepository;
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
+    private final CouponRepository couponRepository;
+    private final CouponUsageRepository couponUsageRepository;
     private final ProductVariantRepository productVariantRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -87,6 +94,8 @@ public class OrderServiceImpl implements OrderService {
             UserRepository userRepository,
             CartRepository cartRepository,
             CartItemRepository cartItemRepository,
+            CouponRepository couponRepository,
+            CouponUsageRepository couponUsageRepository,
             ProductVariantRepository productVariantRepository,
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
@@ -100,6 +109,8 @@ public class OrderServiceImpl implements OrderService {
         this.userRepository = userRepository;
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
+        this.couponRepository = couponRepository;
+        this.couponUsageRepository = couponUsageRepository;
         this.productVariantRepository = productVariantRepository;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
@@ -133,10 +144,17 @@ public class OrderServiceImpl implements OrderService {
 
         String province = extractProvince(request);
         long shippingFee = calculateShippingFee(subTotal, province);
-        long total = subTotal + shippingFee;
+        ResolvedCoupon resolvedCoupon = resolveBestCoupon(user.getId(), subTotal, request.getVoucherCode());
+        long discountAmount = resolvedCoupon == null ? 0L : resolvedCoupon.discountAmount;
+        long total = Math.max(0L, subTotal + shippingFee - discountAmount);
 
         OrderEntity order = new OrderEntity();
         order.setUserId(user.getId());
+        order.setSubTotal(subTotal);
+        order.setShippingFee(shippingFee);
+        order.setDiscountAmount(discountAmount);
+        order.setCouponId(resolvedCoupon == null ? null : resolvedCoupon.coupon.getId());
+        order.setCouponCode(resolvedCoupon == null ? null : resolvedCoupon.coupon.getCode());
         order.setTotalPrice(total);
         order.setStatus(STATUS_PENDING);
         order.setPaymentMethod(request.getPaymentMethod().trim());
@@ -154,6 +172,18 @@ public class OrderServiceImpl implements OrderService {
             orderItemRepository.save(orderItem);
         }
         addHistory(savedOrder.getId(), STATUS_PENDING);
+        if (resolvedCoupon != null) {
+            CouponEntity coupon = resolvedCoupon.coupon;
+            coupon.setUsedCount((coupon.getUsedCount() == null ? 0 : coupon.getUsedCount()) + 1);
+            couponRepository.save(coupon);
+
+            CouponUsageEntity usage = new CouponUsageEntity();
+            usage.setCouponId(coupon.getId());
+            usage.setUserId(user.getId());
+            usage.setOrderId(savedOrder.getId());
+            usage.setUsedAt(LocalDateTime.now());
+            couponUsageRepository.save(usage);
+        }
 
         cartItemRepository.deleteByCartId(cart.getId());
         publishOrderCreatedAfterCommit(savedOrder.getId());
@@ -341,6 +371,49 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    public OrderResponse reorder(String username, Long orderId) {
+        UserEntity user = getUser(username);
+        OrderEntity oldOrder = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException("Order not found", HttpStatus.NOT_FOUND));
+        if (!user.getId().equals(oldOrder.getUserId())) {
+            throw new BusinessException("Order does not belong to current user", HttpStatus.FORBIDDEN);
+        }
+
+        List<OrderItemEntity> oldItems = orderItemRepository.findByOrderIdOrderByIdAsc(orderId);
+        if (oldItems.isEmpty()) {
+            throw new BusinessException("Order has no items", HttpStatus.BAD_REQUEST);
+        }
+
+        CartEntity cart = cartRepository.findByUserId(user.getId()).orElseGet(() -> {
+            CartEntity created = new CartEntity();
+            created.setUserId(user.getId());
+            created.setCreatedAt(LocalDateTime.now());
+            return cartRepository.save(created);
+        });
+
+        for (OrderItemEntity oldItem : oldItems) {
+            ProductVariantEntity variant = getVariant(oldItem.getVariantId());
+            int available = Math.max(0, variant.getStock() == null ? 0 : variant.getStock());
+            if (available <= 0) continue;
+            int quantity = Math.max(1, Math.min(oldItem.getQuantity() == null ? 1 : oldItem.getQuantity(), available));
+            CartItemEntity existing = cartItemRepository.findByCartIdAndVariantId(cart.getId(), variant.getId()).orElse(null);
+            if (existing == null) {
+                CartItemEntity item = new CartItemEntity();
+                item.setCartId(cart.getId());
+                item.setVariantId(variant.getId());
+                item.setQuantity(quantity);
+                cartItemRepository.save(item);
+            } else {
+                int next = Math.min(existing.getQuantity() + quantity, available);
+                existing.setQuantity(next);
+                cartItemRepository.save(existing);
+            }
+        }
+        return toResponse(oldOrder);
+    }
+
+    @Override
+    @Transactional
     public OrderResponse updateOrderStatus(Long orderId, UpdateOrderStatusRequest request) {
         OrderEntity order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new BusinessException("Order not found", HttpStatus.NOT_FOUND));
@@ -486,6 +559,7 @@ public class OrderServiceImpl implements OrderService {
             ProductEntity product = productRepository.findById(variant.getProductId()).orElse(null);
             return OrderItemResponse.builder()
                     .id(item.getId())
+                    .productId(product == null ? null : product.getId())
                     .variantId(item.getVariantId())
                     .sku(variant.getSku())
                     .productName(product == null ? null : product.getName())
@@ -508,6 +582,10 @@ public class OrderServiceImpl implements OrderService {
                 .userId(order.getUserId())
                 .customerName(customerName)
                 .totalPrice(order.getTotalPrice())
+                .subTotal(order.getSubTotal())
+                .shippingFee(order.getShippingFee())
+                .discountAmount(order.getDiscountAmount())
+                .appliedVoucherCode(order.getCouponCode())
                 .status(order.getStatus())
                 .paymentMethod(order.getPaymentMethod())
                 .paymentUrl(null)
@@ -580,6 +658,60 @@ public class OrderServiceImpl implements OrderService {
         return defaultFee + FAR_DISTANCE_SURCHARGE;
     }
 
+    private ResolvedCoupon resolveBestCoupon(Long userId, long subTotal, String preferredCode) {
+        LocalDateTime now = LocalDateTime.now();
+        List<CouponEntity> candidates = couponRepository.findAll().stream()
+                .filter(coupon -> "ACTIVE".equalsIgnoreCase(String.valueOf(coupon.getStatus())))
+                .filter(coupon -> coupon.getStartDate() == null || !coupon.getStartDate().isAfter(now))
+                .filter(coupon -> coupon.getEndDate() == null || !coupon.getEndDate().isBefore(now))
+                .filter(coupon -> coupon.getMinOrderValue() == null || subTotal >= coupon.getMinOrderValue())
+                .filter(coupon -> coupon.getQuantity() == null || (coupon.getUsedCount() == null ? 0 : coupon.getUsedCount()) < coupon.getQuantity())
+                .filter(coupon -> !couponUsageRepository.existsByCouponIdAndUserId(coupon.getId(), userId))
+                .toList();
+
+        if (candidates.isEmpty()) return null;
+
+        CouponEntity preferred = null;
+        if (preferredCode != null && !preferredCode.isBlank()) {
+            String normalized = preferredCode.trim().toUpperCase(Locale.ROOT);
+            preferred = candidates.stream()
+                    .filter(coupon -> normalized.equalsIgnoreCase(coupon.getCode()))
+                    .findFirst()
+                    .orElseThrow(() -> new BusinessException("Voucher không hợp lệ hoặc không áp dụng được", HttpStatus.BAD_REQUEST));
+        }
+
+        if (preferred != null) {
+            long discount = calculateCouponDiscount(preferred, subTotal);
+            if (discount <= 0) {
+                throw new BusinessException("Voucher không tạo được giảm giá", HttpStatus.BAD_REQUEST);
+            }
+            return new ResolvedCoupon(preferred, discount);
+        }
+
+        return candidates.stream()
+                .map(coupon -> new ResolvedCoupon(coupon, calculateCouponDiscount(coupon, subTotal)))
+                .filter(result -> result.discountAmount > 0)
+                .max(Comparator.comparingLong(value -> value.discountAmount))
+                .orElse(null);
+    }
+
+    private long calculateCouponDiscount(CouponEntity coupon, long subTotal) {
+        if (coupon == null) return 0L;
+        String discountType = String.valueOf(coupon.getDiscountType()).trim().toUpperCase(Locale.ROOT);
+        long discountValue = coupon.getDiscountValue() == null ? 0L : coupon.getDiscountValue();
+        if (discountValue <= 0 || subTotal <= 0) return 0L;
+
+        long discount = 0L;
+        if ("PERCENT".equals(discountType)) {
+            discount = Math.round(subTotal * (discountValue / 100.0d));
+        } else if ("AMOUNT".equals(discountType)) {
+            discount = discountValue;
+        }
+        long maxDiscount = coupon.getMaxDiscountValue() == null ? Long.MAX_VALUE : Math.max(0L, coupon.getMaxDiscountValue());
+        discount = Math.min(discount, maxDiscount);
+        return Math.max(0L, Math.min(discount, subTotal));
+    }
+
     private String normalizeProvince(String province) {
         if (province == null || province.isBlank()) {
             return "";
@@ -604,5 +736,15 @@ public class OrderServiceImpl implements OrderService {
                 .filter(token -> !token.isBlank())
                 .toList();
         return String.join(" ", filtered);
+    }
+
+    private static class ResolvedCoupon {
+        private final CouponEntity coupon;
+        private final long discountAmount;
+
+        private ResolvedCoupon(CouponEntity coupon, long discountAmount) {
+            this.coupon = coupon;
+            this.discountAmount = discountAmount;
+        }
     }
 }

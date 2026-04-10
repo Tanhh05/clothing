@@ -4,6 +4,11 @@ export const productApi = {
   getProducts(params) {
     return api.get("/products", { params });
   },
+  getRecommendations(productIds = [], limit = 4) {
+    return api.get("/products/recommendations", {
+      params: { productIds, limit }
+    });
+  },
   getById(idOrSlug) {
     return api.get(`/products/${encodeURIComponent(idOrSlug)}`);
   },
@@ -74,5 +79,11 @@ export const productApi = {
     return api.get("/products/import/template", {
       responseType: "blob"
     });
+  },
+  subscribeStockAlert(payload) {
+    return api.post("/user/stock-alerts", payload);
+  },
+  unsubscribeStockAlert(payload) {
+    return api.delete("/user/stock-alerts", { data: payload });
   }
 };
