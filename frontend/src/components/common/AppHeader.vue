@@ -211,6 +211,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Search, User, ShoppingBag, ArrowDown, ArrowUp, Close, Bell } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
+import { ElMessageBox } from 'element-plus';
 import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
@@ -427,6 +428,17 @@ const stopNotificationPolling = () => {
 
 const handleLogout = async () => {
   try {
+    // Show confirmation dialog
+    await ElMessageBox.confirm(
+      'Bạn có chắc chắn muốn đăng xuất?',
+      'Xác nhận đăng xuất',
+      {
+        confirmButtonText: 'Có',
+        cancelButtonText: 'Không',
+        type: 'warning',
+      }
+    );
+
     // Clear auth store
     authStore.logout();
 
@@ -446,7 +458,10 @@ const handleLogout = async () => {
     // Redirect to home
     router.push('/');
   } catch (error) {
-    console.error('Logout failed:', error);
+    // User cancelled the dialog, do nothing
+    if (error.message !== 'cancel') {
+      console.error('Logout failed:', error);
+    }
   }
 };
 

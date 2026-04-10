@@ -2,8 +2,6 @@
   <section class="login-page client-page-shell">
     <el-card shadow="never" class="login-card">
       <div class="head">
-        <h1>Đăng nhập</h1>
-        <p>Đăng nhập để tiếp tục mua sắm và theo dõi đơn hàng.</p>
       </div>
 
       <el-form label-position="top" @submit.prevent="onSubmit">

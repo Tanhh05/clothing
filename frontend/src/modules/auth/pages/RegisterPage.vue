@@ -1,10 +1,7 @@
 <template>
   <section class="register-page client-page-shell">
     <el-card shadow="never" class="register-card">
-      <div class="head">
-        <h1>Tạo tài khoản</h1>
-        <p>Điền thông tin để đăng ký tài khoản mua sắm.</p>
-      </div>
+
 
       <el-form label-position="top" @submit.prevent="onSubmit">
         <el-form-item label="Tên đăng nhập">
