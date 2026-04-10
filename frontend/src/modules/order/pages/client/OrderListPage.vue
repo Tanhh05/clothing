@@ -1,5 +1,5 @@
 <template>
-  <div class="orders-page">
+  <div class="orders-page client-page-shell">
     <div class="orders-container">
       <el-card class="hero-card" shadow="never">
         <div class="hero-top">

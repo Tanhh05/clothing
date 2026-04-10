@@ -1,5 +1,5 @@
 <template>
-  <section class="login-page">
+  <section class="login-page client-page-shell">
     <el-card shadow="never" class="login-card">
       <div class="head">
         <h1>Đăng nhập</h1>

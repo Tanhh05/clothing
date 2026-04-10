@@ -1,5 +1,5 @@
 <template>
-  <section class="product-admin-page" v-loading="loading">
+  <section class="product-admin-page admin-page-shell" v-loading="loading">
     <div class="inventory-panel">
       <div class="panel-header">
         <div class="panel-actions">
@@ -34,7 +34,7 @@
       </div>
 
       <div class="table-wrap">
-        <el-table
+        <BaseTable
           ref="productTableRef"
           :data="filteredProducts"
           border
@@ -85,7 +85,7 @@
               </div>
             </template>
           </el-table-column>
-        </el-table>
+        </BaseTable>
       </div>
       <div class="pagination-wrap">
         <el-pagination
@@ -339,7 +339,7 @@
       </div>
 
       <div v-loading="inventoryLoading" class="inventory-alert-wrap">
-        <el-table
+        <BaseTable
           :data="lowStockItems"
           border
           stripe
@@ -357,12 +357,12 @@
               <el-button size="small" @click="loadInventoryLogs(row.variantId)">Xem log</el-button>
             </template>
           </el-table-column>
-        </el-table>
+        </BaseTable>
       </div>
 
       <section class="inventory-log-box">
         <h4>Lịch sử nhập/xuất</h4>
-        <el-table :data="inventoryLogs" border stripe size="small" table-layout="fixed" empty-text="Chưa có log">
+        <BaseTable :data="inventoryLogs" border stripe size="small" table-layout="fixed" empty-text="Chưa có log">
           <el-table-column prop="createdAt" label="Thời gian" min-width="165">
             <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
           </el-table-column>
@@ -373,7 +373,7 @@
             <template #default="{ row }">{{ row.beforeStock }} → {{ row.afterStock }}</template>
           </el-table-column>
           <el-table-column prop="note" label="Ghi chú" min-width="220" show-overflow-tooltip />
-        </el-table>
+        </BaseTable>
       </section>
     </el-drawer>
 
@@ -416,7 +416,7 @@
           <el-tag type="success">Thành công: {{ importResult.successCount || 0 }}</el-tag>
           <el-tag type="danger">Thất bại: {{ importResult.failedCount || 0 }}</el-tag>
         </div>
-        <el-table :data="importResult.results || []" border stripe size="small" table-layout="fixed" max-height="320">
+        <BaseTable :data="importResult.results || []" border stripe size="small" table-layout="fixed" max-height="320">
           <el-table-column prop="rowNumber" label="Dòng" width="72" />
           <el-table-column prop="name" label="Tên sản phẩm" min-width="180" />
           <el-table-column label="Trạng thái" width="120">
@@ -425,7 +425,7 @@
             </template>
           </el-table-column>
           <el-table-column prop="message" label="Chi tiết" min-width="220" show-overflow-tooltip />
-        </el-table>
+        </BaseTable>
       </div>
 
       <template #footer>

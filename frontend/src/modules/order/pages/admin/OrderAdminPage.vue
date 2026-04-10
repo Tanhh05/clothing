@@ -1,5 +1,5 @@
 <template>
-  <section class="admin-orders-page" v-loading="loading">
+  <section class="admin-orders-page admin-page-shell" v-loading="loading">
     <div class="panel">
       <div class="panel-head">
         <div class="filters-row">
@@ -39,7 +39,7 @@
       </div>
 
       <div class="table-wrap">
-        <el-table
+        <BaseTable
           ref="orderTableRef"
           :data="orders"
           border
@@ -87,7 +87,7 @@
               </div>
             </template>
           </el-table-column>
-        </el-table>
+        </BaseTable>
       </div>
       <div class="pagination-wrap">
         <el-pagination
@@ -169,7 +169,7 @@
 
           <section class="detail-card">
             <h4 class="card-title">Sản phẩm trong đơn</h4>
-            <el-table :data="selectedOrder.items || []" border stripe size="small" table-layout="fixed" empty-text="Không có sản phẩm">
+            <BaseTable :data="selectedOrder.items || []" border stripe size="small" table-layout="fixed" empty-text="Không có sản phẩm">
               <el-table-column prop="productName" label="Sản phẩm" min-width="220" />
               <el-table-column prop="sku" label="SKU" width="130" />
               <el-table-column prop="quantity" label="SL" width="80" />
@@ -179,7 +179,7 @@
               <el-table-column label="Thành tiền" width="140">
                 <template #default="{ row }">{{ formatCurrency(row.lineTotal) }}</template>
               </el-table-column>
-            </el-table>
+            </BaseTable>
           </section>
 
           <section class="detail-card history-box">
@@ -691,25 +691,26 @@ onMounted(() => {
 
 .panel-head {
   margin-bottom: 10px;
-  display: grid;
+  display: grid !important;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   gap: 8px;
 }
 
 .filters-row {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) 180px 280px auto;
+  display: grid !important;
+  grid-template-columns: minmax(280px, 1.5fr) minmax(160px, 180px) minmax(240px, 280px) auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
 
 .head-actions {
-  display: flex;
+  display: flex !important;
   align-items: center;
   gap: 8px;
   flex-wrap: nowrap;
+  justify-content: flex-end;
 }
 
 .bulk-toolbar {
@@ -897,6 +898,22 @@ onMounted(() => {
       width: 100% !important;
       max-width: 100% !important;
     }
+  }
+}
+
+@media (max-width: 1280px) {
+  .panel-head {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .head-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .filters-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

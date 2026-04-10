@@ -5,10 +5,230 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  background: #f8fafc;
+  color: #111827;
 }
 
 a {
   text-decoration: none;
+}
+
+:root {
+  --client-page-max-width: 1240px;
+  --client-page-padding-x: 16px;
+  --client-page-padding-y: 24px;
+  --client-card-radius: 10px;
+  --client-border-color: #e5e7eb;
+}
+
+.layout .container {
+  min-height: calc(100vh - 200px);
+}
+
+.layout .container > * {
+  width: 100%;
+}
+
+.layout .container .el-card {
+  border: 1px solid var(--client-border-color);
+  border-radius: var(--client-card-radius);
+}
+
+.layout .container .el-form-item__label {
+  font-weight: 600;
+  color: #334155;
+}
+
+.layout .container .el-table {
+  --el-table-border-color: #e5e7eb;
+  --el-table-header-bg-color: #f8fafc;
+  --el-table-row-hover-bg-color: #f9fafb;
+}
+
+.el-table,
+.el-table__inner-wrapper,
+.el-table__header-wrapper,
+.el-table__body-wrapper,
+.base-table {
+  border-radius: 0 !important;
+}
+
+.el-button {
+  border-radius: 0 !important;
+}
+
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner,
+.el-input-number,
+.el-select-dropdown,
+.el-picker-panel,
+.el-date-editor.el-input__wrapper {
+  border-radius: 0 !important;
+}
+
+.client-page-shell {
+  box-sizing: border-box;
+}
+
+.client-page-shell:not(.home-wrapper) {
+  max-width: var(--client-page-max-width);
+  margin: 0 auto;
+  padding: var(--client-page-padding-y) var(--client-page-padding-x) 36px;
+}
+
+.client-page-shell h1,
+.client-page-shell .section-title,
+.client-page-shell .cart-title,
+.client-page-shell .summary-title,
+.client-page-shell .discovery-title {
+  letter-spacing: -0.2px;
+}
+
+.client-page-shell .el-card {
+  border-radius: var(--client-card-radius);
+}
+
+.client-page-shell .el-input__wrapper,
+.client-page-shell .el-textarea__inner,
+.client-page-shell .el-select__wrapper {
+  border-radius: 0;
+}
+
+.client-page-shell .el-button {
+  border-radius: 0;
+}
+
+.client-page-shell .empty-state,
+.client-page-shell .empty-layout {
+  border: 1px dashed var(--client-border-color);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.home-wrapper.client-page-shell {
+  .home-content {
+    max-width: var(--client-page-max-width);
+    margin: 0 auto;
+    padding: var(--client-page-padding-y) var(--client-page-padding-x) 40px;
+  }
+}
+
+.product-list-page.client-page-shell {
+  .container-fluid {
+    max-width: none;
+    padding: 0;
+  }
+
+  .filter-sidebar,
+  .compare-bar,
+  .compare-table-wrap {
+    border-radius: 0;
+  }
+}
+
+.product-detail-container.client-page-shell {
+  .product-layout {
+    background: #fff;
+    border: 1px solid var(--client-border-color);
+    border-radius: 12px;
+    padding: 16px;
+  }
+}
+
+.cart-page-container.client-page-shell {
+  .cart-item-card,
+  .summary-box,
+  .rec-item {
+    border-radius: 10px;
+  }
+}
+
+.checkout-page.client-page-shell {
+  .checkout-layout {
+    margin: 0;
+  }
+
+  .el-card {
+    border-radius: 10px;
+  }
+}
+
+.orders-page.client-page-shell,
+.wishlist-page.client-page-shell,
+.notification-client-page.client-page-shell,
+.account-page.client-page-shell,
+.search-page.client-page-shell,
+.login-page.client-page-shell,
+.register-page.client-page-shell {
+  .hero-card,
+  .filter-card,
+  .surface-card,
+  .search-page-card {
+    border-radius: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .client-page-shell:not(.home-wrapper) {
+    padding: 16px 12px 24px;
+  }
+}
+
+.admin-layout .content .admin-page-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-layout .content .admin-page-shell .head,
+.admin-layout .content .admin-page-shell .panel-head,
+.admin-layout .content .admin-page-shell .toolbar,
+.admin-layout .content .admin-page-shell .filters-row,
+.admin-layout .content .admin-page-shell .head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-layout .content .admin-page-shell .panel,
+.admin-layout .content .admin-page-shell .inventory-panel,
+.admin-layout .content .admin-page-shell .filter-panel,
+.admin-layout .content .admin-page-shell .hero-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.admin-layout .content .admin-page-shell .table-wrap {
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.admin-layout .content .admin-page-shell .search-input,
+.admin-layout .content .admin-page-shell .status-filter,
+.admin-layout .content .admin-page-shell .date-filter,
+.admin-layout .content .admin-page-shell .date-range {
+  min-width: 180px;
+}
+
+.admin-layout .content .admin-page-shell .el-input__wrapper,
+.admin-layout .content .admin-page-shell .el-select__wrapper {
+  border-radius: 0;
+}
+
+.admin-layout .content .admin-page-shell .el-button {
+  border-radius: 0;
+}
+
+.admin-auth-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: #f8fafc;
 }
 
 /* Admin UI consistency */

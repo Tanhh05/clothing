@@ -1,5 +1,5 @@
 <template>
-  <div class="checkout-page">
+  <div class="checkout-page client-page-shell">
     <div v-if="cartStore.isEmpty" class="empty-layout">
       <el-empty description="Giỏ hàng đang trống">
         <router-link to="/cart">

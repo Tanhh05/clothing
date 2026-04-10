@@ -1,5 +1,5 @@
 <template>
-  <div class="product-list-page">
+  <div class="product-list-page client-page-shell">
     <div class="container-fluid">
       <div class="list-controls">
         <div class="list-stats">
@@ -44,14 +44,15 @@
           <div v-else class="product-grid">
             <div v-for="product in displayProducts" :key="product.id" class="product-card-wrap">
               <ProductCard :product="product" />
-              <button
-                type="button"
+              <el-button
+                size="small"
                 class="compare-toggle"
-                :class="{ active: isCompared(product.id) }"
+                :type="isCompared(product.id) ? 'primary' : 'default'"
+                :plain="!isCompared(product.id)"
                 @click.stop="toggleCompare(product)"
               >
-                {{ isCompared(product.id) ? "Bỏ so sánh" : "Thêm so sánh" }}
-              </button>
+                {{ isCompared(product.id) ? "Bỏ so sánh" : "Thêm so sánh" }}
+              </el-button>
             </div>
           </div>
 

@@ -1,5 +1,5 @@
 <template>
-  <section class="returns-admin">
+  <section class="returns-admin admin-page-shell">
     <section class="panel" v-loading="loading">
       <div class="panel-head">
         <el-select v-model="statusFilter" clearable placeholder="Trạng thái" class="status-filter">
@@ -7,7 +7,7 @@
         </el-select>
         <el-button :loading="loading" @click="fetchRequests">Làm mới</el-button>
       </div>
-      <el-table :data="requests" border stripe size="small" empty-text="Chưa có yêu cầu đổi trả" table-layout="fixed">
+      <BaseTable :data="requests" border stripe size="small" empty-text="Chưa có yêu cầu đổi trả" table-layout="fixed">
         <el-table-column label="Yêu cầu" min-width="240">
           <template #default="{ row }">
             <div class="request-cell">
@@ -71,7 +71,7 @@
             <el-button v-else size="small" disabled>Hoàn tất</el-button>
           </template>
         </el-table-column>
-      </el-table>
+      </BaseTable>
     </section>
   </section>
 </template>

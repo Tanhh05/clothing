@@ -1,5 +1,5 @@
 <template>
-  <section class="category-admin-page" v-loading="loading">
+  <section class="category-admin-page admin-page-shell" v-loading="loading">
     <div class="inventory-panel">
       <div class="panel-header">
         <div class="panel-actions">
@@ -19,7 +19,7 @@
       </div>
 
       <div class="table-wrap">
-        <el-table
+        <BaseTable
           :data="filteredCategories"
           border
           stripe
@@ -42,7 +42,7 @@
               <el-button size="small" type="danger" plain @click="deleteCategory(row)">Xóa</el-button>
             </template>
           </el-table-column>
-        </el-table>
+        </BaseTable>
       </div>
       <div class="pagination-wrap">
         <el-pagination

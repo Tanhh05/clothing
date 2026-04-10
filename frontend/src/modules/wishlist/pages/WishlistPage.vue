@@ -1,5 +1,5 @@
 <template>
-  <div class="wishlist-page">
+  <div class="wishlist-page client-page-shell">
     <div class="container">
       <div class="header">
         <h1>SẢN PHẨM YÊU THÍCH</h1>

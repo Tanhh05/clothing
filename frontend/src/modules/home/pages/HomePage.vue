@@ -1,5 +1,5 @@
 <template>
-  <div class="home-wrapper">
+  <div class="home-wrapper client-page-shell">
     <!-- Hero Section -->
     <section
       v-if="currentBanner"

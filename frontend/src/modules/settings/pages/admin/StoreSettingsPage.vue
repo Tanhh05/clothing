@@ -1,5 +1,5 @@
 <template>
-  <section class="settings-page">
+  <section class="settings-page admin-page-shell">
     <header class="head">
       <div>
         <p class="eyebrow">Admin panel</p>

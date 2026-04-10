@@ -1,5 +1,5 @@
 <template>
-  <section class="banner-admin-page" v-loading="loading">
+  <section class="banner-admin-page admin-page-shell" v-loading="loading">
     <div class="panel">
       <div class="panel-head">
         <el-input
@@ -12,7 +12,7 @@
         <el-button type="primary" @click="openCreate">+ Thêm banner</el-button>
       </div>
       <div class="table-wrap">
-        <el-table :data="pagedBanners" border stripe size="small" table-layout="fixed" class="banner-table" empty-text="Không có banner">
+        <BaseTable :data="pagedBanners" border stripe size="small" table-layout="fixed" class="banner-table" empty-text="Không có banner">
           <el-table-column prop="id" label="#" width="70" />
           <el-table-column label="Desktop" width="120">
             <template #default="{ row }">
@@ -41,7 +41,7 @@
               <el-button size="small" type="danger" plain @click="deleteBanner(row)">Xóa</el-button>
             </template>
           </el-table-column>
-        </el-table>
+        </BaseTable>
       </div>
       <div class="pagination-wrap">
         <el-pagination

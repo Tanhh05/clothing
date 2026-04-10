@@ -1,66 +1,44 @@
 <template>
-  <section class="account-page">
-    <el-card shadow="never" class="hero-card">
-      <div class="hero-content">
-        <div>
-          <p class="hero-eyebrow">TRANG TÀI KHOẢN</p>
-          <h1>Thông tin cá nhân</h1>
-          <p class="hero-sub">Quản lý hồ sơ, địa chỉ giao hàng và thông tin nhận hàng tại một nơi.</p>
+  <section class="account-page client-page-shell">
+    <el-card shadow="never" class="surface-card profile-card">
+      <template #header>
+        <div class="card-head">
+          <span>Thông tin cá nhân</span>
         </div>
-        <div class="hero-badges">
-          <el-tag type="info" effect="plain">Tài khoản: {{ authStore.profile?.username || authStore.username || "N/A" }}</el-tag>
-          <el-tag type="success" effect="plain">Địa chỉ: {{ addresses.length }}</el-tag>
-        </div>
-      </div>
-    </el-card>
+      </template>
 
-    <el-row :gutter="16">
-      <el-col :xs="24" :lg="14">
-        <el-card shadow="never" class="surface-card">
-          <template #header>
-            <div class="card-head">
-              <span>Hồ sơ tài khoản</span>
-              <el-tag size="small" type="primary" effect="plain">Cập nhật nhanh</el-tag>
-            </div>
-          </template>
-          <el-form label-position="top" class="profile-form">
+      <el-form label-position="top" class="profile-form">
+        <el-row :gutter="16">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="Họ và tên">
               <el-input v-model="profileForm.fullName" placeholder="Nhập họ và tên" />
             </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
             <el-form-item label="Số điện thoại">
               <el-input v-model="profileForm.phone" placeholder="Nhập số điện thoại" />
             </el-form-item>
-            <el-row :gutter="10">
-              <el-col :xs="24" :sm="12">
-                <el-form-item label="Email">
-                  <el-input :model-value="authStore.profile?.email || ''" disabled />
-                </el-form-item>
-              </el-col>
-              <el-col :xs="24" :sm="12">
-                <el-form-item label="Tên đăng nhập">
-                  <el-input :model-value="authStore.profile?.username || authStore.username || ''" disabled />
-                </el-form-item>
-              </el-col>
-            </el-row>
-            <el-button type="primary" :loading="savingProfile" @click="saveProfile">Lưu thông tin cá nhân</el-button>
-          </el-form>
-        </el-card>
-      </el-col>
+          </el-col>
+        </el-row>
 
-      <el-col :xs="24" :lg="10">
-        <el-card shadow="never" class="summary-card surface-card">
-          <template #header>
-            <div class="card-head">
-              <span>Tổng quan địa chỉ</span>
-            </div>
-          </template>
-          <div class="summary-number">{{ addresses.length }}</div>
-          <p class="summary-text">Địa chỉ đã lưu trong tài khoản</p>
-          <el-tag v-if="defaultAddress" type="success" effect="plain">Mặc định: {{ defaultAddress.recipientName }}</el-tag>
-          <el-button type="primary" class="summary-btn" @click="openCreate">Thêm địa chỉ mới</el-button>
-        </el-card>
-      </el-col>
-    </el-row>
+        <el-row :gutter="16">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="Email">
+              <el-input :model-value="authStore.profile?.email || ''" disabled />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="Tên đăng nhập">
+              <el-input :model-value="authStore.profile?.username || authStore.username || ''" disabled />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <div class="form-actions">
+          <el-button type="primary" :loading="savingProfile" @click="saveProfile">Lưu thông tin cá nhân</el-button>
+        </div>
+      </el-form>
+    </el-card>
 
     <el-card shadow="never" class="address-panel surface-card">
       <template #header>
@@ -195,6 +173,10 @@ const profileForm = ref({
 const form = ref(defaultForm());
 
 const defaultAddress = computed(() => addresses.value.find((item) => item.isDefault) || null);
+const displayName = computed(
+  () => authStore.profile?.fullName || authStore.profile?.username || authStore.username || "Tài khoản khách hàng"
+);
+const accountInitial = computed(() => String(displayName.value || "U").trim().charAt(0).toUpperCase());
 
 function defaultForm() {
   return {
@@ -395,13 +377,8 @@ onMounted(async () => {
 
 <style scoped lang="scss">
 .account-page {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 24px 16px 48px;
-  background:
-    radial-gradient(circle at top right, rgba(64, 158, 255, 0.08), transparent 40%),
-    radial-gradient(circle at 10% 40%, rgba(103, 194, 58, 0.07), transparent 28%);
-  border-radius: 0;
+  background: transparent;
+  padding: 24px 0;
 }
 
 .hero-card {
@@ -410,54 +387,72 @@ onMounted(async () => {
 
 .hero-content {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 14px;
-
-  h1 {
-    margin: 0 0 6px;
-    font-size: 30px;
-    font-weight: 900;
-    letter-spacing: -0.5px;
-  }
 }
 
-.hero-eyebrow {
-  margin: 0 0 6px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
-  color: #64748b;
+.hero-content.compact {
+  min-height: 84px;
 }
 
-.hero-sub {
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 56px;
+  height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+  border: 1px solid #d6dee8;
+  background: #f8fafc;
+  flex-shrink: 0;
+}
+
+.identity-content {
+  display: grid;
+  gap: 2px;
+}
+
+.identity-name {
   margin: 0;
-  color: var(--el-text-color-secondary);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: #0f172a;
+}
+
+.identity-meta {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
 }
 
 .hero-badges {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .surface-card {
-  border-radius: 0;
-  overflow: hidden;
+  height: 100%;
+  border-radius: 0 !important;
 }
 
 .surface-card :deep(.el-card__header) {
-  border-bottom: none;
-  padding-bottom: 6px;
+  border-radius: 0;
 }
 
 .surface-card :deep(.el-card__body) {
-  padding-top: 12px;
-}
-
-.account-page :deep(.el-card) {
-  border: none;
-  box-shadow: none !important;
+  border-radius: 0;
 }
 
 .card-head {
@@ -471,14 +466,15 @@ onMounted(async () => {
 
 .summary-card {
   height: 100%;
+  border-radius: 0 !important;
 }
 
 .summary-number {
-  font-size: 40px;
-  font-weight: 700;
+  font-size: 36px;
+  font-weight: 800;
   line-height: 1;
   margin-bottom: 6px;
-  color: var(--el-color-primary);
+  color: #0f172a;
 }
 
 .summary-text {
@@ -489,46 +485,85 @@ onMounted(async () => {
 .summary-btn {
   margin-top: 12px;
   width: 100%;
+  border-radius: 0 !important;
 }
 
 .address-panel {
   margin-top: 16px;
+  border-radius: 0 !important;
+}
+
+.address-panel :deep(.el-card__header) {
+  border-radius: 0;
+}
+
+.address-panel :deep(.el-card__body) {
+  border-radius: 0;
 }
 
 .address-list {
   display: grid;
-  gap: 10px;
+  gap: 0;
 }
 
 .address-card {
-  border: none;
-  border-radius: 0;
-  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-bottom: none;
+  padding: 16px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 10px;
-  background: linear-gradient(180deg, #ffffff, #f8fbff);
-  box-shadow: none;
-  border-left: 3px solid #0f172a;
+  background: #fff;
+}
+
+.address-card:last-child {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.address-card:first-child {
+  border-top: 1px solid #e5e7eb;
 }
 
 .name-line {
   margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.address-main {
+  flex: 1;
 }
 
 .address-main p {
   margin: 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.address-main p:last-child {
+  margin-top: 4px;
+  color: #666;
+  font-size: 13px;
 }
 
 .card-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .loading-box {
   min-height: 120px;
+}
+
+.profile-card {
+  margin-bottom: 24px;
+  border-radius: 0 !important;
+}
+
+.profile-form {
+  padding: 12px 0;
 }
 
 .profile-form :deep(.el-input),
@@ -536,47 +571,76 @@ onMounted(async () => {
   width: 100%;
 }
 
-.account-page :deep(.el-input__wrapper),
-.account-page :deep(.el-textarea__inner),
-.account-page :deep(.el-select__wrapper) {
+.profile-form :deep(.el-input__wrapper) {
+  border-radius: 0 !important;
+}
+
+.profile-form :deep(.el-input__wrapper:hover) {
   box-shadow: none;
-  border: none;
-  background: #f5f7fb;
 }
 
-.account-page :deep(.el-input__wrapper.is-focus),
-.account-page :deep(.el-select__wrapper.is-focused) {
-  box-shadow: 0 0 0 1px rgba(64, 158, 255, 0.38);
+.profile-form :deep(.el-select .el-input__wrapper) {
+  border-radius: 0 !important;
 }
 
-.account-page :deep(.el-card),
-.account-page :deep(.el-card__header),
-.account-page :deep(.el-card__body),
-.account-page :deep(.el-card__footer),
-.account-page :deep(.el-input__wrapper),
-.account-page :deep(.el-select__wrapper),
-.account-page :deep(.el-textarea__inner),
-.account-page :deep(.el-button),
-.account-page :deep(.el-tag),
-.account-page :deep(.el-dialog),
-.account-page :deep(.el-dialog__header),
-.account-page :deep(.el-dialog__body),
-.account-page :deep(.el-dialog__footer) {
+.form-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+// Dialog styles
+:deep(.el-dialog) {
+  border-radius: 0 !important;
+}
+
+:deep(.el-dialog__header) {
+  border-radius: 0;
+}
+
+:deep(.el-dialog__body) {
+  border-radius: 0;
+}
+
+:deep(.el-form-item__content .el-input__wrapper) {
+  border-radius: 0 !important;
+}
+
+:deep(.el-form-item__content .el-select .el-input__wrapper) {
+  border-radius: 0 !important;
+}
+
+// Button styles
+:deep(.el-button) {
+  border-radius: 0 !important;
+}
+
+:deep(.el-tag) {
+  border-radius: 0 !important;
+}
+
+// Element Plus overrides
+:deep(.el-card) {
   border-radius: 0 !important;
 }
 
 @media (max-width: 768px) {
   .hero-content {
     flex-direction: column;
+    align-items: flex-start;
   }
 
   .hero-badges {
-    flex-direction: row;
-    flex-wrap: wrap;
+    width: 100%;
   }
 
   .address-card {
     flex-direction: column;
+  }
+
+  .card-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 </style>

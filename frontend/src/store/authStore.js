@@ -184,6 +184,9 @@ export const useAuthStore = defineStore("authStore", {
       this.clearClientAuth();
       this.clearAdminAuth();
       clearAuthStorage();
+    },
+    logout() {
+      this.clearAuth();
     }
   }
 });

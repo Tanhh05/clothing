@@ -1,5 +1,5 @@
 <template>
-  <div class="product-detail-container" v-loading="loading">
+  <div class="product-detail-container client-page-shell" v-loading="loading">
     <div v-if="product" class="product-layout">
       <!-- LEFT: Image Gallery -->
        

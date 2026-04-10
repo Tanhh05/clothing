@@ -1,5 +1,5 @@
 <template>
-  <section class="warehouse-page">
+  <section class="warehouse-page admin-page-shell">
     <section class="panel filter-panel">
       <div class="toolbar">
         <el-input
@@ -28,7 +28,7 @@
     </section>
 
     <section class="panel">
-      <el-table
+      <BaseTable
         v-loading="loading"
         :data="pageData.content"
         border
@@ -54,7 +54,7 @@
             <el-button text type="primary" :icon="View" @click="openDetail(row.id)">Xem</el-button>
           </template>
         </el-table-column>
-      </el-table>
+      </BaseTable>
 
       <div class="pagination-wrap">
         <el-pagination
@@ -207,7 +207,7 @@
           </article>
         </section>
 
-        <el-table :data="detailData.items || []" border stripe size="small" table-layout="fixed">
+        <BaseTable :data="detailData.items || []" border stripe size="small" table-layout="fixed">
           <el-table-column label="#" width="56">
             <template #default="{ $index }">{{ $index + 1 }}</template>
           </el-table-column>
@@ -220,7 +220,7 @@
             <template #default="{ row }">{{ formatCurrency(row.lineTotal) }}</template>
           </el-table-column>
           <el-table-column prop="currentStock" label="Tồn hiện tại" width="120" align="right" />
-        </el-table>
+        </BaseTable>
       </template>
       <template v-else>
         <el-empty description="Không có dữ liệu chi tiết" />

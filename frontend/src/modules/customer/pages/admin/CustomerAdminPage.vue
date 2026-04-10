@@ -1,5 +1,5 @@
 <template>
-  <section class="customer-admin-page" v-loading="loading">
+  <section class="customer-admin-page admin-page-shell" v-loading="loading">
     <div class="panel">
       <div class="panel-head">
         <el-input
@@ -23,7 +23,7 @@
       </div>
 
       <div class="table-wrap">
-        <el-table
+        <BaseTable
           :data="customers"
           border
           stripe
@@ -78,7 +78,7 @@
               </el-button>
             </template>
           </el-table-column>
-        </el-table>
+        </BaseTable>
       </div>
 
       <div class="mobile-list">

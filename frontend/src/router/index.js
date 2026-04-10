@@ -1,13 +1,10 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { applyGuards } from "./guards";
-import ClientLayout from "@/layouts/ClientLayout.vue";
-import AdminLayout from "@/layouts/AdminLayout.vue";
-import AuthLayout from "@/layouts/AuthLayout.vue";
 
 const routes = [
   {
     path: "/",
-    component: ClientLayout,
+    component: () => import("@/layouts/ClientLayout.vue"),
     children: [
       {
         path: "",
@@ -45,11 +42,6 @@ const routes = [
         meta: { requiresAuth: true }
       },
       {
-        path: "notifications",
-        component: () => import("@/modules/notification/pages/client/NotificationPage.vue"),
-        meta: { requiresAuth: true }
-      },
-      {
         path: "account",
         component: () => import("@/modules/auth/pages/AccountPage.vue"),
         meta: { requiresAuth: true }
@@ -58,7 +50,7 @@ const routes = [
   },
   {
     path: "/auth",
-    component: AuthLayout,
+    component: () => import("@/layouts/AuthLayout.vue"),
     children: [
       {
         path: "login",
@@ -79,7 +71,7 @@ const routes = [
   },
   {
     path: "/admin",
-    component: AdminLayout,
+    component: () => import("@/layouts/AdminLayout.vue"),
     meta: { requiresAuth: true, roles: ["ADMIN"] },
     children: [
       {

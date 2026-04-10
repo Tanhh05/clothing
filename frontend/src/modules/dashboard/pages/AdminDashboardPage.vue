@@ -1,5 +1,5 @@
 <template>
-  <section class="revenue-page" v-loading="loading">
+  <section class="revenue-page admin-page-shell" v-loading="loading">
     <header class="head">
       <div>
         <p class="eyebrow">Admin panel</p>
@@ -108,14 +108,14 @@
             <h3>Top sản phẩm 30 ngày</h3>
           </div>
           <div class="table-scroll">
-            <el-table :data="summary.topProducts30d || []" border size="small" empty-text="Chưa có dữ liệu">
+            <BaseTable :data="summary.topProducts30d || []" border size="small" empty-text="Chưa có dữ liệu">
               <el-table-column prop="productId" label="#" width="74" />
               <el-table-column prop="productName" label="Sản phẩm" min-width="170" />
               <el-table-column prop="totalQuantity" label="Đã bán" width="110" />
               <el-table-column label="Doanh thu" width="140">
                 <template #default="{ row }">{{ formatCurrency(row.totalRevenue) }}</template>
               </el-table-column>
-            </el-table>
+            </BaseTable>
           </div>
         </article>
 
@@ -124,7 +124,7 @@
             <h3>Đơn hàng gần đây</h3>
           </div>
           <div class="table-scroll">
-            <el-table :data="pagedRecentOrders" border stripe table-layout="auto" empty-text="Chưa có đơn">
+            <BaseTable :data="pagedRecentOrders" border stripe table-layout="auto" empty-text="Chưa có đơn">
               <el-table-column prop="id" label="Mã đơn" width="88" />
               <el-table-column label="Khách hàng" min-width="160">
                 <template #default="{ row }">{{ row.customerName || `User #${row.userId || "N/A"}` }}</template>
@@ -143,7 +143,7 @@
               <el-table-column label="Ngày tạo" width="170">
                 <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
               </el-table-column>
-            </el-table>
+            </BaseTable>
           </div>
           <div class="table-pagination">
             <el-pagination
@@ -171,7 +171,7 @@
           <el-button @click="logDrawerVisible = false">Đóng</el-button>
         </div>
         <div class="table-scroll">
-          <el-table :data="pagedAuditLogs" border size="small" empty-text="Chưa có log">
+          <BaseTable :data="pagedAuditLogs" border size="small" empty-text="Chưa có log">
             <el-table-column prop="createdAt" label="Thời gian" width="165">
               <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
             </el-table-column>
@@ -180,7 +180,7 @@
             <el-table-column label="Chi tiết" min-width="220">
               <template #default="{ row }">{{ row.detail || "-" }}</template>
             </el-table-column>
-          </el-table>
+          </BaseTable>
         </div>
         <div class="table-pagination">
           <el-pagination

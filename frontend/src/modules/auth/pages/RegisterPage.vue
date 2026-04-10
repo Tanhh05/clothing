@@ -1,5 +1,5 @@
 <template>
-  <section class="register-page">
+  <section class="register-page client-page-shell">
     <el-card shadow="never" class="register-card">
       <div class="head">
         <h1>Tạo tài khoản</h1>

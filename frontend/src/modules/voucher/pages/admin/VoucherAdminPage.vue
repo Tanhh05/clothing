@@ -1,11 +1,11 @@
 <template>
-  <section class="voucher-page">
+  <section class="voucher-page admin-page-shell">
     <section class="panel">
       <div class="panel-head">
         <el-button @click="resetForm">Làm mới</el-button>
         <el-button type="primary" @click="openCreate">+ Tạo voucher</el-button>
       </div>
-      <el-table :data="vouchers" border stripe size="small" empty-text="Chưa có voucher" table-layout="fixed">
+      <BaseTable :data="vouchers" border stripe size="small" empty-text="Chưa có voucher" table-layout="fixed">
         <el-table-column label="Voucher" min-width="220">
           <template #default="{ row }">
             <div class="voucher-cell">
@@ -39,7 +39,7 @@
             <el-button size="small" type="danger" plain @click="removeVoucher(row.id)">Xóa</el-button>
           </template>
         </el-table-column>
-      </el-table>
+      </BaseTable>
     </section>
 
     <el-drawer v-model="drawerVisible" :title="editingId ? 'Sửa voucher' : 'Tạo voucher'" direction="rtl" size="34%">

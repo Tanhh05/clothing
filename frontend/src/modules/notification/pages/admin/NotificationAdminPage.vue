@@ -1,5 +1,5 @@
 <template>
-  <section class="notification-page">
+  <section class="notification-page admin-page-shell">
     <header class="head">
       <div>
         <p class="eyebrow">Admin panel</p>
@@ -53,7 +53,7 @@
 
     <section class="panel">
       <div class="panel-head"><h3>Lịch sử gửi</h3></div>
-      <el-table :data="history" border stripe size="small" table-layout="fixed" empty-text="Chưa có thông báo">
+      <BaseTable :data="history" border stripe size="small" table-layout="fixed" empty-text="Chưa có thông báo">
         <el-table-column prop="createdAt" label="Thời gian" width="170">
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
@@ -63,7 +63,7 @@
         <el-table-column prop="status" label="Trạng thái" width="120">
           <template #default="{ row }"><el-tag :type="row.status === 'SENT' ? 'success' : 'warning'">{{ row.status }}</el-tag></template>
         </el-table-column>
-      </el-table>
+      </BaseTable>
     </section>
   </section>
 </template>

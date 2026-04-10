@@ -93,10 +93,10 @@
           <a href="#">tìm cửa hàng</a>
           <a href="#">trợ giúp</a>
           <RouterLink to="/orders">trình theo dõi đơn hàng</RouterLink>
-          <RouterLink to="/notifications">thông báo</RouterLink>
           <RouterLink to="/account">tài khoản</RouterLink>
+          <a href="#" @click.prevent="handleLogout">đăng xuất</a>
         </div>
-        
+
         <div class="actions">
           <div class="search-wrapper" @focusin="isSearchOverlayOpen = true" @focusout="handleSearchBlur">
             <el-input
@@ -107,7 +107,7 @@
               @input="handleSearchInput"
               clearable
             />
-            
+
             <!-- Search Overlay -->
             <transition name="fade">
               <div v-if="isSearchOverlayOpen && (searchResults.products.length > 0 || searchResults.suggestions.length > 0)" class="search-overlay">
@@ -146,7 +146,7 @@
               </div>
             </transition>
           </div>
-          
+
           <el-popover
             v-if="authStore.isAuthenticated"
             placement="bottom-end"
@@ -245,7 +245,7 @@ const formatDateTime = (value) => {
 
 const handleSearchInput = () => {
   if (searchTimeout) clearTimeout(searchTimeout);
-  
+
   if (!searchQuery.value.trim()) {
     searchResults.value = { products: [], suggestions: [] };
     return;
@@ -425,6 +425,31 @@ const stopNotificationPolling = () => {
   }
 };
 
+const handleLogout = async () => {
+  try {
+    // Clear auth store
+    authStore.logout();
+
+    // Clear localStorage
+    localStorage.removeItem('auth');
+    localStorage.removeItem('clothing_auth');
+
+    // Clear cart store
+    cartStore.clear();
+
+    // Clear wishlist
+    wishlistStore.clear();
+
+    // Stop notification polling
+    stopNotificationPolling();
+
+    // Redirect to home
+    router.push('/');
+  } catch (error) {
+    console.error('Logout failed:', error);
+  }
+};
+
 onMounted(async () => {
   try {
     await fetchAllCategories();
@@ -480,7 +505,7 @@ onBeforeUnmount(() => {
   gap: 8px;
   cursor: pointer;
   transition: opacity 0.2s;
-  
+
   &:hover {
     opacity: 0.9;
   }
@@ -513,7 +538,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-  
+
   &:hover {
     background: #000;
     color: #fff;
@@ -533,14 +558,14 @@ onBeforeUnmount(() => {
     margin-bottom: 15px;
     text-transform: uppercase;
   }
-  
+
   p {
     font-size: 13px;
     line-height: 1.6;
     margin-bottom: 20px;
     color: #333;
   }
-  
+
   .promo-link {
     font-size: 13px;
     font-weight: 700;
@@ -548,7 +573,7 @@ onBeforeUnmount(() => {
     text-decoration: underline;
     text-transform: uppercase;
     text-underline-offset: 4px;
-    
+
     &:hover {
       color: #666;
     }
@@ -606,11 +631,11 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   min-width: 150px;
-  
+
   .menu-heading {
     margin: 0 0 10px;
     font-size: 14px;
-    
+
     a {
       color: #000;
       text-decoration: none;
@@ -621,12 +646,12 @@ onBeforeUnmount(() => {
     height: 30px;
     line-height: 30px;
     padding: 0;
-    
+
     a {
       color: #555;
       text-decoration: none;
       width: 100%;
-      
+
       &:hover {
         text-decoration: underline;
       }
@@ -639,16 +664,16 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
-  
+
   .utility-links {
     display: flex;
     gap: 15px;
     font-size: 11px;
-    
+
     a {
       color: #666;
       text-decoration: none;
-      
+
       &:hover {
         text-decoration: underline;
       }
@@ -659,7 +684,7 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     gap: 20px;
-    
+
     .search-wrapper {
       position: relative;
     }
@@ -674,7 +699,7 @@ onBeforeUnmount(() => {
         &.is-focus { box-shadow: 0 0 0 1px #000 inset; background: #fff; }
       }
     }
-    
+
     .action-icon {
       font-size: 20px;
       cursor: pointer;
@@ -741,7 +766,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   border-bottom: 1px solid #f5f5f5;
   transition: all 0.2s;
-  
+
   &:hover {
     .suggestion-term { text-decoration: underline; }
   }
@@ -750,7 +775,7 @@ onBeforeUnmount(() => {
     font-size: 14px;
     font-weight: 700;
   }
-  
+
   .suggestion-count {
     font-size: 12px;
     color: #888;
@@ -777,7 +802,7 @@ onBeforeUnmount(() => {
   padding: 10px;
   cursor: pointer;
   transition: background 0.2s;
-  
+
   &:hover {
     background: #f9f9f9;
   }
@@ -786,7 +811,7 @@ onBeforeUnmount(() => {
     width: 80px;
     height: 100px;
     background: #f5f5f5;
-    
+
     img {
       width: 100%;
       height: 100%;
@@ -796,21 +821,21 @@ onBeforeUnmount(() => {
 
   .search-prod-info {
     flex: 1;
-    
+
     .search-prod-brand {
       font-size: 11px;
       color: #666;
       text-transform: uppercase;
       margin-bottom: 4px;
     }
-    
+
     .search-prod-name {
       font-size: 13px;
       font-weight: 700;
       margin-bottom: 6px;
       line-height: 1.3;
     }
-    
+
     .search-prod-price {
       font-size: 14px;
       font-weight: 800;

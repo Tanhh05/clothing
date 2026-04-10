@@ -1,5 +1,5 @@
 <template>
-  <div class="cart-page-container">
+  <div class="cart-page-container client-page-shell">
     <div v-loading="cartStore.loading" class="cart-wrapper">
       <div v-if="!cartStore.isEmpty" class="cart-layout">
         <!-- LEFT: Cart Items -->
