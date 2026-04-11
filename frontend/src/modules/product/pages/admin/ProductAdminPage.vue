@@ -1088,23 +1088,29 @@ const openInventoryDrawer = async () => {
 };
 
 const restoreDeletedProduct = async (item) => {
+  if (restoringId.value) return;
   try {
-    await ElMessageBox.confirm(`Khôi phục sản phẩm "${item.name || item.id}"?`, "Xác nhận", {
-      type: "info",
+    await confirm({
+      title: "Xác nhận",
+      message: `Khôi phục sản phẩm "${item.name || item.id}"?`,
       confirmButtonText: "Khôi phục",
-      cancelButtonText: "Hủy"
+      cancelButtonText: "Hủy",
+      onConfirm: async () => {
+        restoringId.value = item.id;
+        try {
+          await productApi.restoreProduct(item.id);
+          ElMessage.success("Khôi phục sản phẩm thành công");
+          await Promise.all([refreshProducts(), loadDeletedProducts()]);
+        } finally {
+          restoringId.value = null;
+        }
+      }
     });
-    restoringId.value = item.id;
-    await productApi.restoreProduct(item.id);
-    ElMessage.success("Khôi phục sản phẩm thành công");
-    await Promise.all([refreshProducts(), loadDeletedProducts()]);
   } catch (error) {
-    if (error !== "cancel") {
+    if (error.message !== "cancel") {
       console.error(error);
-      ElMessage.error(error?.response?.data?.message || "Khôi phục sản phẩm thất bại");
+      ElMessage.error("Khôi phục sản phẩm thất bại");
     }
-  } finally {
-    restoringId.value = null;
   }
 };
 

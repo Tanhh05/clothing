@@ -133,9 +133,12 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessage } from "element-plus";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { Plus } from "@element-plus/icons-vue";
 import { bannerApi } from "@/modules/banner/api/bannerApi";
+
+const { confirm } = useConfirmDialog();
 
 const loading = ref(false);
 const submitting = ref(false);
@@ -419,16 +422,19 @@ const formatSchedule = (startAt, endAt) => {
 
 const deleteBanner = async (item) => {
   try {
-    await ElMessageBox.confirm(`Xóa banner "${item.title || item.id}"?`, "Xác nhận", {
-      type: "warning",
+    await confirm({
+      title: "Xác nhận",
+      message: `Xóa banner "${item.title || item.id}"?`,
       confirmButtonText: "Xóa",
-      cancelButtonText: "Hủy"
+      cancelButtonText: "Hủy",
+      onConfirm: async () => {
+        await bannerApi.deleteBanner(item.id);
+        ElMessage.success("Đã xóa banner");
+        await fetchBanners();
+      }
     });
-    await bannerApi.deleteBanner(item.id);
-    ElMessage.success("Đã xóa banner");
-    await fetchBanners();
   } catch (error) {
-    if (error !== "cancel") {
+    if (error.message !== "cancel") {
       console.error(error);
       ElMessage.error(error?.response?.data?.message || "Xóa banner thất bại");
     }

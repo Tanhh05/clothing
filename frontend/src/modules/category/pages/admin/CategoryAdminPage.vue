@@ -98,9 +98,12 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessage } from "element-plus";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { Search } from "@element-plus/icons-vue";
 import { categoryApi } from "@/modules/category/api/categoryApi";
+
+const { confirm } = useConfirmDialog();
 
 const loading = ref(false);
 const submitting = ref(false);
@@ -220,19 +223,24 @@ const submitCategory = async () => {
 
 const deleteCategory = async (item) => {
   try {
-    await ElMessageBox.confirm(`Xóa danh mục "${item.name}"?`, "Xác nhận", {
-      type: "warning",
+    await confirm({
+      title: "Xác nhận",
+      message: `Xóa danh mục "${item.name}"?`,
       confirmButtonText: "Xóa",
-      cancelButtonText: "Hủy"
+      cancelButtonText: "Hủy",
+      onConfirm: async () => {
+        await categoryApi.deleteCategory(item.id);
+        ElMessage.success("Đã xóa danh mục");
+        await loadCategories();
+      }
     });
-
-    await categoryApi.deleteCategory(item.id);
-    ElMessage.success("Đã xóa danh mục");
-    await loadCategories();
   } catch (error) {
-    if (error !== "cancel") {
+    if (error.message !== "cancel") {
       console.error(error);
       ElMessage.error(error?.response?.data?.message || "Xóa danh mục thất bại");
+    }
+  }
+};
     }
   }
 };

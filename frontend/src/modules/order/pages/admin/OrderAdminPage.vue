@@ -222,10 +222,12 @@
 
 <script setup>
 import { onMounted, ref, watch } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessage } from "element-plus";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { orderApi } from "@/modules/order/api/orderApi";
 
 const loading = ref(false);
+const { confirm } = useConfirmDialog();
 const orders = ref([]);
 const totalElements = ref(0);
 const keyword = ref("");
@@ -597,17 +599,23 @@ const exportSelectedInvoices = async () => {
   const isSelectAllCurrentPage = selectedOrderIds.value.length === orders.value.length && orders.value.length > 0;
   if (isSelectAllCurrentPage && totalElements.value > orders.value.length) {
     try {
-      await ElMessageBox.confirm(
-        "Bạn đã chọn tất cả đơn trên trang hiện tại. In toàn bộ đơn theo bộ lọc hiện tại?",
-        "Xác nhận in hóa đơn",
-        { type: "info", confirmButtonText: "In toàn bộ", cancelButtonText: "Chỉ in trang này" }
-      );
-      selectedOrders = await fetchAllOrdersForCurrentFilter();
+      await confirm({
+        title: "Xác nhận in hóa đơn",
+        message: "Bạn đã chọn tất cả đơn trên trang hiện tại. In toàn bộ đơn theo bộ lọc hiện tại?",
+        confirmButtonText: "In toàn bộ",
+        cancelButtonText: "Chỉ in trang này",
+        onConfirm: async () => {
+          selectedOrders = await fetchAllOrdersForCurrentFilter();
+          printInvoices(selectedOrders);
+        }
+      });
     } catch {
       // user chooses "Chỉ in trang này"
+      printInvoices(selectedOrders);
     }
+  } else {
+    printInvoices(selectedOrders);
   }
-  printInvoices(selectedOrders);
 };
 
 const openDetails = (order) => {
@@ -678,14 +686,17 @@ const syncOrderWithGhn = async (order) => {
 
 const markCancelled = async (order) => {
   try {
-    await ElMessageBox.confirm(`Đánh dấu đơn #${order.id} là KHÁCH HỦY?`, "Xác nhận", {
-      type: "warning",
+    await confirm({
+      title: "Xác nhận",
+      message: `Đánh dấu đơn #${order.id} là KHÁCH HỦY?`,
       confirmButtonText: "Xác nhận",
-      cancelButtonText: "Hủy"
+      cancelButtonText: "Hủy",
+      onConfirm: async () => {
+        await updateStatus(order, "CANCELLED");
+      }
     });
-    await updateStatus(order, "CANCELLED");
   } catch (error) {
-    if (error !== "cancel") {
+    if (error.message !== "cancel") {
       ElMessage.error("Không thể cập nhật trạng thái khách hủy");
     }
   }
@@ -693,14 +704,17 @@ const markCancelled = async (order) => {
 
 const markFailed = async (order) => {
   try {
-    await ElMessageBox.confirm(`Đánh dấu đơn #${order.id} là BOM HÀNG?`, "Xác nhận", {
-      type: "warning",
+    await confirm({
+      title: "Xác nhận",
+      message: `Đánh dấu đơn #${order.id} là BOM HÀNG?`,
       confirmButtonText: "Xác nhận",
-      cancelButtonText: "Hủy"
+      cancelButtonText: "Hủy",
+      onConfirm: async () => {
+        await updateStatus(order, "FAILED");
+      }
     });
-    await updateStatus(order, "FAILED");
   } catch (error) {
-    if (error !== "cancel") {
+    if (error.message !== "cancel") {
       ElMessage.error("Không thể cập nhật trạng thái bom hàng");
     }
   }
@@ -708,14 +722,17 @@ const markFailed = async (order) => {
 
 const markFailedDelivery = async (order) => {
   try {
-    await ElMessageBox.confirm(`Đánh dấu đơn #${order.id} là GIAO THẤT BẠI?`, "Xác nhận", {
-      type: "warning",
+    await confirm({
+      title: "Xác nhận",
+      message: `Đánh dấu đơn #${order.id} là GIAO THẤT BẠI?`,
       confirmButtonText: "Xác nhận",
-      cancelButtonText: "Hủy"
+      cancelButtonText: "Hủy",
+      onConfirm: async () => {
+        await updateStatus(order, "FAILED_DELIVERY");
+      }
     });
-    await updateStatus(order, "FAILED_DELIVERY");
   } catch (error) {
-    if (error !== "cancel") {
+    if (error.message !== "cancel") {
       ElMessage.error("Không thể cập nhật trạng thái giao thất bại");
     }
   }
@@ -723,14 +740,17 @@ const markFailedDelivery = async (order) => {
 
 const markRefunded = async (order) => {
   try {
-    await ElMessageBox.confirm(`Đánh dấu đơn #${order.id} là ĐÃ HOÀN TIỀN?`, "Xác nhận", {
-      type: "warning",
+    await confirm({
+      title: "Xác nhận",
+      message: `Đánh dấu đơn #${order.id} là ĐÃ HOÀN TIỀN?`,
       confirmButtonText: "Xác nhận",
-      cancelButtonText: "Hủy"
+      cancelButtonText: "Hủy",
+      onConfirm: async () => {
+        await updateStatus(order, "REFUNDED");
+      }
     });
-    await updateStatus(order, "REFUNDED");
   } catch (error) {
-    if (error !== "cancel") {
+    if (error.message !== "cancel") {
       ElMessage.error("Không thể cập nhật trạng thái hoàn tiền");
     }
   }
