@@ -17,6 +17,7 @@ import com.clothing.entity.OrderItemEntity;
 import com.clothing.entity.OrderStatusHistoryEntity;
 import com.clothing.entity.ProductEntity;
 import com.clothing.entity.ProductVariantEntity;
+import com.clothing.entity.UserAddressEntity;
 import com.clothing.entity.UserEntity;
 import com.clothing.exception.BusinessException;
 import com.clothing.messaging.publisher.OrderEventPublisher;
@@ -29,7 +30,9 @@ import com.clothing.repository.OrderRepository;
 import com.clothing.repository.OrderStatusHistoryRepository;
 import com.clothing.repository.ProductRepository;
 import com.clothing.repository.ProductVariantRepository;
+import com.clothing.repository.UserAddressRepository;
 import com.clothing.repository.UserRepository;
+import com.clothing.service.GhnShippingService;
 import com.clothing.service.OrderService;
 import com.clothing.service.PaymentService;
 import com.clothing.service.AuditLogService;
@@ -45,6 +48,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -62,8 +67,10 @@ import java.util.Set;
 
 @Service
 public class OrderServiceImpl implements OrderService {
+    private static final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
 
     private static final String STATUS_PENDING = "PENDING";
+    private static final String SHIPPING_PROVIDER_GHN = "GHN";
     private static final String PAYMENT_MOMO = "MOMO";
     private static final long FAR_DISTANCE_SURCHARGE = 20_000L;
     private static final Set<String> NEAR_PROVINCES = Set.of(
@@ -86,9 +93,11 @@ public class OrderServiceImpl implements OrderService {
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final OrderEventPublisher orderEventPublisher;
     private final ProductRepository productRepository;
+    private final UserAddressRepository userAddressRepository;
     private final PaymentService paymentService;
     private final AuditLogService auditLogService;
     private final StoreSettingService storeSettingService;
+    private final GhnShippingService ghnShippingService;
 
     public OrderServiceImpl(
             UserRepository userRepository,
@@ -102,9 +111,11 @@ public class OrderServiceImpl implements OrderService {
             OrderStatusHistoryRepository orderStatusHistoryRepository,
             OrderEventPublisher orderEventPublisher,
             ProductRepository productRepository,
+            UserAddressRepository userAddressRepository,
             PaymentService paymentService,
             AuditLogService auditLogService,
-            StoreSettingService storeSettingService
+            StoreSettingService storeSettingService,
+            GhnShippingService ghnShippingService
     ) {
         this.userRepository = userRepository;
         this.cartRepository = cartRepository;
@@ -117,9 +128,11 @@ public class OrderServiceImpl implements OrderService {
         this.orderStatusHistoryRepository = orderStatusHistoryRepository;
         this.orderEventPublisher = orderEventPublisher;
         this.productRepository = productRepository;
+        this.userAddressRepository = userAddressRepository;
         this.paymentService = paymentService;
         this.auditLogService = auditLogService;
         this.storeSettingService = storeSettingService;
+        this.ghnShippingService = ghnShippingService;
     }
 
     @Override
@@ -158,6 +171,7 @@ public class OrderServiceImpl implements OrderService {
         order.setTotalPrice(total);
         order.setStatus(STATUS_PENDING);
         order.setPaymentMethod(request.getPaymentMethod().trim());
+        order.setShippingProvider(SHIPPING_PROVIDER_GHN);
         order.setAddress(request.getAddress().trim());
         order.setCreatedAt(LocalDateTime.now());
         OrderEntity savedOrder = orderRepository.save(order);
@@ -171,6 +185,9 @@ public class OrderServiceImpl implements OrderService {
             orderItem.setPrice(variant.getPrice());
             orderItemRepository.save(orderItem);
         }
+
+        tryCreateGhnShippingOrder(savedOrder, user, request, cartItems);
+
         addHistory(savedOrder.getId(), STATUS_PENDING);
         if (resolvedCoupon != null) {
             CouponEntity coupon = resolvedCoupon.coupon;
@@ -417,19 +434,94 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponse updateOrderStatus(Long orderId, UpdateOrderStatusRequest request) {
         OrderEntity order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new BusinessException("Order not found", HttpStatus.NOT_FOUND));
-        String nextStatus = request.getStatus().trim().toUpperCase(Locale.ROOT);
+        String requestedStatus = normalizeStatus(request.getStatus());
+        if (requestedStatus.isBlank()) {
+            throw new BusinessException("status is required", HttpStatus.BAD_REQUEST);
+        }
+
+        String requestShippingCode = normalizeShippingCode(request.getShippingCode());
+        if (!requestShippingCode.isBlank()) {
+            order.setShippingProvider(SHIPPING_PROVIDER_GHN);
+            order.setShippingCode(requestShippingCode);
+            orderRepository.save(order);
+        }
+
+        String shippingCode = normalizeShippingCode(order.getShippingCode());
+        boolean shouldSyncWithGhn = !shippingCode.isBlank() && !Boolean.FALSE.equals(request.getSyncWithGhn());
+        if (shouldSyncWithGhn) {
+            String syncedStatus = syncStatusFromGhn(order, false);
+            if (!requestedStatus.equals(syncedStatus)) {
+                throw new BusinessException(
+                        "GHN status mismatch. Requested " + requestedStatus + " but GHN is " + syncedStatus,
+                        HttpStatus.BAD_REQUEST
+                );
+            }
+        }
+
         String prevStatus = normalizeStatus(order.getStatus());
-        validateStatusTransition(prevStatus, nextStatus, orderId);
-        order.setStatus(nextStatus);
-        orderRepository.save(order);
-        addHistory(orderId, nextStatus);
+        if (requestedStatus.equals(prevStatus)) {
+            return toResponse(order);
+        }
+        validateStatusTransition(prevStatus, requestedStatus, orderId);
+        applyOrderStatus(order, requestedStatus, false);
         auditLogService.log(
                 "ORDER_STATUS_UPDATED",
                 "ORDER",
                 orderId,
-                "Status " + prevStatus + " -> " + nextStatus
+                "Status " + prevStatus + " -> " + requestedStatus
         );
         return toResponse(order);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse syncOrderStatusWithGhn(Long orderId) {
+        OrderEntity order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException("Order not found", HttpStatus.NOT_FOUND));
+        syncStatusFromGhn(order, true);
+        return toResponse(order);
+    }
+
+    @Override
+    @Transactional
+    public void handleGhnWebhook(Map<String, Object> payload) {
+        if (payload == null || payload.isEmpty()) {
+            return;
+        }
+        String orderCode = normalizeShippingCode(toText(payload.get("order_code")));
+        String ghnStatus = ghnShippingService.normalizeGhnStatus(toText(payload.get("status")));
+        if (orderCode.isBlank() || ghnStatus.isBlank()) {
+            return;
+        }
+
+        OrderEntity order = orderRepository.findByShippingCode(orderCode).orElse(null);
+        if (order == null) {
+            return;
+        }
+
+        order.setShippingProvider(SHIPPING_PROVIDER_GHN);
+        order.setShippingStatus(ghnStatus);
+        order.setShippingUpdatedAt(LocalDateTime.now());
+        orderRepository.save(order);
+
+        String nextOrderStatus = normalizeStatus(ghnShippingService.toInternalOrderStatus(ghnStatus));
+        if (nextOrderStatus.isBlank()) {
+            return;
+        }
+        if (nextOrderStatus.equals(normalizeStatus(order.getStatus()))) {
+            return;
+        }
+        if (!isAllowedExternalTransition(normalizeStatus(order.getStatus()), nextOrderStatus)) {
+            return;
+        }
+
+        applyOrderStatus(order, nextOrderStatus, true);
+        auditLogService.log(
+                "ORDER_STATUS_SYNCED_GHN_WEBHOOK",
+                "ORDER",
+                order.getId(),
+                "Webhook synced by GHN: " + nextOrderStatus + " (" + ghnStatus + ")"
+        );
     }
 
     @Override
@@ -522,6 +614,17 @@ public class OrderServiceImpl implements OrderService {
         return String.valueOf(status == null ? "" : status).trim().toUpperCase(Locale.ROOT);
     }
 
+    private String normalizeShippingCode(String shippingCode) {
+        if (shippingCode == null) {
+            return "";
+        }
+        return shippingCode.trim();
+    }
+
+    private String toText(Object value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
     private void validateStatusTransition(String currentStatus, String targetStatus, Long orderId) {
         if (currentStatus.equals(targetStatus)) {
             return;
@@ -543,6 +646,79 @@ public class OrderServiceImpl implements OrderService {
             case "CANCELLED", "FAILED", "FAILED_DELIVERY", "RETURN_REQUESTED" -> "REFUNDED".equals(targetStatus);
             default -> false;
         };
+    }
+
+    private boolean isAllowedExternalTransition(String currentStatus, String targetStatus) {
+        if (currentStatus.equals(targetStatus)) {
+            return true;
+        }
+        if (isAllowedTransition(currentStatus, targetStatus)) {
+            return true;
+        }
+        return switch (currentStatus) {
+            case "PENDING" -> Set.of("CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED", "FAILED_DELIVERY").contains(targetStatus);
+            case "PROCESSING" -> Set.of("SHIPPED", "DELIVERED", "CANCELLED", "FAILED_DELIVERY").contains(targetStatus);
+            case "CONFIRMED" -> Set.of("DELIVERED").contains(targetStatus);
+            case "SHIPPED" -> Set.of("CANCELLED").contains(targetStatus);
+            default -> false;
+        };
+    }
+
+    private String syncStatusFromGhn(OrderEntity order, boolean forceApply) {
+        String shippingCode = normalizeShippingCode(order.getShippingCode());
+        if (shippingCode.isBlank()) {
+            throw new BusinessException("Order has no shippingCode", HttpStatus.BAD_REQUEST);
+        }
+
+        GhnShippingService.GhnOrderDetail detail = ghnShippingService.getOrderDetail(shippingCode);
+        String ghnStatus = ghnShippingService.normalizeGhnStatus(detail.status());
+        String mappedStatus = normalizeStatus(ghnShippingService.toInternalOrderStatus(ghnStatus));
+        if (mappedStatus.isBlank()) {
+            throw new BusinessException("GHN status is not mapped yet: " + ghnStatus, HttpStatus.BAD_REQUEST);
+        }
+
+        order.setShippingProvider(SHIPPING_PROVIDER_GHN);
+        order.setShippingStatus(ghnStatus);
+        order.setShippingUpdatedAt(LocalDateTime.now());
+        if (detail.orderCode() != null && !detail.orderCode().isBlank()) {
+            order.setShippingCode(detail.orderCode().trim());
+        }
+        orderRepository.save(order);
+
+        String currentStatus = normalizeStatus(order.getStatus());
+        if (mappedStatus.equals(currentStatus)) {
+            return mappedStatus;
+        }
+        if (!isAllowedExternalTransition(currentStatus, mappedStatus)) {
+            throw new BusinessException(
+                    "Cannot sync order #" + order.getId() + " from " + currentStatus + " to " + mappedStatus,
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        if (forceApply) {
+            applyOrderStatus(order, mappedStatus, true);
+            auditLogService.log(
+                    "ORDER_STATUS_SYNCED_GHN",
+                    "ORDER",
+                    order.getId(),
+                    "Synced status by GHN detail: " + mappedStatus + " (" + ghnStatus + ")"
+            );
+        }
+        return mappedStatus;
+    }
+
+    private void applyOrderStatus(OrderEntity order, String status, boolean externalSync) {
+        String normalized = normalizeStatus(status);
+        String current = normalizeStatus(order.getStatus());
+        if (normalized.equals(current)) {
+            return;
+        }
+        order.setStatus(normalized);
+        if (externalSync) {
+            order.setShippingUpdatedAt(LocalDateTime.now());
+        }
+        orderRepository.save(order);
+        addHistory(order.getId(), normalized);
     }
 
     private OrderResponse toResponse(OrderEntity order) {
@@ -589,6 +765,10 @@ public class OrderServiceImpl implements OrderService {
                 .status(order.getStatus())
                 .paymentMethod(order.getPaymentMethod())
                 .paymentUrl(null)
+                .shippingProvider(order.getShippingProvider())
+                .shippingCode(order.getShippingCode())
+                .shippingStatus(order.getShippingStatus())
+                .shippingUpdatedAt(order.getShippingUpdatedAt())
                 .address(order.getAddress())
                 .createdAt(order.getCreatedAt())
                 .items(itemResponses)
@@ -625,6 +805,150 @@ public class OrderServiceImpl implements OrderService {
             return;
         }
         orderEventPublisher.publishOrderCreated(orderId);
+    }
+
+    private void tryCreateGhnShippingOrder(
+            OrderEntity order,
+            UserEntity user,
+            CreateOrderRequest request,
+            List<CartItemEntity> cartItems
+    ) {
+        order.setShippingProvider(SHIPPING_PROVIDER_GHN);
+
+        if (!ghnShippingService.canCallShippingApi()) {
+            throw new BusinessException("GHN shipping config is incomplete", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        ReceiverInfo receiver = resolveReceiverInfo(user, request);
+        if (receiver.address.isBlank() || receiver.district.isBlank() || receiver.ward.isBlank() || receiver.phone.isBlank()) {
+            throw new BusinessException(
+                    "Thiếu thông tin nhận hàng để tạo đơn GHN (address/district/ward/phone)",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        if (!isValidShippingPhone(receiver.phone)) {
+            log.warn("Reject create GHN for order {}: invalid phone {}", order.getId(), receiver.phone);
+            throw new BusinessException(
+                    "Số điện thoại nhận hàng không hợp lệ. Vui lòng nhập đúng 10 số (VD: 09xxxxxxxx)",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        long totalWeightGrams = estimateTotalWeightGrams(cartItems);
+        long codAmount = "COD".equalsIgnoreCase(order.getPaymentMethod())
+                ? (order.getTotalPrice() == null ? 0L : order.getTotalPrice())
+                : 0L;
+
+        String clientOrderCode = "ORD-" + order.getId();
+        String shippingCode = ghnShippingService.createShippingOrder(new GhnShippingService.CreateShippingOrderRequest(
+                clientOrderCode,
+                receiver.recipientName,
+                receiver.phone,
+                receiver.address,
+                receiver.province,
+                receiver.district,
+                receiver.ward,
+                codAmount,
+                totalWeightGrams
+        ));
+
+        if (shippingCode == null || shippingCode.isBlank()) {
+            throw new BusinessException("GHN không trả về mã vận đơn", HttpStatus.BAD_GATEWAY);
+        }
+
+        order.setShippingCode(shippingCode);
+        order.setShippingStatus("ready_to_pick");
+        order.setShippingUpdatedAt(LocalDateTime.now());
+        orderRepository.save(order);
+    }
+
+    private long estimateTotalWeightGrams(List<CartItemEntity> cartItems) {
+        if (cartItems == null || cartItems.isEmpty()) {
+            return 500L;
+        }
+        long total = 0L;
+        for (CartItemEntity item : cartItems) {
+            ProductVariantEntity variant = getVariant(item.getVariantId());
+            double itemWeightKg = variant.getWeight() == null || variant.getWeight() <= 0
+                    ? 0.2D
+                    : variant.getWeight();
+            long itemWeightGrams = Math.round(itemWeightKg * 1000D);
+            int quantity = item.getQuantity() == null || item.getQuantity() <= 0 ? 1 : item.getQuantity();
+            total += Math.max(50L, itemWeightGrams) * quantity;
+        }
+        return Math.max(50L, total);
+    }
+
+    private ReceiverInfo resolveReceiverInfo(UserEntity user, CreateOrderRequest request) {
+        UserAddressEntity defaultAddress = userAddressRepository.findByUserIdAndIsDefaultTrue(user.getId()).orElse(null);
+
+        String recipientName = firstNonBlank(
+                request.getRecipientName(),
+                defaultAddress == null ? null : defaultAddress.getRecipientName(),
+                user.getFullName(),
+                user.getUsername()
+        );
+        String phone = firstNonBlank(
+                request.getPhone(),
+                defaultAddress == null ? null : defaultAddress.getPhone(),
+                user.getPhone()
+        );
+        String province = firstNonBlank(
+                request.getProvince(),
+                defaultAddress == null ? null : defaultAddress.getProvince()
+        );
+        String district = firstNonBlank(
+                request.getDistrict(),
+                defaultAddress == null ? null : defaultAddress.getDistrict()
+        );
+        String ward = firstNonBlank(
+                request.getWard(),
+                defaultAddress == null ? null : defaultAddress.getWard()
+        );
+        String address = firstNonBlank(
+                request.getAddress(),
+                defaultAddress == null ? null : defaultAddress.getAddressLine()
+        );
+
+        return new ReceiverInfo(
+                safeTrim(recipientName),
+                normalizePhoneForShipping(safeTrim(phone)),
+                safeTrim(province),
+                safeTrim(district),
+                safeTrim(ward),
+                safeTrim(address)
+        );
+    }
+
+    private String normalizePhoneForShipping(String phone) {
+        String normalized = safeTrim(phone).replaceAll("\\s+", "");
+        if (normalized.startsWith("+84")) {
+            return "0" + normalized.substring(3);
+        }
+        if (normalized.startsWith("84")) {
+            return "0" + normalized.substring(2);
+        }
+        return normalized;
+    }
+
+    private boolean isValidShippingPhone(String phone) {
+        return phone != null && phone.matches("^0\\d{9}$");
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
+    private String safeTrim(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private String extractProvince(CreateOrderRequest request) {
@@ -745,6 +1069,24 @@ public class OrderServiceImpl implements OrderService {
         private ResolvedCoupon(CouponEntity coupon, long discountAmount) {
             this.coupon = coupon;
             this.discountAmount = discountAmount;
+        }
+    }
+
+    private static class ReceiverInfo {
+        private final String recipientName;
+        private final String phone;
+        private final String province;
+        private final String district;
+        private final String ward;
+        private final String address;
+
+        private ReceiverInfo(String recipientName, String phone, String province, String district, String ward, String address) {
+            this.recipientName = recipientName;
+            this.phone = phone;
+            this.province = province;
+            this.district = district;
+            this.ward = ward;
+            this.address = address;
         }
     }
 }

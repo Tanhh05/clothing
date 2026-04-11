@@ -26,7 +26,7 @@
                     {{ item.productName.toUpperCase() }}
                   </router-link>
                   <div class="item-utils">
-                    <el-icon class="util-icon" @click="handleRemove(item.id)"><Delete /></el-icon>
+                    <el-icon class="util-icon" @click="handleRemove(item)"><Delete /></el-icon>
                     <button
                       type="button"
                       class="wishlist-icon-btn"
@@ -45,7 +45,7 @@
                 </div>
                 <p class="item-meta">{{ item.color }}</p>
                 <p class="item-meta">Kích cỡ: {{ item.size }}</p>
-                
+
                 <div class="item-bottom">
                   <div class="quantity-control">
                     <el-select v-model="item.quantity" @change="val => handleUpdateQuantity(item.id, val)" size="default" class="qty-select">
@@ -89,7 +89,7 @@
         <div class="cart-sidebar">
           <div class="summary-box">
             <h2 class="summary-title">TÓM TẮT ĐƠN HÀNG</h2>
-            
+
             <div class="sum-row">
               <span>{{ cartStore.totalItems }} sản phẩm</span>
               <span>{{ formatCurrency(cartStore.totalPrice) }}</span>
@@ -110,7 +110,7 @@
               </p>
               <p v-else>Bạn đã đạt ưu đãi miễn phí ship.</p>
             </div>
-            
+
             <div class="sum-total">
               <span class="total-label">Tạm tính</span>
               <span class="total-value">{{ formatCurrency(estimatedGrandTotalAfterDiscount) }}</span>
@@ -170,19 +170,22 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useCartStore } from '@/store/cartStore';
 import { Delete, Right, Ticket } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage } from 'element-plus';
 import api from '@/services/api';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useStoreSettingsStore } from '@/store/storeSettingsStore';
 import { voucherApi } from '@/modules/voucher/api/voucherApi';
+import { useConfirmDialog } from '@/composables/useConfirmDialog';
 
 const cartStore = useCartStore();
 const wishlistStore = useWishlistStore();
 const storeSettingsStore = useStoreSettingsStore();
 const router = useRouter();
+const { confirm } = useConfirmDialog();
 const productCatalog = ref([]);
 const bestVoucher = ref(null);
 const availableVouchers = ref([]);
+const removeConfirming = ref(false);
 const estimatedShippingFee = computed(() => {
   const baseFee = storeSettingsStore.defaultShippingFee;
   const threshold = storeSettingsStore.freeShippingThreshold;
@@ -308,16 +311,28 @@ const handleUpdateQuantity = async (itemId, qty) => {
   await cartStore.updateQuantity(itemId, qty);
 };
 
-const handleRemove = async (itemId) => {
+const handleRemove = async (item) => {
+  if (!item?.id || removeConfirming.value) return;
+  removeConfirming.value = true;
   try {
-    await ElMessageBox.confirm('Bạn có chắc chắn muốn xóa sản phẩm này khỏi giỏ hàng?', 'Xóa sản phẩm', {
-      confirmButtonText: 'Xóa',
-      cancelButtonText: 'Hủy',
-      type: 'warning'
+    await confirm({
+      title: 'Xác nhận',
+      message: `Bạn có chắc muốn xóa ${item.productName || 'sản phẩm này'} khỏi giỏ hàng?`,
+      confirmButtonText: 'OK',
+      cancelButtonText: 'Cancel',
+      onConfirm: async () => {
+        await cartStore.removeItem(item.id);
+      }
     });
-    await cartStore.removeItem(itemId);
+    ElMessage({
+      type: 'success',
+      message: 'Đã xóa sản phẩm khỏi giỏ hàng',
+      offset: 72
+    });
   } catch (e) {
     // cancelled
+  } finally {
+    removeConfirming.value = false;
   }
 };
 
@@ -413,13 +428,13 @@ watch(
 
 .cart-header {
   margin-bottom: 40px;
-  
+
   .cart-title {
     font-size: 40px;
     font-weight: 950;
     margin-bottom: 10px;
     letter-spacing: -1px;
-    
+
     span {
       font-size: 18px;
       font-weight: 500;
@@ -452,7 +467,7 @@ watch(
     width: 220px;
     height: 100%;
     background: #f5f5f5;
-    
+
     .item-img {
       width: 100%;
       height: 100%;
@@ -478,14 +493,14 @@ watch(
         text-decoration: none;
         max-width: 80%;
         line-height: 1.3;
-        
+
         &:hover { text-decoration: underline; }
       }
-      
+
       .item-utils {
         display: flex;
         gap: 15px;
-        
+
         .util-icon {
           font-size: 22px;
           cursor: pointer;
@@ -572,7 +587,7 @@ watch(
     margin-top: 30px;
     padding-top: 25px;
     border-top: 1px solid #ebedee;
-    
+
     .total-label { font-size: 18px; font-weight: 900; }
     .total-value { font-size: 18px; font-weight: 900; }
   }
@@ -611,7 +626,7 @@ watch(
     align-items: center;
     gap: 10px;
     margin-bottom: 14px;
-    
+
     a {
       font-size: 14px;
       color: #000;
@@ -619,7 +634,7 @@ watch(
       font-weight: 700;
       text-underline-offset: 3px;
     }
-    
+
     .el-icon { font-size: 18px; }
   }
 
@@ -704,7 +719,7 @@ watch(
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
-      
+
       img {
         height: 24px;
         object-fit: contain;
@@ -757,13 +772,13 @@ watch(
 .empty-layout {
   text-align: center;
   padding: 120px 20px;
-  
+
   .empty-title {
     font-size: 36px;
     font-weight: 950;
     margin-bottom: 25px;
   }
-  
+
   .empty-msg {
     margin-bottom: 40px;
     color: #444;
@@ -788,13 +803,13 @@ watch(
   .cart-layout {
     grid-template-columns: 1fr;
   }
-  
+
   .cart-sidebar {
     .summary-box {
       position: static;
     }
   }
-  
+
   .rec-row {
     grid-template-columns: 1fr 1fr;
   }

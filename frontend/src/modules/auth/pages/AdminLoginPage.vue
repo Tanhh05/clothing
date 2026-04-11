@@ -1,7 +1,6 @@
 <template>
   <section class="admin-login admin-auth-shell">
     <div class="admin-login__card">
-      <h1>Admin Login</h1>
       <p class="hint">Chỉ tài khoản quản trị mới được truy cập trang này.</p>
 
       <el-form class="stack" @submit.prevent="onSubmit">

@@ -65,6 +65,7 @@
                 <span><strong>TT:</strong> {{ paymentLabel(row.paymentMethod) }}</span>
                 <span><strong>Tổng:</strong> {{ formatCurrency(row.totalPrice) }}</span>
                 <el-tag size="small" :type="statusTagType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+                <span><strong>GHN:</strong> {{ row.shippingCode || "Chưa có mã" }}</span>
               </div>
             </template>
           </el-table-column>
@@ -117,20 +118,38 @@
               <p><strong>Khách hàng:</strong> {{ customerDisplay(selectedOrder) }}</p>
               <p><strong>Địa chỉ:</strong> {{ selectedOrder.address || "N/A" }}</p>
               <p><strong>Tổng tiền:</strong> {{ formatCurrency(selectedOrder.totalPrice) }}</p>
+              <p><strong>Mã vận đơn GHN:</strong> {{ selectedOrder.shippingCode || "Chưa có" }}</p>
+              <p><strong>Trạng thái GHN:</strong> {{ selectedOrder.shippingStatus || "N/A" }}</p>
             </div>
           </section>
 
           <section class="detail-card status-box">
             <h4 class="card-title">Xử lý trạng thái</h4>
             <p><strong>Trạng thái hiện tại:</strong> <el-tag>{{ statusLabel(selectedOrder.status) }}</el-tag></p>
+            <el-input
+              v-model="shippingCodeDraft"
+              placeholder="Mã vận đơn GHN (nếu cần gán tay)"
+              clearable
+              class="shipping-code-input"
+            />
+            <el-checkbox v-model="statusSyncWithGhn">Đối chiếu GHN trước khi cập nhật trạng thái</el-checkbox>
             <div class="status-actions">
               <el-button
                 type="primary"
                 :disabled="updatingOrderId === selectedOrder.id || !nextStatus(selectedOrder.status)"
                 :loading="updatingOrderId === selectedOrder.id"
                 @click="updateStatus(selectedOrder)"
-              >
+                >
                 {{ nextStatus(selectedOrder.status) ? `Chuyển → ${statusLabel(nextStatus(selectedOrder.status))}` : "Đã hoàn tất" }}
+              </el-button>
+              <el-button
+                plain
+                type="info"
+                :loading="syncingOrderId === selectedOrder.id"
+                :disabled="syncingOrderId === selectedOrder.id || !selectedOrder.shippingCode"
+                @click="syncOrderWithGhn(selectedOrder)"
+              >
+                Sync trạng thái GHN
               </el-button>
               <el-button
                 type="warning"
@@ -215,6 +234,9 @@ const dateRange = ref([]);
 const detailsVisible = ref(false);
 const selectedOrder = ref(null);
 const updatingOrderId = ref(null);
+const syncingOrderId = ref(null);
+const statusSyncWithGhn = ref(true);
+const shippingCodeDraft = ref("");
 const page = ref(0);
 const size = ref(10);
 const orderTableRef = ref(null);
@@ -320,6 +342,14 @@ const canMarkRefunded = (status) => {
 
 const sortedHistory = (history) => {
   return [...(history || [])].sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt));
+};
+
+const extractApiMessage = (error, fallback) => {
+  return (
+    error?.response?.data?.message
+    || error?.message
+    || fallback
+  );
 };
 
 const buildQueryParams = (nextPage = page.value, nextSize = size.value) => {
@@ -582,6 +612,8 @@ const exportSelectedInvoices = async () => {
 
 const openDetails = (order) => {
   selectedOrder.value = order;
+  shippingCodeDraft.value = String(order?.shippingCode || "");
+  statusSyncWithGhn.value = true;
   detailsVisible.value = true;
 };
 
@@ -592,7 +624,12 @@ const updateStatus = async (order, targetStatus = null) => {
 
   updatingOrderId.value = order.id;
   try {
-    const { data } = await orderApi.updateOrderStatus(order.id, normalizedNextStatus);
+    const payload = {
+      status: normalizedNextStatus,
+      syncWithGhn: statusSyncWithGhn.value,
+      shippingCode: shippingCodeDraft.value?.trim() || undefined
+    };
+    const { data } = await orderApi.updateOrderStatus(order.id, payload);
     const updated = data || {};
     const index = orders.value.findIndex((o) => o.id === order.id);
     if (index !== -1) {
@@ -605,9 +642,37 @@ const updateStatus = async (order, targetStatus = null) => {
     await fetchOrders(page.value);
   } catch (error) {
     console.error(error);
-    ElMessage.error(error?.response?.data?.message || "Cập nhật trạng thái thất bại");
+    ElMessage.error(extractApiMessage(error, "Cập nhật trạng thái thất bại"));
   } finally {
     updatingOrderId.value = null;
+  }
+};
+
+const syncOrderWithGhn = async (order) => {
+  if (!order?.id) return;
+  syncingOrderId.value = order.id;
+  try {
+    const { data } = await orderApi.syncOrderStatusWithGhn(order.id);
+    const updated = data || {};
+    const index = orders.value.findIndex((o) => o.id === order.id);
+    if (index !== -1) {
+      orders.value[index] = updated;
+    }
+    if (selectedOrder.value?.id === order.id) {
+      selectedOrder.value = updated;
+      shippingCodeDraft.value = String(updated?.shippingCode || "");
+    }
+    ElMessage.success(`Đã sync GHN cho đơn #${order.id}`);
+  } catch (error) {
+    const message = extractApiMessage(error, "Không thể sync trạng thái GHN");
+    if (error?.response?.status === 400 && message.includes("Cannot sync order")) {
+      ElMessage.warning("GHN chưa cập nhật trạng thái mới hơn để đồng bộ. Vui lòng thử lại sau.");
+      await fetchOrders(page.value);
+      return;
+    }
+    ElMessage.error(message);
+  } finally {
+    syncingOrderId.value = null;
   }
 };
 
@@ -854,6 +919,10 @@ onMounted(() => {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-start;
+}
+
+.shipping-code-input {
+  width: min(420px, 100%);
 }
 
 .history-box {

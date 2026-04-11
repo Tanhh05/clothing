@@ -95,6 +95,8 @@
                 <p><span>Thanh toán</span><strong>{{ paymentLabel(order.paymentMethod) }}</strong></p>
                 <p><span>Địa chỉ</span><strong>{{ order.address || "N/A" }}</strong></p>
                 <p><span>Tổng sản phẩm</span><strong>{{ itemCount(order) }}</strong></p>
+                <p><span>Mã vận đơn</span><strong>{{ order.shippingCode || "Chưa có" }}</strong></p>
+                <p><span>Trạng thái GHN</span><strong>{{ shippingStatusLabel(order.shippingStatus) }}</strong></p>
               </section>
 
               <section class="items-panel">
@@ -315,7 +317,9 @@ const statusMap = {
   RETURN_REQUESTED: "Đang yêu cầu đổi trả",
   CANCELLED: "Đã hủy",
   FAILED: "Thất bại",
-  FAILED_INSUFFICIENT_STOCK: "Thất bại - hết hàng"
+  FAILED_INSUFFICIENT_STOCK: "Thất bại - hết hàng",
+  FAILED_DELIVERY: "Giao thất bại",
+  REFUNDED: "Đã hoàn tiền"
 };
 
 const statusFilterOptions = [
@@ -398,6 +402,24 @@ const paymentLabel = (method) => {
 };
 
 const statusLabel = (status) => statusMap[status] || status || "N/A";
+
+const shippingStatusLabel = (status) => {
+  const map = {
+    ready_to_pick: "Sẵn sàng lấy hàng",
+    picking: "Đang lấy hàng",
+    picked: "Đã lấy hàng",
+    storing: "Đã nhập kho trung chuyển",
+    sorting: "Đang phân loại",
+    transporting: "Đang vận chuyển",
+    delivering: "Đang giao",
+    delivered: "Giao thành công",
+    cancel: "Đã hủy",
+    delivery_fail: "Giao thất bại",
+    returned: "Đang hoàn hàng"
+  };
+  const normalized = String(status || "").trim().toLowerCase();
+  return map[normalized] || (normalized || "N/A");
+};
 
 const statusType = (status) => {
   const value = (status || "").toUpperCase();

@@ -48,6 +48,18 @@ public class OrderEntity {
     @Column(name = "payment_method", length = 50)
     private String paymentMethod;
 
+    @Column(name = "shipping_provider", length = 50)
+    private String shippingProvider;
+
+    @Column(name = "shipping_code", length = 100, unique = true)
+    private String shippingCode;
+
+    @Column(name = "shipping_status", length = 50)
+    private String shippingStatus;
+
+    @Column(name = "shipping_updated_at")
+    private LocalDateTime shippingUpdatedAt;
+
     @Column(columnDefinition = "TEXT")
     private String address;
 

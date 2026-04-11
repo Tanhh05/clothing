@@ -91,7 +91,7 @@
             <el-button type="primary" class="submit-btn" native-type="submit" :loading="loading">
               ĐĂNG NHẬP <el-icon class="el-icon--right"><Right /></el-icon>
             </el-button>
-            
+
             <div class="sub-actions">
               <a @click="authMode = 'register'">Chưa có tài khoản? Đăng ký ngay</a>
             </div>
@@ -156,6 +156,7 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
 import { useWishlistStore } from '@/store/wishlistStore';
+import { useConfirmDialog } from '@/composables/useConfirmDialog';
 import { ElMessage } from 'element-plus';
 
 const props = defineProps({
@@ -168,6 +169,7 @@ const router = useRouter();
 const authStore = useAuthStore();
 const cartStore = useCartStore();
 const wishlistStore = useWishlistStore();
+const { showAlert } = useConfirmDialog();
 const loading = ref(false);
 const googleReady = ref(false);
 const googleButtonRef = ref(null);
@@ -260,7 +262,7 @@ const loadGoogleScript = () => {
 
 const handleCredentialResponse = async (response) => {
   if (!response?.credential) return;
-  
+
   loading.value = true;
   try {
     await authStore.loginWithGoogle(response.credential);
@@ -370,6 +372,14 @@ const handleRegister = async () => {
     ElMessage.warning('Vui lòng nhập đầy đủ các trường bắt buộc');
     return;
   }
+
+  // Validation số điện thoại
+  const phoneRegex = /^0\d{9}$/;
+  if (!registerForm.phone || !phoneRegex.test(registerForm.phone)) {
+    await showAlert('Số điện thoại không hợp lệ. Vui lòng nhập đúng 10 số (VD: 09xxxxxxxx)', 'Lỗi');
+    return;
+  }
+
   if (!agreements.terms || !agreements.age) {
     ElMessage.warning('Bạn cần chấp thuận các điều khoản');
     return;
@@ -591,7 +601,7 @@ const handleRegister = async () => {
   text-align: center;
   position: relative;
   margin: 28px 0 24px;
-  
+
   &::before {
     content: '';
     position: absolute;
@@ -601,7 +611,7 @@ const handleRegister = async () => {
     height: 1px;
     background: #ebedee;
   }
-  
+
   span {
     position: relative;
     background: #fff;
@@ -659,7 +669,7 @@ const handleRegister = async () => {
 .auth-form {
   .form-group {
     margin-bottom: 25px;
-    
+
     label {
       display: block;
       font-size: 11px;
@@ -674,7 +684,7 @@ const handleRegister = async () => {
       border-radius: 0;
       height: 50px;
       padding: 0 15px;
-      
+
       &.is-focus {
         border-color: #000;
       }
@@ -691,19 +701,19 @@ const handleRegister = async () => {
     height: auto;
     white-space: normal;
     align-items: flex-start;
-    
+
     .el-checkbox__label {
       font-size: 13px;
       line-height: 1.4;
       color: #000;
       padding-top: 2px;
-      
+
       a {
         color: #000;
         text-decoration: underline;
       }
     }
-    
+
     .el-checkbox__input.is-checked .el-checkbox__inner {
       background-color: #000;
       border-color: #000;
@@ -747,14 +757,14 @@ const handleRegister = async () => {
 .sub-actions {
   margin-top: 25px;
   text-align: center;
-  
+
   a {
     font-size: 14px;
     font-weight: 700;
     color: #000;
     text-decoration: underline;
     cursor: pointer;
-    
+
     &:hover { color: #666; }
   }
 }

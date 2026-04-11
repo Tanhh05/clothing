@@ -12,4 +12,9 @@ public class UpdateOrderStatusRequest {
     @NotBlank(message = "status is required")
     @Size(max = 50, message = "status max length is 50")
     private String status;
+
+    private Boolean syncWithGhn;
+
+    @Size(max = 100, message = "shippingCode max length is 100")
+    private String shippingCode;
 }

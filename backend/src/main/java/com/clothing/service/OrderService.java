@@ -8,6 +8,7 @@ import com.clothing.dto.response.PageResponse;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 public interface OrderService {
 
@@ -37,4 +38,8 @@ public interface OrderService {
     OrderResponse updateOrderStatus(Long orderId, UpdateOrderStatusRequest request);
 
     int bulkUpdateStatus(List<Long> ids, String status);
+
+    OrderResponse syncOrderStatusWithGhn(Long orderId);
+
+    void handleGhnWebhook(Map<String, Object> payload);
 }

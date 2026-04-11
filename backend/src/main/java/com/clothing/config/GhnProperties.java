@@ -10,5 +10,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class GhnProperties {
 
     private String baseUrl = "https://online-gateway.ghn.vn/shiip/public-api/master-data";
+    private String shippingBaseUrl = "https://online-gateway.ghn.vn/shiip/public-api/v2/shipping-order";
     private String token = "";
+    private String shopId = "";
 }

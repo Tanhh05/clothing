@@ -438,13 +438,15 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessage } from "element-plus";
 import { Plus, Search, Upload } from "@element-plus/icons-vue";
 import { useProductStore } from "@/modules/product/store/productStore";
 import { productApi } from "@/modules/product/api/productApi";
 import api from "@/services/api";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 const store = useProductStore();
+const { confirm } = useConfirmDialog();
 
 const loading = computed(() => store.loading);
 const products = computed(() => store.products || []);
@@ -462,6 +464,7 @@ const selectedIds = ref([]);
 const deletedDrawerVisible = ref(false);
 const deletedProducts = ref([]);
 const deletedLoading = ref(false);
+const confirmDialogPending = ref(false);
 const restoringId = ref(null);
 const inventoryDrawerVisible = ref(false);
 const inventoryLoading = ref(false);
@@ -969,24 +972,30 @@ const submitProduct = async () => {
 };
 
 const deleteItem = async (item) => {
+  if (confirmDialogPending.value) return;
+  confirmDialogPending.value = true;
   try {
-    await ElMessageBox.confirm(`Xóa sản phẩm \"${item.name}\"?`, "Xác nhận", {
-      type: "warning",
-      confirmButtonText: "Xóa",
-      cancelButtonText: "Hủy"
+    await confirm({
+      title: "Xác nhận",
+      message: `Bạn có chắc muốn xóa ${item.name || "sản phẩm này"}?`,
+      confirmButtonText: "OK",
+      cancelButtonText: "Cancel",
+      onConfirm: async () => {
+        await productApi.deleteProduct(item.id);
+      }
     });
-
-    await productApi.deleteProduct(item.id);
     ElMessage.success("Đã xóa sản phẩm");
     await refreshProducts();
     if (deletedDrawerVisible.value) {
       await loadDeletedProducts();
     }
   } catch (error) {
-    if (error !== "cancel") {
+    if (error.message !== "cancel") {
       console.error(error);
       ElMessage.error("Xóa sản phẩm thất bại");
     }
+  } finally {
+    confirmDialogPending.value = false;
   }
 };
 
@@ -1004,14 +1013,18 @@ const bulkSetStatus = async (status) => {
 };
 
 const bulkSoftDelete = async () => {
-  if (!selectedIds.value.length) return;
+  if (!selectedIds.value.length || confirmDialogPending.value) return;
+  confirmDialogPending.value = true;
   try {
-    await ElMessageBox.confirm(`Xóa mềm ${selectedIds.value.length} sản phẩm đã chọn?`, "Xác nhận", {
-      type: "warning",
-      confirmButtonText: "Xóa",
-      cancelButtonText: "Hủy"
+    await confirm({
+      title: "Xác nhận",
+      message: `Bạn có chắc muốn xóa mềm ${selectedIds.value.length} sản phẩm đã chọn?`,
+      confirmButtonText: "OK",
+      cancelButtonText: "Cancel",
+      onConfirm: async () => {
+        await productApi.bulkDelete(selectedIds.value);
+      }
     });
-    await productApi.bulkDelete(selectedIds.value);
     ElMessage.success("Đã xóa mềm sản phẩm đã chọn");
     clearSelection();
     await refreshProducts();
@@ -1019,10 +1032,12 @@ const bulkSoftDelete = async () => {
       await loadDeletedProducts();
     }
   } catch (error) {
-    if (error !== "cancel") {
+    if (error.message !== "cancel") {
       console.error(error);
       ElMessage.error(error?.response?.data?.message || "Không thể xóa hàng loạt");
     }
+  } finally {
+    confirmDialogPending.value = false;
   }
 };
 

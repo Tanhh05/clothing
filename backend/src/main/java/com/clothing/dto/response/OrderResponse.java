@@ -19,6 +19,10 @@ public class OrderResponse {
     private String status;
     private String paymentMethod;
     private String paymentUrl;
+    private String shippingProvider;
+    private String shippingCode;
+    private String shippingStatus;
+    private LocalDateTime shippingUpdatedAt;
     private String address;
     private Long subTotal;
     private Long shippingFee;

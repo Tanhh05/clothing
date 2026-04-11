@@ -19,10 +19,16 @@ export const orderApi = {
   getAdminSummary() {
     return api.get("/orders/summary");
   },
-  updateOrderStatus(orderId, status) {
-    return api.patch(`/orders/${orderId}/status`, { status });
+  updateOrderStatus(orderId, payload) {
+    if (typeof payload === "string") {
+      return api.patch(`/orders/${orderId}/status`, { status: payload });
+    }
+    return api.patch(`/orders/${orderId}/status`, payload || {});
   },
   bulkUpdateStatus(ids, status) {
     return api.patch("/orders/bulk/status", { ids, status });
+  },
+  syncOrderStatusWithGhn(orderId) {
+    return api.post(`/orders/${orderId}/status/sync-ghn`);
   }
 };

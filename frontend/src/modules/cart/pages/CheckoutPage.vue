@@ -248,6 +248,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { useCartStore } from '@/store/cartStore';
 import { useAuthStore } from '@/store/authStore';
+import { useConfirmDialog } from '@/composables/useConfirmDialog';
 import { useStoreSettingsStore } from '@/store/storeSettingsStore';
 import { orderApi } from '@/modules/order/api/orderApi';
 import { addressApi } from '@/modules/address/api/addressApi';
@@ -262,6 +263,7 @@ const router = useRouter();
 const cartStore = useCartStore();
 const authStore = useAuthStore();
 const storeSettingsStore = useStoreSettingsStore();
+const { showError, showAlert } = useConfirmDialog();
 
 const savedAddresses = ref([]);
 const selectedSavedAddressId = ref(null);
@@ -543,10 +545,27 @@ const handleVoucherChange = (value) => {
   voucherClearedByUser.value = !selectedVoucherCode.value;
 };
 
+const normalizePhoneForShipping = (value) => {
+  const raw = String(value || '').trim().replace(/\s+/g, '');
+  if (!raw) return '';
+  if (raw.startsWith('+84')) return `0${raw.slice(3)}`;
+  if (raw.startsWith('84')) return `0${raw.slice(2)}`;
+  return raw;
+};
+
+const isValidShippingPhone = (value) => /^0\d{9}$/.test(String(value || ''));
+
 const submitCheckout = async () => {
   if (!authStore.isAuthenticated) {
     ElMessage.warning('Vui lòng đăng nhập để thanh toán');
     router.push('/auth/login');
+    return;
+  }
+  if (!firstName.value.trim()) return ElMessage.warning('Vui lòng nhập tên người nhận');
+  if (!phoneNumber.value.trim()) return ElMessage.warning('Vui lòng nhập số điện thoại');
+  const normalizedPhone = normalizePhoneForShipping(phoneNumber.value);
+  if (!isValidShippingPhone(normalizedPhone)) {
+    await showAlert('Số điện thoại không hợp lệ. Vui lòng nhập đúng 10 số (VD: 09xxxxxxxx)', 'Lỗi');
     return;
   }
   if (!selectedProvinceId.value || !selectedDistrictId.value || !selectedWardId.value) return ElMessage.warning('Vui lòng chọn đầy đủ tỉnh/huyện/xã');
@@ -562,7 +581,11 @@ const submitCheckout = async () => {
     const payload = {
       paymentMethod: paymentMethod.value,
       address: fullAddress,
+      recipientName: firstName.value?.trim() || undefined,
+      phone: normalizedPhone || undefined,
       province: selectedProvinceName.value,
+      district: selectedDistrictName.value,
+      ward: selectedWardName.value,
       voucherCode: appliedVoucherCode.value || undefined
     };
 
@@ -575,7 +598,8 @@ const submitCheckout = async () => {
     await cartStore.fetchCart();
     router.push('/orders');
   } catch (error) {
-    ElMessage.error(error?.response?.data?.message || 'Không thể tạo đơn hàng');
+    const message = error?.response?.data?.message || 'Không thể tạo đơn hàng';
+    await showAlert(message, 'Lỗi');
   } finally {
     submittingOrder.value = false;
   }

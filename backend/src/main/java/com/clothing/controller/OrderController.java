@@ -100,4 +100,10 @@ public class OrderController {
         int affected = orderService.bulkUpdateStatus(request.getIds(), request.getStatus());
         return ResponseEntity.ok(Map.of("affected", affected));
     }
+
+    @PostMapping("/{orderId}/status/sync-ghn")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<OrderResponse> syncOrderStatusWithGhn(@PathVariable Long orderId) {
+        return ResponseEntity.ok(orderService.syncOrderStatusWithGhn(orderId));
+    }
 }

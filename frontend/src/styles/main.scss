@@ -252,3 +252,115 @@ a {
     line-height: 1.35;
   }
 }
+
+.el-message-box.confirm-clean-box {
+  width: min(420px, calc(100vw - 32px));
+  border-radius: 6px;
+  padding: 0;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  border: none;
+
+  .el-message-box__header {
+    padding: 14px 16px 10px;
+    border-bottom: none;
+    background: #fff;
+  }
+
+  .el-message-box__title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+  }
+
+  .el-message-box__headerbtn {
+    top: 10px;
+    right: 10px;
+    font-size: 16px;
+    color: #999;
+
+    &:hover {
+      color: #666;
+    }
+  }
+
+  .el-message-box__content {
+    padding: 8px 16px 12px;
+    background: #fff;
+  }
+
+  .el-message-box__container {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .el-message-box__status {
+    font-size: 18px !important;
+    color: #f0ad4e !important;
+    margin-right: 0;
+    flex-shrink: 0;
+    padding-top: 1px;
+  }
+
+  .el-message-box__message {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.5;
+    flex: 1;
+  }
+
+  .el-message-box__btns {
+    padding: 10px 16px;
+    gap: 8px;
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid #f0f0f0;
+    background: #fff;
+  }
+
+  .el-button {
+    min-width: 72px;
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 13px;
+    height: 32px;
+    padding: 0 14px;
+  }
+
+  .el-button--default {
+    color: #666;
+    border-color: #ddd;
+    background: #fff;
+    transition: all 0.2s;
+
+    &:hover {
+      color: #333;
+      border-color: #b3b3b3;
+      background: #fafafa;
+    }
+  }
+
+  .el-button--primary {
+    border-color: #409eff;
+    background: #409eff;
+    color: #fff;
+    transition: all 0.2s;
+
+    &:hover {
+      border-color: #66b1ff;
+      background: #66b1ff;
+    }
+  }
+}
+
+.el-overlay.confirm-clean-mask {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.45) !important;
+
+  .el-message-box.confirm-clean-box {
+    margin: 0 !important;
+  }
+}
+
+

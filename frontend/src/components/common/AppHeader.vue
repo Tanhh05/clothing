@@ -164,9 +164,18 @@
             <div class="notification-popover">
               <div class="notification-head">
                 <strong>Thông báo</strong>
-                <el-button text size="small" @click="markAllNotificationsAsRead">Đánh dấu đã đọc</el-button>
+                <el-button
+                  text
+                  size="small"
+                  :loading="notificationLoading"
+                  :disabled="notificationLoading || !notifications.length"
+                  @click="markAllNotificationsAsRead"
+                >
+                  Đánh dấu đã đọc
+                </el-button>
               </div>
-              <div v-if="notifications.length" class="notification-list">
+              <div v-if="notificationLoading" class="notification-empty">Đang tải thông báo...</div>
+              <div v-else-if="notifications.length" class="notification-list">
                 <button
                   v-for="item in notifications"
                   :key="item.id"
@@ -180,7 +189,7 @@
                   <small class="noti-time">{{ formatDateTime(item.createdAt) }}</small>
                 </button>
               </div>
-              <p v-else class="notification-empty">Chưa có thông báo</p>
+              <p v-else class="notification-empty">{{ notificationError || "Chưa có thông báo" }}</p>
             </div>
           </el-popover>
 
@@ -211,7 +220,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Search, User, ShoppingBag, ArrowDown, ArrowUp, Close, Bell } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
-import { ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
@@ -233,6 +242,9 @@ const wishlistStore = useWishlistStore();
 const wishlistCount = computed(() => wishlistStore.productIds.length);
 const notifications = ref([]);
 const unreadCount = ref(0);
+const notificationLoading = ref(false);
+const notificationError = ref("");
+const pollingInFlight = ref(false);
 
 const formatCurrency = (val) => {
   if (!val) return 'Liên hệ';
@@ -373,8 +385,15 @@ const fetchNotifications = async () => {
   if (!authStore.isAuthenticated) {
     notifications.value = [];
     unreadCount.value = 0;
+    notificationError.value = "";
     return;
   }
+  if (pollingInFlight.value) {
+    return;
+  }
+  pollingInFlight.value = true;
+  notificationLoading.value = true;
+  notificationError.value = "";
   try {
     const [listRes, unreadRes] = await Promise.all([
       notificationClientApi.getMyNotifications(),
@@ -383,7 +402,18 @@ const fetchNotifications = async () => {
     notifications.value = Array.isArray(listRes?.data) ? listRes.data : [];
     unreadCount.value = Number(unreadRes?.data?.unread || 0);
   } catch (error) {
+    if (error?.response?.status === 401) {
+      notifications.value = [];
+      unreadCount.value = 0;
+      notificationError.value = "Phiên đăng nhập đã hết hạn.";
+      stopNotificationPolling();
+      return;
+    }
+    notificationError.value = "Không thể tải thông báo.";
     console.error('Failed to fetch notifications:', error);
+  } finally {
+    notificationLoading.value = false;
+    pollingInFlight.value = false;
   }
 };
 
@@ -396,6 +426,7 @@ const markNotificationAsRead = async (item) => {
     item.isRead = true;
     unreadCount.value = Math.max(0, unreadCount.value - 1);
   } catch (error) {
+    ElMessage.error(error?.response?.data?.message || 'Không thể đánh dấu thông báo đã đọc');
     console.error('Failed to mark notification as read:', error);
   }
 };
@@ -405,7 +436,9 @@ const markAllNotificationsAsRead = async () => {
     await notificationClientApi.markAllAsRead();
     notifications.value = notifications.value.map((item) => ({ ...item, isRead: true }));
     unreadCount.value = 0;
+    ElMessage.success('Đã đánh dấu tất cả thông báo là đã đọc');
   } catch (error) {
+    ElMessage.error(error?.response?.data?.message || 'Không thể đánh dấu tất cả thông báo đã đọc');
     console.error('Failed to mark all notifications as read:', error);
   }
 };
