@@ -53,41 +53,53 @@ public class MomoPaymentServiceImpl implements PaymentService {
     public String createMomoPayment(OrderEntity order) {
         validateConfig();
 
+        String endpoint = normalizeConfigValue(momoProperties.getEndpoint());
+        String partnerCode = normalizeConfigValue(momoProperties.getPartnerCode());
+        String accessKey = normalizeConfigValue(momoProperties.getAccessKey());
+        String secretKey = normalizeConfigValue(momoProperties.getSecretKey());
+        String redirectUrl = normalizeConfigValue(momoProperties.getRedirectUrl());
+        String ipnUrl = normalizeConfigValue(momoProperties.getIpnUrl());
+        String requestType = normalizeConfigValue(momoProperties.getRequestType());
+
         String orderId = "ORD" + order.getId() + "-" + System.currentTimeMillis();
         String requestId = "REQ" + order.getId() + "-" + System.currentTimeMillis();
         String amount = String.valueOf(order.getTotalPrice());
         String orderInfo = "Thanh toan don hang #" + order.getId();
         String extraData = Base64.getEncoder().encodeToString(("orderId=" + order.getId()).getBytes(StandardCharsets.UTF_8));
-        String requestType = momoProperties.getRequestType();
         String partnerClientId = "";
+        boolean includePartnerClientId = isInitiateRequest(requestType) && !isBlank(partnerClientId);
 
-        String rawSignature = "accessKey=" + momoProperties.getAccessKey()
+        String rawSignature = "accessKey=" + accessKey
                 + "&amount=" + amount
                 + "&extraData=" + extraData
-                + "&ipnUrl=" + momoProperties.getIpnUrl()
+                + "&ipnUrl=" + ipnUrl
                 + "&orderId=" + orderId
                 + "&orderInfo=" + orderInfo
-                + (isInitiateRequest(requestType) ? "&partnerClientId=" + partnerClientId : "")
-                + "&partnerCode=" + momoProperties.getPartnerCode()
-                + "&redirectUrl=" + momoProperties.getRedirectUrl()
+                + (includePartnerClientId ? "&partnerClientId=" + partnerClientId : "")
+                + "&partnerCode=" + partnerCode
+                + "&redirectUrl=" + redirectUrl
                 + "&requestId=" + requestId
                 + "&requestType=" + requestType;
-        String signature = signHmacSha256(rawSignature, momoProperties.getSecretKey());
+        String signature = signHmacSha256(rawSignature, secretKey);
+
+        log.info("MoMo create request. endpoint={}, partnerCode={}, requestType={}, orderId={}, requestId={}",
+                endpoint, mask(partnerCode), requestType, orderId, requestId);
+        log.debug("MoMo rawSignature={}", rawSignature);
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("partnerCode", momoProperties.getPartnerCode());
-        payload.put("accessKey", momoProperties.getAccessKey());
+        payload.put("partnerCode", partnerCode);
+        payload.put("accessKey", accessKey);
         payload.put("partnerName", "Clothing");
         payload.put("storeId", "ClothingStore");
         payload.put("requestId", requestId);
         payload.put("amount", order.getTotalPrice());
         payload.put("orderId", orderId);
         payload.put("orderInfo", orderInfo);
-        payload.put("redirectUrl", momoProperties.getRedirectUrl());
-        payload.put("ipnUrl", momoProperties.getIpnUrl());
+        payload.put("redirectUrl", redirectUrl);
+        payload.put("ipnUrl", ipnUrl);
         payload.put("lang", "vi");
         payload.put("requestType", requestType);
-        if (isInitiateRequest(requestType)) {
+        if (includePartnerClientId) {
             payload.put("partnerClientId", partnerClientId);
         }
         payload.put("autoCapture", true);
@@ -100,7 +112,7 @@ public class MomoPaymentServiceImpl implements PaymentService {
         ResponseEntity<JsonNode> response;
         try {
             response = restTemplate.postForEntity(
-                    momoProperties.getEndpoint(),
+                    endpoint,
                     new HttpEntity<>(payload, headers),
                     JsonNode.class
             );
@@ -195,6 +207,18 @@ public class MomoPaymentServiceImpl implements PaymentService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String normalizeConfigValue(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String mask(String value) {
+        if (value == null || value.isBlank()) {
+            return "<blank>";
+        }
+        int keep = Math.min(4, value.length());
+        return "*".repeat(Math.max(0, value.length() - keep)) + value.substring(value.length() - keep);
     }
 
     private boolean isInitiateRequest(String requestType) {
