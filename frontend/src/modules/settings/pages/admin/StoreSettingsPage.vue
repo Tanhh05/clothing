@@ -60,12 +60,14 @@
 
     <section class="panel">
       <div class="panel-head"><h3>Chính sách</h3></div>
-      <el-form-item label="Chính sách giao hàng">
-        <el-input v-model="settings.shippingPolicy" type="textarea" :rows="3" />
-      </el-form-item>
-      <el-form-item label="Chính sách đổi trả">
-        <el-input v-model="settings.returnPolicy" type="textarea" :rows="3" />
-      </el-form-item>
+      <div class="policy-grid">
+        <el-form-item label="Chính sách giao hàng" class="policy-field">
+          <el-input v-model="settings.shippingPolicy" type="textarea" :rows="3" />
+        </el-form-item>
+        <el-form-item label="Chính sách đổi trả" class="policy-field">
+          <el-input v-model="settings.returnPolicy" type="textarea" :rows="3" />
+        </el-form-item>
+      </div>
     </section>
   </section>
 </template>
@@ -117,7 +119,40 @@ onMounted(fetchSettings);
 .sub-text { margin: 6px 0 0; color: #6b7280; font-size: 13px; }
 .panel { border: 1px solid #dce1e7; background: #fff; padding: 14px; }
 .panel-head h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
-.switch-list { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
-.switch-item { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; min-width: 220px; display: flex; justify-content: space-between; align-items: center; }
-@media (max-width: 760px) { .head { flex-direction: column; align-items: flex-start; } }
+.switch-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 6px;
+}
+
+.switch-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-height: 52px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.policy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.policy-field {
+  margin-bottom: 0;
+}
+
+.policy-field :deep(.el-textarea__inner) {
+  min-height: 108px !important;
+}
+
+@media (max-width: 760px) {
+  .head { flex-direction: column; align-items: flex-start; }
+  .switch-list { grid-template-columns: 1fr; }
+  .policy-grid { grid-template-columns: 1fr; }
+}
 </style>

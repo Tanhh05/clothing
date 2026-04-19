@@ -233,3 +233,32 @@ Kỳ vọng:
 3. `npm run build` frontend thành công.
 4. Test ít nhất 1 API public + 1 API protected (401 khi thiếu token).
 5. Test 1 luồng admin -> client (ví dụ settings hoặc notification).
+
+## 13) Secret guard
+
+- Script check secrets: `scripts/check-no-secrets.sh`
+- CI đã có workflow chạy script này ở mỗi push/PR.
+- Để bật local git hook:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+## 14) CI/CD workflows
+
+- Backend CI: `.github/workflows/backend-ci.yml`
+  - Job `build_and_test`: `mvn clean test`
+  - Job `quality_gate`: secret guard + `mvn -DskipTests verify` + `docker build`
+- Deploy staging: `.github/workflows/deploy-staging.yml`
+  - Trigger tự động sau khi `Backend CI` thành công trên branch `main`
+  - Có thể chạy tay qua `workflow_dispatch` và truyền `git_sha`
+  - Deploy qua SSH, sau đó chạy smoke test bằng `scripts/smoke-test-api.sh`
+
+### Secrets cần cấu hình cho deploy staging
+
+- `STAGING_SSH_HOST`
+- `STAGING_SSH_PORT`
+- `STAGING_SSH_USER`
+- `STAGING_SSH_PRIVATE_KEY`
+- `STAGING_APP_DIR` (thư mục monorepo trên server staging)
+- `STAGING_API_BASE_URL` (ví dụ `https://staging-api.example.com/api`)
