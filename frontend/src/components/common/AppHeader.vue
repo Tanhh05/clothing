@@ -324,7 +324,18 @@ const goToAccount = () => {
 
 const categoriesByParent = computed(() => {
   const map = {};
-  for (const item of categories.value) {
+  const menuCategories = categories.value
+    .filter((item) => {
+      const status = String(item?.status || "ACTIVE").toUpperCase();
+      return status === "ACTIVE" && Boolean(item?.showInMenu);
+    })
+    .sort((a, b) => {
+      const orderA = Number(a?.displayOrder || 0);
+      const orderB = Number(b?.displayOrder || 0);
+      if (orderA !== orderB) return orderA - orderB;
+      return Number(a?.id || 0) - Number(b?.id || 0);
+    });
+  for (const item of menuCategories) {
     const key = item.parentId == null ? 'root' : String(item.parentId);
     if (!map[key]) {
       map[key] = [];

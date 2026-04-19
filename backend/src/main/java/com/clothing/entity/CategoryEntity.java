@@ -28,6 +28,30 @@ public class CategoryEntity {
     @Column(length = 255, unique = true)
     private String slug;
 
+    @Column(length = 500)
+    private String imageUrl;
+
+    @Column(length = 150)
+    private String subtitle;
+
+    @Column(length = 500)
+    private String externalLink;
+
+    @Column(length = 50)
+    private String pageType;
+
+    @Column(length = 2000)
+    private String shortContent;
+
+    @Column
+    private Integer displayOrder;
+
+    @Column
+    private Boolean showInMenu;
+
+    @Column(length = 20)
+    private String status;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "parent_id")
     private CategoryEntity parent;

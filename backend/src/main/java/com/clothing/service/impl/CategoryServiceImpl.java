@@ -40,6 +40,7 @@ public class CategoryServiceImpl implements CategoryService {
         entity.setName(request.getName().trim());
         entity.setSlug(slug);
         entity.setParent(parent);
+        applyExtendedFields(entity, request);
 
         return toResponse(categoryRepository.save(entity));
     }
@@ -56,6 +57,7 @@ public class CategoryServiceImpl implements CategoryService {
         category.setName(request.getName().trim());
         category.setSlug(slug);
         category.setParent(parent);
+        applyExtendedFields(category, request);
 
         return toResponse(categoryRepository.save(category));
     }
@@ -157,11 +159,56 @@ public class CategoryServiceImpl implements CategoryService {
                 .replaceAll("^-+|-+$", "");
     }
 
+    private void applyExtendedFields(CategoryEntity category, CategoryUpsertRequest request) {
+        category.setImageUrl(normalizeNullable(request.getImageUrl()));
+        category.setSubtitle(normalizeNullable(request.getSubtitle()));
+        category.setExternalLink(normalizeNullable(request.getExternalLink()));
+        category.setPageType(normalizePageType(request.getPageType()));
+        category.setShortContent(normalizeNullable(request.getShortContent()));
+        category.setDisplayOrder(request.getDisplayOrder() == null ? 0 : Math.max(0, request.getDisplayOrder()));
+        category.setShowInMenu(Boolean.TRUE.equals(request.getShowInMenu()));
+        category.setStatus(normalizeStatus(request.getStatus()));
+    }
+
+    private String normalizeNullable(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private String normalizePageType(String value) {
+        String normalized = normalizeNullable(value);
+        if (normalized == null) {
+            return "TRANG_DON";
+        }
+        return normalized.toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeStatus(String value) {
+        String normalized = normalizeNullable(value);
+        if (normalized == null) {
+            return "ACTIVE";
+        }
+        String upper = normalized.toUpperCase(Locale.ROOT);
+        if (!upper.equals("ACTIVE") && !upper.equals("INACTIVE")) {
+            throw new BusinessException("status must be ACTIVE or INACTIVE", HttpStatus.BAD_REQUEST);
+        }
+        return upper;
+    }
+
     private CategoryResponse toResponse(CategoryEntity entity) {
         return CategoryResponse.builder()
                 .id(entity.getId())
                 .name(entity.getName())
                 .slug(entity.getSlug())
+                .imageUrl(entity.getImageUrl())
+                .subtitle(entity.getSubtitle())
+                .externalLink(entity.getExternalLink())
+                .pageType(entity.getPageType())
+                .shortContent(entity.getShortContent())
+                .displayOrder(entity.getDisplayOrder())
+                .showInMenu(entity.getShowInMenu())
+                .status(entity.getStatus())
                 .parentId(entity.getParent() == null ? null : entity.getParent().getId())
                 .build();
     }

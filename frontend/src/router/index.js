@@ -131,6 +131,22 @@ const routes = [
         component: () => import("@/modules/pos/pages/admin/PosCounterPage.vue")
       }
     ]
+  },
+  {
+    path: "/system/connection-error",
+    component: () => import("@/modules/system/pages/ConnectionErrorPage.vue")
+  },
+  {
+    path: "/system/forbidden",
+    component: () => import("@/modules/system/pages/ForbiddenPage.vue")
+  },
+  {
+    path: "/system/not-found",
+    component: () => import("@/modules/system/pages/ApiNotFoundPage.vue")
+  },
+  {
+    path: "/:pathMatch(.*)*",
+    component: () => import("@/modules/system/pages/NotFoundPage.vue")
   }
 ];
 

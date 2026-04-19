@@ -4,17 +4,34 @@
       <p class="palette-label">ADMIN TWENTY</p>
 
       <nav class="menu">
-        <RouterLink
-          v-for="item in menuItems"
-          :key="item.to"
-          :to="item.to"
-          class="menu-item"
-          :class="{ active: isActive(item.to) }"
-        >
-          <el-icon class="item-icon"><component :is="item.icon" /></el-icon>
-          <span class="item-label">{{ item.label }}</span>
-          <el-icon v-if="item.hasArrow" class="arrow-icon"><ArrowDown /></el-icon>
+        <RouterLink :to="dashboardItem.to" class="menu-item" :class="{ active: isActive(dashboardItem.to) }">
+          <el-icon class="item-icon"><component :is="dashboardItem.icon" /></el-icon>
+          <span class="item-label">{{ dashboardItem.label }}</span>
         </RouterLink>
+
+        <div
+          v-for="group in menuGroups"
+          :key="group.key"
+          class="menu-group"
+          :class="{ open: openGroupKey === group.key, active: isGroupActive(group) }"
+        >
+          <button type="button" class="menu-group-trigger" @click="toggleGroup(group.key)">
+            <el-icon class="item-icon"><component :is="group.icon" /></el-icon>
+            <span class="item-label">{{ group.label }}</span>
+            <el-icon class="arrow-icon"><ArrowDown /></el-icon>
+          </button>
+          <div v-show="!sidebarCollapsed && openGroupKey === group.key" class="menu-submenu">
+            <RouterLink
+              v-for="item in group.items"
+              :key="item.to"
+              :to="item.to"
+              class="menu-subitem"
+              :class="{ active: isActive(item.to) }"
+            >
+              {{ item.label }}
+            </RouterLink>
+          </div>
+        </div>
       </nav>
     </aside>
 
@@ -224,20 +241,42 @@ const adminEmailText = computed(() => {
   return profile.email || "N/A";
 });
 
-const menuItems = [
-  { label: "Doanh thu", to: "/admin", icon: House, hasArrow: false },
-  { label: "Sản phẩm", to: "/admin/products", icon: Box, hasArrow: false },
-  { label: "Danh mục", to: "/admin/categories", icon: CollectionTag, hasArrow: false },
-  { label: "Banner", to: "/admin/banners", icon: PictureFilled, hasArrow: false },
-  { label: "Khách hàng", to: "/admin/customers", icon: UserFilled, hasArrow: false },
-  { label: "Đơn hàng", to: "/admin/orders", icon: Tickets, hasArrow: false },
-  { label: "Bán tại quầy", to: "/admin/pos", icon: ShoppingCart, hasArrow: false },
-  { label: "Voucher", to: "/admin/vouchers", icon: Discount, hasArrow: false },
-  { label: "Nhập kho", to: "/admin/warehouse-inbound", icon: Van, hasArrow: false },
-  { label: "Đổi trả", to: "/admin/returns", icon: RefreshLeft, hasArrow: false },
-  { label: "Thông báo", to: "/admin/notifications", icon: ChatDotRound, hasArrow: false },
-  { label: "Cài đặt", to: "/admin/settings", icon: Setting, hasArrow: false }
+const dashboardItem = { label: "Doanh thu", to: "/admin", icon: House };
+const menuGroups = [
+  {
+    key: "catalog",
+    label: "Sản phẩm",
+    icon: Box,
+    items: [
+      { label: "Sản phẩm", to: "/admin/products" },
+      { label: "Danh mục", to: "/admin/categories" },
+      { label: "Banner", to: "/admin/banners" }
+    ]
+  },
+  {
+    key: "sales",
+    label: "Bán hàng",
+    icon: Tickets,
+    items: [
+      { label: "Đơn hàng", to: "/admin/orders" },
+      { label: "Bán tại quầy", to: "/admin/pos" },
+      { label: "Voucher", to: "/admin/vouchers" },
+      { label: "Đổi trả", to: "/admin/returns" }
+    ]
+  },
+  {
+    key: "operation",
+    label: "Vận hành",
+    icon: Van,
+    items: [
+      { label: "Nhập kho", to: "/admin/warehouse-inbound" },
+      { label: "Khách hàng", to: "/admin/customers" },
+      { label: "Thông báo", to: "/admin/notifications" },
+      { label: "Cài đặt", to: "/admin/settings" }
+    ]
+  }
 ];
+const openGroupKey = ref("");
 
 const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value;
@@ -246,6 +285,26 @@ const toggleSidebar = () => {
 const isActive = (to) => {
   if (to === "/admin") return route.path === "/admin";
   return route.path.startsWith(to);
+};
+
+const isGroupActive = (group) => group.items.some((item) => isActive(item.to));
+
+const findGroupByPath = (path) => {
+  for (const group of menuGroups) {
+    if (group.items.some((item) => path.startsWith(item.to))) {
+      return group.key;
+    }
+  }
+  return "";
+};
+
+const toggleGroup = (groupKey) => {
+  if (sidebarCollapsed.value) {
+    sidebarCollapsed.value = false;
+    openGroupKey.value = groupKey;
+    return;
+  }
+  openGroupKey.value = openGroupKey.value === groupKey ? "" : groupKey;
 };
 
 const hasAnySearchResult = computed(() => {
@@ -321,6 +380,17 @@ watch(searchQuery, (value) => {
     runGlobalSearch(value);
   }, 300);
 });
+
+watch(
+  () => route.path,
+  (path) => {
+    const matchedGroup = findGroupByPath(path);
+    if (matchedGroup) {
+      openGroupKey.value = matchedGroup;
+    }
+  },
+  { immediate: true }
+);
 
 const closeSearch = () => {
   searchOpen.value = false;
@@ -465,6 +535,89 @@ onBeforeUnmount(() => {
   }
 }
 
+.menu-group {
+  border-radius: 8px;
+}
+
+.menu-group-trigger {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  color: #343c46;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  .item-icon {
+    font-size: 17px;
+    color: #8e97a3;
+  }
+
+  .item-label {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .arrow-icon {
+    color: #a1a9b4;
+    font-size: 14px;
+    transition: transform 0.2s ease;
+  }
+
+  &:hover {
+    border-color: #e5eaf1;
+    background: #f7faff;
+  }
+}
+
+.menu-group.open .menu-group-trigger .arrow-icon {
+  transform: rotate(180deg);
+}
+
+.menu-group.active .menu-group-trigger {
+  color: #4d9dff;
+
+  .item-icon {
+    color: #4d9dff;
+  }
+}
+
+.menu-submenu {
+  margin-top: 6px;
+  margin-left: 10px;
+  padding-left: 14px;
+  border-left: 1px solid #e5eaf1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.menu-subitem {
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #f7faff;
+  }
+
+  &.active {
+    color: #4d9dff;
+    background: #f1f7ff;
+  }
+}
+
 .admin-layout.collapsed {
   .palette-label {
     font-size: 10px;
@@ -473,6 +626,16 @@ onBeforeUnmount(() => {
   }
 
   .menu-item {
+    justify-content: center;
+    padding: 12px 8px;
+
+    .item-label,
+    .arrow-icon {
+      display: none;
+    }
+  }
+
+  .menu-group-trigger {
     justify-content: center;
     padding: 12px 8px;
 
@@ -795,6 +958,16 @@ onBeforeUnmount(() => {
     padding: 12px 14px;
 
     .item-label {
+      display: inline;
+    }
+  }
+
+  .admin-layout.collapsed .menu-group-trigger {
+    justify-content: flex-start;
+    padding: 12px 14px;
+
+    .item-label,
+    .arrow-icon {
       display: inline;
     }
   }

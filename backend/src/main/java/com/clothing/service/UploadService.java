@@ -13,4 +13,6 @@ public interface UploadService {
     List<String> uploadProductFiles(List<MultipartFile> files);
 
     List<String> uploadReviewFiles(List<MultipartFile> files);
+
+    List<String> uploadPublicFiles(List<MultipartFile> files, String folder);
 }

@@ -6,4 +6,3 @@
 <script setup>
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 </script>
-

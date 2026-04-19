@@ -59,7 +59,7 @@
           <div class="card-actions">
             <el-tag v-if="item.isDefault" type="success">Mặc định</el-tag>
             <el-button size="small" @click="openEdit(item)">Sửa</el-button>
-            <el-button size="small" type="danger" plain @click="removeAddress(item.id)">Xóa</el-button>
+            <el-button size="small" type="danger" plain @click="removeAddress(item)">Xóa</el-button>
           </div>
         </article>
       </div>
@@ -147,8 +147,10 @@ import { ElMessage } from "element-plus";
 import { useAuthStore } from "@/store/authStore";
 import { userAddressApi } from "@/modules/address/api/userAddressApi";
 import { addressApi } from "@/modules/address/api/addressApi";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 const authStore = useAuthStore();
+const { confirm } = useConfirmDialog();
 
 const loading = ref(false);
 const savingProfile = ref(false);
@@ -348,13 +350,23 @@ const saveAddress = async () => {
   }
 };
 
-const removeAddress = async (id) => {
+const removeAddress = async (item) => {
   try {
-    await userAddressApi.deleteAddress(id);
-    await fetchAddresses();
-    ElMessage.success("Đã xóa địa chỉ");
+    await confirm({
+      title: "Xác nhận",
+      message: `Xóa địa chỉ của "${item?.recipientName || "người nhận"}"?`,
+      confirmButtonText: "Xóa",
+      cancelButtonText: "Hủy",
+      onConfirm: async () => {
+        await userAddressApi.deleteAddress(item.id);
+        await fetchAddresses();
+        ElMessage.success("Đã xóa địa chỉ");
+      }
+    });
   } catch (error) {
-    ElMessage.error(error?.response?.data?.message || "Không thể xóa địa chỉ");
+    if (error.message !== "cancel") {
+      ElMessage.error(error?.response?.data?.message || "Không thể xóa địa chỉ");
+    }
   }
 };
 

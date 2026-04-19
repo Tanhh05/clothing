@@ -42,6 +42,7 @@ public class UploadServiceImpl implements UploadService {
 
     @Override
     public UploadPresignResponse createPresignedUploadUrl(UploadPresignRequest request) {
+        validateR2Configuration();
         validateRequest(request);
 
         String cleanFolder = sanitizePathSegment(request.getFolder());
@@ -86,7 +87,14 @@ public class UploadServiceImpl implements UploadService {
         return uploadFiles(files, "reviews");
     }
 
+    @Override
+    public List<String> uploadPublicFiles(List<MultipartFile> files, String folder) {
+        String cleanFolder = sanitizePathSegment(folder);
+        return uploadFiles(files, cleanFolder);
+    }
+
     private List<String> uploadFiles(List<MultipartFile> files, String folder) {
+        validateR2Configuration();
         if (files == null || files.isEmpty()) {
             throw new BusinessException("At least one file is required", HttpStatus.BAD_REQUEST);
         }
@@ -190,5 +198,30 @@ public class UploadServiceImpl implements UploadService {
             return "";
         }
         return contentType.toLowerCase(Locale.ROOT);
+    }
+
+    private void validateR2Configuration() {
+        if (isPlaceholder(r2Properties.getAccountId())
+                || isPlaceholder(r2Properties.getAccessKey())
+                || isPlaceholder(r2Properties.getSecretKey())
+                || isPlaceholder(r2Properties.getBucket())
+                || isPlaceholder(r2Properties.getEndpoint())) {
+            throw new BusinessException(
+                    "R2 chưa cấu hình đúng. Cập nhật R2_ACCOUNT_ID, R2_ACCESS_KEY, R2_SECRET_KEY, R2_ENDPOINT trong backend/.env.local rồi restart backend.",
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    private boolean isPlaceholder(String value) {
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        return normalized.contains("replace-with")
+                || normalized.contains("your-account-id")
+                || normalized.contains("your-access-key")
+                || normalized.contains("your-secret-key")
+                || normalized.contains("cdn.example.com");
     }
 }

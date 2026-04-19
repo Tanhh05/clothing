@@ -105,11 +105,13 @@
 import { onMounted, ref } from "vue";
 import { ElMessage } from "element-plus";
 import { voucherApi } from "@/modules/voucher/api/voucherApi";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 const drawerVisible = ref(false);
 const editingId = ref(null);
 const vouchers = ref([]);
 const form = ref(defaultForm());
+const { confirm } = useConfirmDialog();
 
 function defaultForm() {
   return {
@@ -202,11 +204,21 @@ const saveVoucher = async () => {
 
 const removeVoucher = async (id) => {
   try {
-    await voucherApi.deleteVoucher(id);
-    vouchers.value = vouchers.value.filter((item) => item.id !== id);
-    ElMessage.success("Đã xóa voucher");
+    await confirm({
+      title: "Xác nhận",
+      message: `Xóa voucher #${id}?`,
+      confirmButtonText: "Xóa",
+      cancelButtonText: "Hủy",
+      onConfirm: async () => {
+        await voucherApi.deleteVoucher(id);
+        vouchers.value = vouchers.value.filter((item) => item.id !== id);
+        ElMessage.success("Đã xóa voucher");
+      }
+    });
   } catch (error) {
-    ElMessage.error(error?.response?.data?.message || "Xóa voucher thất bại");
+    if (error.message !== "cancel") {
+      ElMessage.error(error?.response?.data?.message || "Xóa voucher thất bại");
+    }
   }
 };
 

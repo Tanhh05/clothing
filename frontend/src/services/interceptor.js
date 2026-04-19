@@ -1,5 +1,6 @@
 import api from "./api";
 import { useAuthStore } from "@/store/authStore";
+import router from "@/router";
 
 let requestInterceptorId = null;
 let responseInterceptorId = null;
@@ -38,6 +39,26 @@ function setupInterceptors(pinia) {
           authStore.clearAdminAuth();
         } else {
           authStore.clearClientAuth();
+        }
+      } else if (status === 403 || status === 404) {
+        const targetPath = status === 403 ? "/system/forbidden" : "/system/not-found";
+        if (router.currentRoute.value.path !== targetPath) {
+          router.push({
+            path: targetPath,
+            query: {
+              message: String(error?.response?.data?.message || "")
+            }
+          });
+        }
+      } else if (!error?.response) {
+        const currentPath = router.currentRoute.value.path;
+        if (currentPath !== "/system/connection-error") {
+          router.push({
+            path: "/system/connection-error",
+            query: {
+              from: currentPath
+            }
+          });
         }
       }
       return Promise.reject(error);

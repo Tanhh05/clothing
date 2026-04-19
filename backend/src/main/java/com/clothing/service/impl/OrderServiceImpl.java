@@ -669,22 +669,13 @@ public class OrderServiceImpl implements OrderService {
             return List.of();
         }
 
-        Set<Long> productIds = topRows.stream()
-                .map(TopProductSalesProjection::getProductId)
-                .filter(id -> id != null && id > 0)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        Map<Long, ProductEntity> productById = new HashMap<>();
-        for (ProductEntity product : productRepository.findAllById(productIds)) {
-            productById.put(product.getId(), product);
-        }
-
         List<ProductSalesStatResponse> responses = new ArrayList<>(topRows.size());
         for (TopProductSalesProjection row : topRows) {
             Long productId = row.getProductId();
-            ProductEntity product = productById.get(productId);
+            String productName = row.getProductName();
             responses.add(ProductSalesStatResponse.builder()
                     .productId(productId)
-                    .productName(product == null ? ("Product #" + productId) : product.getName())
+                    .productName(productName == null || productName.isBlank() ? ("Product #" + productId) : productName)
                     .totalQuantity(safeLong(row.getTotalQuantity()))
                     .totalRevenue(safeLong(row.getTotalRevenue()))
                     .build());

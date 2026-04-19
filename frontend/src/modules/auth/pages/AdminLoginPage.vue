@@ -1,7 +1,11 @@
 <template>
   <section class="admin-login admin-auth-shell">
-    <div class="admin-login__card">
-      <p class="hint">Chỉ tài khoản quản trị mới được truy cập trang này.</p>
+    <div class="admin-login__shell">
+      <div class="admin-login__brand">
+        <p class="kicker">ADMIN PORTAL</p>
+        <h1>Đăng nhập quản trị</h1>
+        <p class="hint">Chỉ tài khoản có quyền admin mới truy cập được khu vực này.</p>
+      </div>
 
       <el-form class="stack" @submit.prevent="onSubmit">
         <el-form-item>
@@ -55,53 +59,65 @@ async function onSubmit() {
 <style scoped lang="scss">
 .admin-login {
   min-height: 100vh;
-  padding: 24px;
+  padding: 20px;
   display: grid;
   place-items: center;
-  background:
-    radial-gradient(circle at top right, rgba(17, 24, 39, 0.08), transparent 40%),
-    linear-gradient(120deg, #f8fafc 0%, #eff4f8 100%);
+  background: #f3f5f7;
 }
 
-.admin-login__card {
-  width: min(420px, 100%);
-  border: 1px solid #dce1e7;
+.admin-login__shell {
+  width: min(430px, 100%);
+  border: 1px solid #d8dee6;
   background: #fff;
-  padding: 24px;
+  padding: 22px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.admin-login__brand {
+  margin-bottom: 14px;
+
+  .kicker {
+    margin: 0 0 6px;
+    font-size: 11px;
+    letter-spacing: 1.1px;
+    color: #64748b;
+    font-weight: 700;
+  }
 
   h1 {
     margin: 0;
-    font-size: 28px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
   }
 
   .hint {
-    margin: 10px 0 18px;
+    margin: 8px 0 0;
     color: #6b7280;
-    font-size: 13px;
+    font-size: 12px;
   }
 }
 
 .stack {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 
   :deep(.el-form-item) {
     margin-bottom: 0;
   }
 
   :deep(.el-input__wrapper) {
-    min-height: 44px;
-    border-radius: 0;
+    min-height: 46px;
+    border-radius: 8px;
+    box-shadow: 0 0 0 1px #d7dee8 inset;
   }
 }
 
 .submit-btn {
   width: 100%;
-  min-height: 44px;
-  border-radius: 0;
-  font-weight: 700;
+  min-height: 46px;
+  border-radius: 8px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
 }
 </style>

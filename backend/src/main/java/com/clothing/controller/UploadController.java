@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,5 +38,13 @@ public class UploadController {
             @RequestPart("files") List<MultipartFile> files
     ) {
         return ResponseEntity.ok(uploadService.uploadReviewFiles(files));
+    }
+
+    @PostMapping(value = "/public-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<List<String>> uploadPublicImages(
+            @RequestPart("files") List<MultipartFile> files,
+            @RequestParam(value = "folder", required = false, defaultValue = "uploads") String folder
+    ) {
+        return ResponseEntity.ok(uploadService.uploadPublicFiles(files, folder));
     }
 }

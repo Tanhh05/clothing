@@ -31,6 +31,21 @@
           <el-table-column prop="id" label="#" width="80" />
           <el-table-column prop="name" label="Tên danh mục" min-width="220" show-overflow-tooltip />
           <el-table-column prop="slug" label="Slug" min-width="220" show-overflow-tooltip />
+          <el-table-column label="Điều hướng menu" width="140">
+            <template #default="{ row }">
+              <el-tag :type="row.showInMenu ? 'success' : 'info'" size="small">
+                {{ row.showInMenu ? "Hiển thị" : "Ẩn" }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="Trạng thái" width="120">
+            <template #default="{ row }">
+              <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'danger'" size="small">
+                {{ row.status === "ACTIVE" ? "Active" : "Inactive" }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="displayOrder" label="Thứ tự" width="90" />
           <el-table-column label="Danh mục cha" min-width="220" show-overflow-tooltip>
             <template #default="{ row }">
               {{ parentName(row.parentId) }}
@@ -56,41 +71,120 @@
     </div>
 
     <el-drawer
-      v-model="drawerVisible"
+      v-model="dialogVisible"
       :title="drawerMode === 'create' ? 'Thêm danh mục' : 'Cập nhật danh mục'"
       direction="rtl"
-      size="34%"
+      size="42%"
       class="category-form-drawer"
+      :close-on-click-modal="false"
     >
-      <el-form :model="categoryForm" label-position="top">
-        <el-form-item label="Tên danh mục">
-          <el-input v-model="categoryForm.name" />
-        </el-form-item>
-        <el-form-item label="Slug (tùy chọn)">
-          <el-input v-model="categoryForm.slug" placeholder="bo-trong-de-tu-sinh" />
-        </el-form-item>
-        <el-form-item label="Danh mục cha (tùy chọn)">
-          <el-select
-            v-model="categoryForm.parentId"
-            style="width: 100%"
-            clearable
-            placeholder="Chọn danh mục cha"
-          >
-            <el-option
-              v-for="item in parentOptions"
-              :key="item.id"
-              :label="item.name"
-              :value="item.id"
-            />
-          </el-select>
-        </el-form-item>
+      <el-form :model="categoryForm" label-position="top" class="category-form-grid">
+        <el-row :gutter="14">
+          <el-col :xs="24" :md="12">
+            <el-form-item label="Tiêu đề (Tên menu hoặc danh mục)">
+              <el-input v-model="categoryForm.name" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :md="12">
+            <el-form-item label="Tiêu đề phụ">
+              <el-input v-model="categoryForm.subtitle" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :md="12">
+            <el-form-item label="Tiêu đề URL (bắt buộc)">
+              <el-input v-model="categoryForm.slug" placeholder="gioi-thieu" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :md="12">
+            <el-form-item label="Trang">
+              <el-select v-model="categoryForm.pageType" style="width: 100%">
+                <el-option label="Trang đơn" value="TRANG_DON" />
+                <el-option label="Trang blog" value="TRANG_BLOG" />
+                <el-option label="Trang chủ" value="TRANG_CHU" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :md="12">
+            <el-form-item label="Loại menu">
+              <el-radio-group v-model="categoryForm.menuType" @change="handleMenuTypeChange">
+                <el-radio-button label="parent">Menu cha</el-radio-button>
+                <el-radio-button label="child">Menu con</el-radio-button>
+              </el-radio-group>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :md="12">
+            <el-form-item label="Menu cha" :required="categoryForm.menuType === 'child'">
+              <el-select
+                v-model="categoryForm.parentId"
+                style="width: 100%"
+                clearable
+                filterable
+                placeholder="Chọn menu cha"
+                :disabled="categoryForm.menuType !== 'child'"
+              >
+                <el-option
+                  v-for="item in parentOptions"
+                  :key="item.id"
+                  :label="item.name"
+                  :value="item.id"
+                />
+              </el-select>
+              <p v-if="categoryForm.menuType === 'child' && !parentOptions.length" class="upload-tip">
+                Chưa có menu cha nào. Hãy tạo menu cha trước.
+              </p>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :md="12">
+            <el-form-item label="Thứ tự">
+              <el-input-number v-model="categoryForm.displayOrder" :min="0" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :md="12">
+            <el-form-item label="Trạng thái">
+              <el-select v-model="categoryForm.status" style="width: 100%">
+                <el-option label="Active" value="ACTIVE" />
+                <el-option label="Inactive" value="INACTIVE" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="Nội dung ngắn">
+              <el-input v-model="categoryForm.shortContent" type="textarea" :rows="3" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="Hình ảnh">
+              <el-upload
+                v-model:file-list="categoryForm.imageUploadFiles"
+                list-type="picture-card"
+                :auto-upload="false"
+                :limit="1"
+                accept="image/*"
+                :on-change="syncImageFromUploadList"
+                :on-remove="syncImageFromUploadList"
+              >
+                <el-icon><Plus /></el-icon>
+              </el-upload>
+              <p class="upload-tip">Chọn 1 ảnh từ máy. Ảnh sẽ được upload khi lưu danh mục.</p>
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item class="checkbox-field">
+              <el-checkbox v-model="categoryForm.showInMenu">
+                Điều hướng menu (hiển thị ở đầu trang)
+              </el-checkbox>
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
 
       <template #footer>
-        <el-button @click="drawerVisible = false">Hủy</el-button>
-        <el-button type="primary" :loading="submitting" @click="submitCategory">
-          {{ drawerMode === "create" ? "Tạo danh mục" : "Lưu thay đổi" }}
-        </el-button>
+        <div class="dialog-footer">
+          <el-button @click="dialogVisible = false">Hủy</el-button>
+          <el-button type="primary" :loading="submitting" @click="submitCategory">
+            {{ drawerMode === "create" ? "Tạo danh mục" : "Lưu thay đổi" }}
+          </el-button>
+        </div>
       </template>
     </el-drawer>
   </section>
@@ -100,8 +194,9 @@
 import { computed, onMounted, ref } from "vue";
 import { ElMessage } from "element-plus";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import { Search } from "@element-plus/icons-vue";
+import { Search, Plus } from "@element-plus/icons-vue";
 import { categoryApi } from "@/modules/category/api/categoryApi";
+import { uploadApi } from "@/modules/upload/api/uploadApi";
 
 const { confirm } = useConfirmDialog();
 
@@ -113,12 +208,21 @@ const page = ref(0);
 const size = ref(10);
 const totalElements = ref(0);
 
-const drawerVisible = ref(false);
+const dialogVisible = ref(false);
 const drawerMode = ref("create");
 const editingId = ref(null);
 const categoryForm = ref({
   name: "",
   slug: "",
+  imageUrl: "",
+  imageUploadFiles: [],
+  subtitle: "",
+  pageType: "TRANG_DON",
+  menuType: "parent",
+  shortContent: "",
+  displayOrder: 0,
+  showInMenu: false,
+  status: "ACTIVE",
   parentId: null
 });
 
@@ -145,7 +249,8 @@ const filteredCategories = computed(() => {
   return categories.value.filter((item) => {
     const name = String(item?.name || "").toLowerCase();
     const slug = String(item?.slug || "").toLowerCase();
-    return name.includes(q) || slug.includes(q);
+    const subtitle = String(item?.subtitle || "").toLowerCase();
+    return name.includes(q) || slug.includes(q) || subtitle.includes(q);
   });
 });
 
@@ -174,9 +279,18 @@ const openCreate = () => {
   categoryForm.value = {
     name: "",
     slug: "",
+    imageUrl: "",
+    imageUploadFiles: [],
+    subtitle: "",
+    pageType: "TRANG_DON",
+    menuType: "parent",
+    shortContent: "",
+    displayOrder: 0,
+    showInMenu: false,
+    status: "ACTIVE",
     parentId: null
   };
-  drawerVisible.value = true;
+  dialogVisible.value = true;
 };
 
 const openEdit = (item) => {
@@ -185,20 +299,63 @@ const openEdit = (item) => {
   categoryForm.value = {
     name: item.name || "",
     slug: item.slug || "",
+    imageUrl: item.imageUrl || "",
+    imageUploadFiles: item.imageUrl
+      ? [{ name: "category-image", url: item.imageUrl }]
+      : [],
+    subtitle: item.subtitle || "",
+    pageType: item.pageType || "TRANG_DON",
+    menuType: item.parentId ? "child" : "parent",
+    shortContent: item.shortContent || "",
+    displayOrder: Number(item.displayOrder || 0),
+    showInMenu: Boolean(item.showInMenu),
+    status: item.status || "ACTIVE",
     parentId: item.parentId || null
   };
-  drawerVisible.value = true;
+  dialogVisible.value = true;
 };
 
 const submitCategory = async () => {
+  let resolvedImageUrl = categoryForm.value.imageUrl?.trim() || null;
+  const uploadFiles = Array.isArray(categoryForm.value.imageUploadFiles)
+    ? categoryForm.value.imageUploadFiles
+    : [];
+  const rawImage = uploadFiles.find((file) => file?.raw instanceof File)?.raw || null;
+  if (rawImage) {
+    try {
+      resolvedImageUrl = await uploadApi.uploadPublicFile(rawImage, "categories");
+    } catch (error) {
+      console.error(error);
+      ElMessage.error(error?.message || "Upload ảnh thất bại");
+      return;
+    }
+  } else if (!uploadFiles.length) {
+    resolvedImageUrl = null;
+  }
+
   const payload = {
     name: categoryForm.value.name?.trim() || "",
-    slug: categoryForm.value.slug?.trim() || null,
-    parentId: categoryForm.value.parentId || null
+    slug: categoryForm.value.slug?.trim() || "",
+    imageUrl: resolvedImageUrl,
+    subtitle: categoryForm.value.subtitle?.trim() || null,
+    pageType: categoryForm.value.pageType || "TRANG_DON",
+    shortContent: categoryForm.value.shortContent?.trim() || null,
+    displayOrder: Number(categoryForm.value.displayOrder || 0),
+    showInMenu: Boolean(categoryForm.value.showInMenu),
+    status: categoryForm.value.status || "ACTIVE",
+    parentId: categoryForm.value.menuType === "child" ? (categoryForm.value.parentId || null) : null
   };
 
   if (!payload.name) {
     ElMessage.warning("Vui lòng nhập tên danh mục");
+    return;
+  }
+  if (!payload.slug) {
+    ElMessage.warning("Vui lòng nhập tiêu đề URL");
+    return;
+  }
+  if (categoryForm.value.menuType === "child" && !payload.parentId) {
+    ElMessage.warning("Vui lòng chọn menu cha cho menu con");
     return;
   }
 
@@ -211,13 +368,31 @@ const submitCategory = async () => {
       await categoryApi.updateCategory(editingId.value, payload);
       ElMessage.success("Cập nhật danh mục thành công");
     }
-    drawerVisible.value = false;
+    dialogVisible.value = false;
     await loadCategories();
   } catch (error) {
     console.error(error);
     ElMessage.error(error?.response?.data?.message || "Lưu danh mục thất bại");
   } finally {
     submitting.value = false;
+  }
+};
+
+const syncImageFromUploadList = () => {
+  const list = Array.isArray(categoryForm.value.imageUploadFiles) ? categoryForm.value.imageUploadFiles : [];
+  if (!list.length) {
+    categoryForm.value.imageUrl = "";
+    return;
+  }
+  const first = list[0];
+  if (first?.url && !(first?.raw instanceof File)) {
+    categoryForm.value.imageUrl = first.url;
+  }
+};
+
+const handleMenuTypeChange = (nextType) => {
+  if (nextType === "parent") {
+    categoryForm.value.parentId = null;
   }
 };
 
@@ -283,7 +458,13 @@ onMounted(() => {
 
 .category-table {
   width: 100%;
-  min-width: 900px;
+  min-width: 1200px;
+}
+
+.upload-tip {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 12px;
 }
 
 .table-wrap {
@@ -297,10 +478,35 @@ onMounted(() => {
   justify-content: flex-end;
 }
 
+.category-form-grid {
+  margin-top: 6px;
+}
+
+.checkbox-field {
+  margin-bottom: 0;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .category-form-drawer {
+  :deep(.el-drawer__header) {
+    margin-bottom: 0;
+    padding: 18px 20px 12px;
+    border-bottom: 1px solid #eef1f5;
+  }
+
   :deep(.el-drawer__body) {
-    padding: 16px;
+    padding: 16px 20px 8px;
     overflow-y: auto;
+  }
+
+  :deep(.el-drawer__footer) {
+    padding: 12px 20px 18px;
+    border-top: 1px solid #eef1f5;
   }
 }
 

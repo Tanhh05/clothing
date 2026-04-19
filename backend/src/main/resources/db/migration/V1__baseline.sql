@@ -1,2 +1,0 @@
--- Baseline migration marker for existing databases.
--- Existing schema is currently managed outside Flyway.
