@@ -11,6 +11,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.Set;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,7 +37,16 @@ public class CustomUserDetailsService implements UserDetailsService {
         return User.builder()
                 .username(user.getUsername())
                 .password(user.getPassword())
+                .disabled(!isActive(user))
                 .authorities(authorities)
                 .build();
+    }
+
+    private boolean isActive(UserEntity user) {
+        String status = user.getStatus();
+        if (status == null || status.isBlank()) {
+            return true;
+        }
+        return "ACTIVE".equals(status.trim().toUpperCase(Locale.ROOT));
     }
 }

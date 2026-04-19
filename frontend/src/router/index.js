@@ -120,6 +120,17 @@ const routes = [
         component: () => import("@/modules/settings/pages/admin/StoreSettingsPage.vue")
       }
     ]
+  },
+  {
+    path: "/admin/pos",
+    component: () => import("@/layouts/AdminPosLayout.vue"),
+    meta: { requiresAuth: true, roles: ["ADMIN"] },
+    children: [
+      {
+        path: "",
+        component: () => import("@/modules/pos/pages/admin/PosCounterPage.vue")
+      }
+    ]
   }
 ];
 

@@ -4,7 +4,9 @@
 
 # Environment files
 backend/.env
+backend/.env.local
 frontend/.env
+frontend/.env.local
 
 # Backend build
 backend/target/

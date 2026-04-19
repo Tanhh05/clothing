@@ -23,10 +23,15 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 
 @Service
 public class MomoPaymentServiceImpl implements PaymentService {
@@ -61,19 +66,6 @@ public class MomoPaymentServiceImpl implements PaymentService {
         String requestType = momoProperties.getRequestType();
         String partnerClientId = "";
 
-        String rawSignature = "accessKey=" + momoProperties.getAccessKey()
-                + "&amount=" + amount
-                + "&extraData=" + extraData
-                + "&ipnUrl=" + momoProperties.getIpnUrl()
-                + "&orderId=" + orderId
-                + "&orderInfo=" + orderInfo
-                + (isInitiateRequest(requestType) ? "&partnerClientId=" + partnerClientId : "")
-                + "&partnerCode=" + momoProperties.getPartnerCode()
-                + "&redirectUrl=" + momoProperties.getRedirectUrl()
-                + "&requestId=" + requestId
-                + "&requestType=" + requestType;
-        String signature = signHmacSha256(rawSignature, momoProperties.getSecretKey());
-
         Map<String, Object> payload = new HashMap<>();
         payload.put("partnerCode", momoProperties.getPartnerCode());
         payload.put("accessKey", momoProperties.getAccessKey());
@@ -92,24 +84,21 @@ public class MomoPaymentServiceImpl implements PaymentService {
         }
         payload.put("autoCapture", true);
         payload.put("extraData", extraData);
-        payload.put("signature", signature);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        ResponseEntity<JsonNode> response;
-        try {
-            response = restTemplate.postForEntity(
-                    momoProperties.getEndpoint(),
-                    new HttpEntity<>(payload, headers),
-                    JsonNode.class
-            );
-        } catch (HttpStatusCodeException ex) {
-            throw mapMomoHttpError(ex);
-        } catch (Exception ex) {
-            log.error("Cannot call MoMo API", ex);
-            throw new BusinessException("Failed to call MoMo API", HttpStatus.BAD_GATEWAY);
-        }
+        ResponseEntity<JsonNode> response = callMomoCreateWithSignatureFallback(
+                payload,
+                headers,
+                amount,
+                extraData,
+                orderId,
+                orderInfo,
+                requestId,
+                requestType,
+                partnerClientId
+        );
 
         JsonNode body = response.getBody();
         if (body == null) {
@@ -137,11 +126,100 @@ public class MomoPaymentServiceImpl implements PaymentService {
         return payUrl;
     }
 
+    private ResponseEntity<JsonNode> callMomoCreateWithSignatureFallback(
+            Map<String, Object> payload,
+            HttpHeaders headers,
+            String amount,
+            String extraData,
+            String orderId,
+            String orderInfo,
+            String requestId,
+            String requestType,
+            String partnerClientId
+    ) {
+        List<String> rawSignatures = buildCreateSignatureCandidates(
+                amount,
+                extraData,
+                orderId,
+                orderInfo,
+                requestId,
+                requestType,
+                partnerClientId
+        );
+        BusinessException lastError = null;
+        for (String rawSignature : rawSignatures) {
+            payload.put("signature", signHmacSha256(rawSignature, momoProperties.getSecretKey()));
+            try {
+                ResponseEntity<JsonNode> response = restTemplate.postForEntity(
+                        momoProperties.getEndpoint(),
+                        new HttpEntity<>(payload, headers),
+                        JsonNode.class
+                );
+                JsonNode body = response.getBody();
+                if (body != null && body.path("resultCode").asInt(0) == 11007) {
+                    lastError = new BusinessException(
+                            "MoMo sai chữ ký (11007). Kiểm tra MOMO_PARTNER_CODE, MOMO_ACCESS_KEY, MOMO_SECRET_KEY và requestType.",
+                            HttpStatus.BAD_GATEWAY
+                    );
+                    continue;
+                }
+                return response;
+            } catch (HttpStatusCodeException ex) {
+                BusinessException mapped = mapMomoHttpError(ex);
+                if (mapped.getMessage().contains("(11007)")) {
+                    lastError = mapped;
+                    continue;
+                }
+                throw mapped;
+            } catch (Exception ex) {
+                log.error("Cannot call MoMo API", ex);
+                throw new BusinessException("Failed to call MoMo API", HttpStatus.BAD_GATEWAY);
+            }
+        }
+        throw lastError == null
+                ? new BusinessException("Failed to call MoMo API", HttpStatus.BAD_GATEWAY)
+                : lastError;
+    }
+
+    private List<String> buildCreateSignatureCandidates(
+            String amount,
+            String extraData,
+            String orderId,
+            String orderInfo,
+            String requestId,
+            String requestType,
+            String partnerClientId
+    ) {
+        ArrayList<String> candidates = new ArrayList<>();
+        String common = "amount=" + amount
+                + "&extraData=" + extraData
+                + "&ipnUrl=" + momoProperties.getIpnUrl()
+                + "&orderId=" + orderId
+                + "&orderInfo=" + orderInfo
+                + "&partnerCode=" + momoProperties.getPartnerCode()
+                + "&redirectUrl=" + momoProperties.getRedirectUrl()
+                + "&requestId=" + requestId
+                + "&requestType=" + requestType;
+
+        // Legacy format (commonly used in many MoMo v2 examples).
+        String legacy = "accessKey=" + momoProperties.getAccessKey() + "&" + common
+                + (isInitiateRequest(requestType) ? "&partnerClientId=" + partnerClientId : "");
+        candidates.add(legacy);
+
+        // Some integrations validate signature without `accessKey`.
+        String noAccessKey = common + (isInitiateRequest(requestType) ? "&partnerClientId=" + partnerClientId : "");
+        candidates.add(noAccessKey);
+
+        return candidates;
+    }
+
     @Override
     public void handleMomoIpn(Map<String, Object> payload) {
         if (payload == null) {
             return;
         }
+        verifyMomoIpnSignature(payload);
+
         Object orderIdObj = payload.get("orderId");
         if (orderIdObj == null) {
             return;
@@ -155,6 +233,78 @@ public class MomoPaymentServiceImpl implements PaymentService {
         }
         payment.setStatus(resultCode == 0 ? STATUS_PAID : STATUS_FAILED);
         paymentRepository.save(payment);
+    }
+
+    private void verifyMomoIpnSignature(Map<String, Object> payload) {
+        String expectedSignature = toText(payload.get("signature"));
+        if (expectedSignature.isBlank()) {
+            throw new BusinessException("Missing MoMo IPN signature", HttpStatus.BAD_REQUEST);
+        }
+        if (isBlank(momoProperties.getSecretKey())) {
+            throw new BusinessException("MoMo secret key is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        if (!isBlank(momoProperties.getPartnerCode())) {
+            String partnerCode = toText(payload.get("partnerCode"));
+            if (!partnerCode.isBlank() && !momoProperties.getPartnerCode().equals(partnerCode)) {
+                throw new BusinessException("Invalid MoMo partnerCode", HttpStatus.BAD_REQUEST);
+            }
+        }
+
+        boolean matched = buildMomoIpnSignatureCandidates(payload).stream()
+                .map(raw -> signHmacSha256(raw, momoProperties.getSecretKey()))
+                .anyMatch(sig -> sig.equalsIgnoreCase(expectedSignature));
+        if (!matched) {
+            throw new BusinessException("Invalid MoMo IPN signature", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private java.util.List<String> buildMomoIpnSignatureCandidates(Map<String, Object> payload) {
+        ArrayList<String> candidates = new ArrayList<>();
+
+        // Common MoMo callback raw signature format for v2 gateway.
+        LinkedHashMap<String, String> strict = new LinkedHashMap<>();
+        strict.put("accessKey", momoProperties.getAccessKey());
+        strict.put("amount", toText(payload.get("amount")));
+        strict.put("extraData", toText(payload.get("extraData")));
+        strict.put("message", toText(payload.get("message")));
+        strict.put("orderId", toText(payload.get("orderId")));
+        strict.put("orderInfo", toText(payload.get("orderInfo")));
+        strict.put("orderType", toText(payload.get("orderType")));
+        strict.put("partnerCode", toText(payload.get("partnerCode")));
+        strict.put("payType", toText(payload.get("payType")));
+        strict.put("requestId", toText(payload.get("requestId")));
+        strict.put("responseTime", toText(payload.get("responseTime")));
+        strict.put("resultCode", toText(payload.get("resultCode")));
+        strict.put("transId", toText(payload.get("transId")));
+        candidates.add(joinAsRawData(strict));
+
+        // Compatibility candidate: without accessKey in callback payload.
+        LinkedHashMap<String, String> withoutAccessKey = new LinkedHashMap<>(strict);
+        withoutAccessKey.remove("accessKey");
+        candidates.add(joinAsRawData(withoutAccessKey));
+
+        // Fallback candidate: sign sorted callback fields except signature itself.
+        TreeMap<String, String> sortedFields = new TreeMap<>();
+        Set<String> ignored = Set.of("signature");
+        for (Map.Entry<String, Object> entry : payload.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || ignored.contains(key)) {
+                continue;
+            }
+            sortedFields.put(key, toText(entry.getValue()));
+        }
+        if (!sortedFields.isEmpty()) {
+            candidates.add(joinAsRawData(sortedFields));
+        }
+
+        return candidates;
+    }
+
+    private String joinAsRawData(Map<String, String> fields) {
+        return fields.entrySet().stream()
+                .map(entry -> entry.getKey() + "=" + (entry.getValue() == null ? "" : entry.getValue()))
+                .reduce((left, right) -> left + "&" + right)
+                .orElse("");
     }
 
     private void validateConfig() {
@@ -195,6 +345,10 @@ public class MomoPaymentServiceImpl implements PaymentService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String toText(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     private boolean isInitiateRequest(String requestType) {

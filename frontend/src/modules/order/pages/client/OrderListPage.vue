@@ -133,7 +133,7 @@
                   Trả hàng / Hoàn tiền
                 </el-button>
               </div>
-              <span v-if="!canRequestReturn(order) && String(order.status || '').toUpperCase() === 'DELIVERED'" class="return-note">
+              <span v-if="!canRequestReturn(order) && isGhnDelivered(order)" class="return-note">
                 Hết thời gian đổi trả hoặc đã có yêu cầu
               </span>
             </div>
@@ -478,6 +478,9 @@ const hasActiveReturn = (orderId) => {
 };
 
 const latestDeliveredAt = (order) => {
+  if (isGhnDelivered(order) && order?.shippingUpdatedAt) {
+    return order.shippingUpdatedAt;
+  }
   const steps = Array.isArray(order?.statusHistory) ? order.statusHistory : [];
   for (let i = steps.length - 1; i >= 0; i -= 1) {
     const step = steps[i];
@@ -486,9 +489,13 @@ const latestDeliveredAt = (order) => {
   return null;
 };
 
+const isGhnDelivered = (order) => {
+  const ghnStatus = String(order?.shippingStatus || "").trim().toLowerCase();
+  return ghnStatus === "delivered";
+};
+
 const canRequestReturn = (order) => {
-  const orderStatus = String(order?.status || "").toUpperCase();
-  if (orderStatus !== "DELIVERED") return false;
+  if (!isGhnDelivered(order)) return false;
   if (hasActiveReturn(order?.id)) return false;
   const deliveredAt = latestDeliveredAt(order);
   if (!deliveredAt) return false;

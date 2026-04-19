@@ -12,12 +12,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class GhnAddressServiceImpl implements AddressService {
@@ -68,19 +71,92 @@ public class GhnAddressServiceImpl implements AddressService {
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         HttpEntity<?> entity = body == null ? new HttpEntity<>(headers) : new HttpEntity<>(body, headers);
-        String url = ghnProperties.getBaseUrl() + path;
-        ResponseEntity<JsonNode> response;
-        try {
-            response = restTemplate.exchange(url, method, entity, JsonNode.class);
-        } catch (Exception ex) {
-            throw new BusinessException("Failed to call GHN API", HttpStatus.BAD_GATEWAY);
+        ResponseEntity<JsonNode> response = null;
+        BusinessException lastException = null;
+        for (String baseUrl : candidateMasterDataBaseUrls()) {
+            try {
+                response = restTemplate.exchange(baseUrl + path, method, entity, JsonNode.class);
+                lastException = null;
+                break;
+            } catch (HttpStatusCodeException ex) {
+                String rawMessage = compactBody(ex.getResponseBodyAsString()).toLowerCase();
+                if (ex.getStatusCode().value() == 401 || rawMessage.contains("token is not valid")) {
+                    lastException = new BusinessException("GHN token is not valid", HttpStatus.BAD_GATEWAY);
+                    continue;
+                }
+                lastException = new BusinessException(
+                        "GHN API error (" + ex.getStatusCode().value() + "): " + compactBody(ex.getResponseBodyAsString()),
+                        HttpStatus.BAD_GATEWAY
+                );
+                throw lastException;
+            } catch (Exception ex) {
+                lastException = new BusinessException("Failed to call GHN API", HttpStatus.BAD_GATEWAY);
+            }
+        }
+        if (response == null) {
+            throw lastException == null ? new BusinessException("Failed to call GHN API", HttpStatus.BAD_GATEWAY) : lastException;
         }
 
         JsonNode root = response.getBody();
         if (root == null || !root.has("data")) {
             throw new BusinessException("Invalid GHN API response", HttpStatus.BAD_GATEWAY);
         }
+        int code = root.path("code").asInt(200);
+        if (code != 200) {
+            String message = root.path("message").asText("GHN API error");
+            throw new BusinessException(message, HttpStatus.BAD_GATEWAY);
+        }
         return root.get("data");
+    }
+
+    private List<String> candidateMasterDataBaseUrls() {
+        String primary = trimTrailingSlash(safeTrim(ghnProperties.getBaseUrl()));
+        if (primary.isBlank()) {
+            primary = "https://online-gateway.ghn.vn/shiip/public-api/master-data";
+        }
+        String alt = alternateGateway(primary);
+        Set<String> urls = new LinkedHashSet<>();
+        urls.add(primary);
+        if (!alt.isBlank()) {
+            urls.add(alt);
+        }
+        return new ArrayList<>(urls);
+    }
+
+    private String alternateGateway(String url) {
+        if (url == null || url.isBlank()) {
+            return "";
+        }
+        if (url.contains("online-gateway.ghn.vn")) {
+            return trimTrailingSlash(url.replace("online-gateway.ghn.vn", "dev-online-gateway.ghn.vn"));
+        }
+        if (url.contains("dev-online-gateway.ghn.vn")) {
+            return trimTrailingSlash(url.replace("dev-online-gateway.ghn.vn", "online-gateway.ghn.vn"));
+        }
+        return "";
+    }
+
+    private String compactBody(String body) {
+        if (body == null) {
+            return "";
+        }
+        String compact = body.replaceAll("\\s+", " ").trim();
+        if (compact.length() > 300) {
+            return compact.substring(0, 300) + "...";
+        }
+        return compact;
+    }
+
+    private String safeTrim(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String trimTrailingSlash(String value) {
+        String result = safeTrim(value);
+        while (result.endsWith("/")) {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result;
     }
 
     private List<AddressUnitResponse> mapAddressUnits(JsonNode data, String idField, String nameField) {

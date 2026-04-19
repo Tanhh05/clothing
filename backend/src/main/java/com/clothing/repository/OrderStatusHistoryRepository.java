@@ -10,5 +10,7 @@ public interface OrderStatusHistoryRepository extends JpaRepository<OrderStatusH
 
     List<OrderStatusHistoryEntity> findByOrderIdOrderByIdAsc(Long orderId);
 
+    List<OrderStatusHistoryEntity> findByOrderIdInOrderByOrderIdAscIdAsc(List<Long> orderIds);
+
     Optional<OrderStatusHistoryEntity> findTopByOrderIdAndStatusOrderByChangedAtDesc(Long orderId, String status);
 }

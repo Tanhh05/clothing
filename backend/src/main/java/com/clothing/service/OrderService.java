@@ -1,6 +1,7 @@
 package com.clothing.service;
 
 import com.clothing.dto.request.CreateOrderRequest;
+import com.clothing.dto.request.PosCheckoutRequest;
 import com.clothing.dto.request.UpdateOrderStatusRequest;
 import com.clothing.dto.response.AdminDashboardSummaryResponse;
 import com.clothing.dto.response.OrderResponse;
@@ -14,6 +15,8 @@ public interface OrderService {
 
     OrderResponse createOrder(String username, CreateOrderRequest request);
 
+    OrderResponse createPosOrder(String adminUsername, PosCheckoutRequest request);
+
     List<OrderResponse> getAllOrders();
 
     AdminDashboardSummaryResponse getAdminDashboardSummary();
@@ -25,6 +28,7 @@ public interface OrderService {
             String direction,
             String q,
             String status,
+            String shippingStatus,
             LocalDate fromDate,
             LocalDate toDate
     );
@@ -40,6 +44,8 @@ public interface OrderService {
     int bulkUpdateStatus(List<Long> ids, String status);
 
     OrderResponse syncOrderStatusWithGhn(Long orderId);
+
+    Map<String, List<String>> getAdminStatusOptions();
 
     void handleGhnWebhook(Map<String, Object> payload);
 }

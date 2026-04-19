@@ -93,8 +93,9 @@
           <a href="#">tìm cửa hàng</a>
           <a href="#">trợ giúp</a>
           <RouterLink to="/orders">trình theo dõi đơn hàng</RouterLink>
-          <RouterLink to="/account">tài khoản</RouterLink>
-          <a href="#" @click.prevent="handleLogout">đăng xuất</a>
+          <RouterLink v-if="authStore.isAuthenticated" to="/account">tài khoản</RouterLink>
+          <RouterLink v-if="!authStore.isAuthenticated" to="/auth/login">đăng nhập</RouterLink>
+          <a v-if="authStore.isAuthenticated" href="#" @click.prevent="handleLogout">đăng xuất</a>
         </div>
 
         <div class="actions">

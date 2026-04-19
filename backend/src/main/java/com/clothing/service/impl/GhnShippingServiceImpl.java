@@ -97,6 +97,9 @@ public class GhnShippingServiceImpl implements GhnShippingService {
         if (!canCallShippingApi()) {
             throw new BusinessException("GHN shipping config is incomplete", HttpStatus.INTERNAL_SERVER_ERROR);
         }
+        if (isBlank(ghnProperties.getShopId())) {
+            throw new BusinessException("GHN shop id is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
         if (isBlank(request.toName())
                 || isBlank(request.toPhone())
                 || isBlank(request.toAddress())

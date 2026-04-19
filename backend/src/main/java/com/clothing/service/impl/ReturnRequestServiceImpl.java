@@ -21,7 +21,10 @@ import com.clothing.repository.ReturnRequestItemRepository;
 import com.clothing.repository.ReturnRequestRepository;
 import com.clothing.repository.UserRepository;
 import com.clothing.service.AuditLogService;
+import com.clothing.service.GhnShippingService;
 import com.clothing.service.ReturnRequestService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +39,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class ReturnRequestServiceImpl implements ReturnRequestService {
+    private static final Logger log = LoggerFactory.getLogger(ReturnRequestServiceImpl.class);
 
     private static final int RETURN_WINDOW_DAYS = 7;
     private static final Set<String> ALLOWED_RETURN_TYPES = Set.of("REFUND", "EXCHANGE");
@@ -67,6 +71,7 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
     private final ProductRepository productRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final AuditLogService auditLogService;
+    private final GhnShippingService ghnShippingService;
 
     public ReturnRequestServiceImpl(
             ReturnRequestRepository returnRequestRepository,
@@ -77,7 +82,8 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
             ProductVariantRepository productVariantRepository,
             ProductRepository productRepository,
             OrderStatusHistoryRepository orderStatusHistoryRepository,
-            AuditLogService auditLogService
+            AuditLogService auditLogService,
+            GhnShippingService ghnShippingService
     ) {
         this.returnRequestRepository = returnRequestRepository;
         this.returnRequestItemRepository = returnRequestItemRepository;
@@ -88,6 +94,7 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
         this.productRepository = productRepository;
         this.orderStatusHistoryRepository = orderStatusHistoryRepository;
         this.auditLogService = auditLogService;
+        this.ghnShippingService = ghnShippingService;
     }
 
     @Override
@@ -125,14 +132,13 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
         }
 
         String orderStatus = normalize(order.getStatus());
-        if (!"DELIVERED".equals(orderStatus) && !"RETURN_REQUESTED".equals(orderStatus)) {
+        String latestGhnStatus = refreshAndGetGhnStatus(order);
+        boolean deliveredByGhn = isDeliveredByGhn(latestGhnStatus);
+        if (!deliveredByGhn && !"RETURN_REQUESTED".equals(orderStatus)) {
             throw new BusinessException("Only delivered orders can be returned", HttpStatus.BAD_REQUEST);
         }
 
-        LocalDateTime deliveredAt = orderStatusHistoryRepository
-                .findTopByOrderIdAndStatusOrderByChangedAtDesc(order.getId(), "DELIVERED")
-                .map(OrderStatusHistoryEntity::getChangedAt)
-                .orElse(order.getCreatedAt());
+        LocalDateTime deliveredAt = resolveDeliveredAt(order, deliveredByGhn);
         if (deliveredAt == null) {
             deliveredAt = LocalDateTime.now();
         }
@@ -283,11 +289,62 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
             return;
         }
         if ("EXCHANGED".equals(returnStatus) || "RETURN_REJECTED".equals(returnStatus)) {
-            if (!"DELIVERED".equals(normalize(order.getStatus()))) {
-                order.setStatus("DELIVERED");
+            String restoredStatus = resolveOrderStatusByGhn(order);
+            if (!restoredStatus.isBlank() && !restoredStatus.equals(normalize(order.getStatus()))) {
+                order.setStatus(restoredStatus);
                 orderRepository.save(order);
-                addOrderHistory(order.getId(), "DELIVERED");
+                addOrderHistory(order.getId(), restoredStatus);
             }
+        }
+    }
+
+    private LocalDateTime resolveDeliveredAt(OrderEntity order, boolean deliveredByGhn) {
+        if (deliveredByGhn && order.getShippingUpdatedAt() != null) {
+            return order.getShippingUpdatedAt();
+        }
+        return orderStatusHistoryRepository
+                .findTopByOrderIdAndStatusOrderByChangedAtDesc(order.getId(), "DELIVERED")
+                .map(OrderStatusHistoryEntity::getChangedAt)
+                .orElse(order.getCreatedAt());
+    }
+
+    private String resolveOrderStatusByGhn(OrderEntity order) {
+        String latestGhnStatus = refreshAndGetGhnStatus(order);
+        if (latestGhnStatus.isBlank()) {
+            return normalize(order.getStatus());
+        }
+        String mapped = normalize(ghnShippingService.toInternalOrderStatus(latestGhnStatus));
+        return mapped.isBlank() ? normalize(order.getStatus()) : mapped;
+    }
+
+    private boolean isDeliveredByGhn(String ghnStatus) {
+        String mapped = normalize(ghnShippingService.toInternalOrderStatus(ghnShippingService.normalizeGhnStatus(ghnStatus)));
+        return "DELIVERED".equals(mapped);
+    }
+
+    private String refreshAndGetGhnStatus(OrderEntity order) {
+        String current = ghnShippingService.normalizeGhnStatus(order.getShippingStatus());
+        String shippingCode = sanitizeNullable(order.getShippingCode());
+        if (shippingCode == null || shippingCode.isBlank() || !ghnShippingService.canCallShippingApi()) {
+            return current;
+        }
+        try {
+            GhnShippingService.GhnOrderDetail detail = ghnShippingService.getOrderDetail(shippingCode);
+            String latest = ghnShippingService.normalizeGhnStatus(detail.status());
+            if (latest.isBlank()) {
+                return current;
+            }
+            order.setShippingProvider("GHN");
+            order.setShippingStatus(latest);
+            order.setShippingUpdatedAt(LocalDateTime.now());
+            if (detail.orderCode() != null && !detail.orderCode().isBlank()) {
+                order.setShippingCode(detail.orderCode().trim());
+            }
+            orderRepository.save(order);
+            return latest;
+        } catch (Exception ex) {
+            log.warn("Cannot refresh GHN status for order {}: {}", order.getId(), ex.getMessage());
+            return current;
         }
     }
 

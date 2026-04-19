@@ -241,9 +241,7 @@ const deleteCategory = async (item) => {
     }
   }
 };
-    }
-  }
-};
+
 
 const handlePageChange = (nextPage) => {
   page.value = Math.max(0, nextPage - 1);

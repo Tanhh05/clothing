@@ -11,7 +11,7 @@
           <el-input v-model="form.password" type="password" show-password placeholder="Mật khẩu" />
         </el-form-item>
         <el-button type="primary" native-type="submit" :loading="submitting" class="submit-btn">
-          {{ submitting ? "Đang đăng nhập..." : "Đăng nhập admin" }}
+          {{ submitting ? "Đang đăng nhập..." : "Đăng nhập" }}
         </el-button>
       </el-form>
     </div>

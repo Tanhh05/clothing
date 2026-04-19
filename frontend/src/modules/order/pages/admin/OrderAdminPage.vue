@@ -4,7 +4,7 @@
       <div class="panel-head">
         <div class="filters-row">
           <el-input v-model="keyword" placeholder="Tìm theo mã đơn / địa chỉ" clearable class="search-input" />
-          <el-select v-model="statusFilter" clearable placeholder="Trạng thái" class="status-filter">
+          <el-select v-model="statusFilter" clearable placeholder="Trạng thái GHN" class="status-filter">
             <el-option v-for="item in statusFilterOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
           <el-date-picker
@@ -24,17 +24,6 @@
           <el-button plain :disabled="!selectedOrderIds.length" @click="exportSelectedInvoices">
             Xuất hóa đơn
           </el-button>
-        </div>
-      </div>
-
-      <div v-if="selectedOrderIds.length" class="bulk-toolbar">
-        <p>Đã chọn {{ selectedOrderIds.length }} đơn</p>
-        <div class="bulk-actions">
-          <el-select v-model="bulkStatus" placeholder="Chọn trạng thái" class="bulk-status-select">
-            <el-option v-for="item in statusFilterOptions" :key="`bulk-${item.value}`" :label="item.label" :value="item.value" />
-          </el-select>
-          <el-button type="primary" :loading="bulkSubmitting" @click="applyBulkStatus">Cập nhật hàng loạt</el-button>
-          <el-button @click="clearOrderSelection">Bỏ chọn</el-button>
         </div>
       </div>
 
@@ -64,7 +53,7 @@
               <div class="summary-cell">
                 <span><strong>TT:</strong> {{ paymentLabel(row.paymentMethod) }}</span>
                 <span><strong>Tổng:</strong> {{ formatCurrency(row.totalPrice) }}</span>
-                <el-tag size="small" :type="statusTagType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+                <el-tag size="small" :type="statusTagType(row.shippingStatus)">{{ shippingStatusLabel(row.shippingStatus) }}</el-tag>
                 <span><strong>GHN:</strong> {{ row.shippingCode || "Chưa có mã" }}</span>
               </div>
             </template>
@@ -72,19 +61,10 @@
           <el-table-column label="Ngày tạo" width="160">
             <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
           </el-table-column>
-          <el-table-column label="Thao tác" width="210">
+          <el-table-column label="Thao tác" width="110">
             <template #default="{ row }">
               <div class="action-cell">
                 <el-button size="small" @click="openDetails(row)">Chi tiết</el-button>
-                <el-button
-                  size="small"
-                  type="primary"
-                  :disabled="updatingOrderId === row.id || !nextStatus(row.status)"
-                  :loading="updatingOrderId === row.id"
-                  @click="updateStatus(row)"
-                >
-                  {{ nextStatus(row.status) ? statusLabel(nextStatus(row.status)) : "Hoàn tất" }}
-                </el-button>
               </div>
             </template>
           </el-table-column>
@@ -119,71 +99,14 @@
               <p><strong>Địa chỉ:</strong> {{ selectedOrder.address || "N/A" }}</p>
               <p><strong>Tổng tiền:</strong> {{ formatCurrency(selectedOrder.totalPrice) }}</p>
               <p><strong>Mã vận đơn GHN:</strong> {{ selectedOrder.shippingCode || "Chưa có" }}</p>
-              <p><strong>Trạng thái GHN:</strong> {{ selectedOrder.shippingStatus || "N/A" }}</p>
+              <p><strong>Trạng thái GHN:</strong> {{ shippingStatusLabel(selectedOrder.shippingStatus) }}</p>
             </div>
           </section>
 
           <section class="detail-card status-box">
-            <h4 class="card-title">Xử lý trạng thái</h4>
-            <p><strong>Trạng thái hiện tại:</strong> <el-tag>{{ statusLabel(selectedOrder.status) }}</el-tag></p>
-            <el-input
-              v-model="shippingCodeDraft"
-              placeholder="Mã vận đơn GHN (nếu cần gán tay)"
-              clearable
-              class="shipping-code-input"
-            />
-            <el-checkbox v-model="statusSyncWithGhn">Đối chiếu GHN trước khi cập nhật trạng thái</el-checkbox>
-            <div class="status-actions">
-              <el-button
-                type="primary"
-                :disabled="updatingOrderId === selectedOrder.id || !nextStatus(selectedOrder.status)"
-                :loading="updatingOrderId === selectedOrder.id"
-                @click="updateStatus(selectedOrder)"
-                >
-                {{ nextStatus(selectedOrder.status) ? `Chuyển → ${statusLabel(nextStatus(selectedOrder.status))}` : "Đã hoàn tất" }}
-              </el-button>
-              <el-button
-                plain
-                type="info"
-                :loading="syncingOrderId === selectedOrder.id"
-                :disabled="syncingOrderId === selectedOrder.id || !selectedOrder.shippingCode"
-                @click="syncOrderWithGhn(selectedOrder)"
-              >
-                Sync trạng thái GHN
-              </el-button>
-              <el-button
-                type="warning"
-                plain
-                :disabled="updatingOrderId === selectedOrder.id || !canMarkCancelled(selectedOrder.status)"
-                @click="markCancelled(selectedOrder)"
-              >
-                Khách hủy
-              </el-button>
-              <el-button
-                type="danger"
-                plain
-                :disabled="updatingOrderId === selectedOrder.id || !canMarkFailed(selectedOrder.status)"
-                @click="markFailed(selectedOrder)"
-              >
-                Bom hàng
-              </el-button>
-              <el-button
-                type="danger"
-                plain
-                :disabled="updatingOrderId === selectedOrder.id || !canMarkFailedDelivery(selectedOrder.status)"
-                @click="markFailedDelivery(selectedOrder)"
-              >
-                Giao thất bại
-              </el-button>
-              <el-button
-                type="success"
-                plain
-                :disabled="updatingOrderId === selectedOrder.id || !canMarkRefunded(selectedOrder.status)"
-                @click="markRefunded(selectedOrder)"
-              >
-                Hoàn tiền
-              </el-button>
-            </div>
+            <h4 class="card-title">Trạng thái</h4>
+            <p><strong>Trạng thái hệ thống:</strong> <el-tag>{{ statusLabel(selectedOrder.status) }}</el-tag></p>
+            <p><strong>Trạng thái GHN:</strong> <el-tag type="info">{{ shippingStatusLabel(selectedOrder.shippingStatus) }}</el-tag></p>
           </section>
 
           <section class="detail-card">
@@ -235,30 +158,14 @@ const statusFilter = ref("");
 const dateRange = ref([]);
 const detailsVisible = ref(false);
 const selectedOrder = ref(null);
-const updatingOrderId = ref(null);
-const syncingOrderId = ref(null);
-const statusSyncWithGhn = ref(true);
-const shippingCodeDraft = ref("");
 const page = ref(0);
 const size = ref(10);
 const orderTableRef = ref(null);
 const selectedOrderIds = ref([]);
-const bulkStatus = ref("");
-const bulkSubmitting = ref(false);
+const ghnShippingStatusOptions = ref([]);
 let filterTimer = null;
 
-const statusFlow = ["PENDING", "PROCESSING", "CONFIRMED", "SHIPPED", "DELIVERED"];
-const statusFilterOptions = [
-  { value: "PENDING", label: "Chờ xử lý" },
-  { value: "PROCESSING", label: "Đang xử lý" },
-  { value: "CONFIRMED", label: "Đã xác nhận" },
-  { value: "SHIPPED", label: "Đang giao" },
-  { value: "DELIVERED", label: "Đã giao" },
-  { value: "CANCELLED", label: "Khách hủy" },
-  { value: "FAILED", label: "Bom hàng" },
-  { value: "FAILED_DELIVERY", label: "Giao thất bại" },
-  { value: "REFUNDED", label: "Đã hoàn tiền" }
-];
+const statusFilterOptions = ref([]);
 
 const normalizeStatus = (status) => String(status || "").trim().toUpperCase();
 
@@ -284,74 +191,110 @@ const customerDisplay = (order) => {
   return order?.customerName || `User #${order?.userId ?? "N/A"}`;
 };
 
+const INTERNAL_STATUS_LABELS = {
+  PENDING: "Chờ xử lý",
+  PROCESSING: "Đang xử lý",
+  CONFIRMED: "Đã xác nhận",
+  SHIPPED: "Đang giao",
+  DELIVERED: "Đã giao",
+  CANCELLED: "Đã hủy",
+  FAILED: "Thất bại",
+  FAILED_INSUFFICIENT_STOCK: "Thiếu tồn kho",
+  FAILED_DELIVERY: "Giao thất bại",
+  RETURN_REQUESTED: "Yêu cầu trả hàng",
+  REFUNDED: "Đã hoàn tiền",
+  ON_HOLD: "Tạm giữ"
+};
+
+const GHN_STATUS_LABELS = {
+  ready_to_pick: "Sẵn sàng lấy hàng",
+  picking: "Đang lấy hàng",
+  picked: "Đã lấy hàng",
+  storing: "Đang lưu kho",
+  sorting: "Đang phân loại",
+  transporting: "Đang trung chuyển",
+  delivering: "Đang giao hàng",
+  delivered: "Đã giao hàng",
+  money_collect_transporting: "Đang đối soát COD",
+  cancel: "Đã hủy",
+  delivery_fail: "Giao thất bại",
+  returned: "Đã hoàn hàng",
+  return: "Đang hoàn hàng",
+  waiting_to_return: "Chờ hoàn hàng",
+  return_transporting: "Đang vận chuyển hoàn",
+  return_sorting: "Đang phân loại hàng hoàn",
+  returning: "Đang hoàn về shop",
+  exception: "Sự cố vận chuyển"
+};
+
+const humanizeStatusCode = (value) => {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "N/A";
+  return normalized
+    .replace(/[_-]+/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 const statusLabel = (status) => {
   const value = normalizeStatus(status);
-  const map = {
-    PENDING: "Chờ xử lý",
-    PROCESSING: "Đang xử lý",
-    CONFIRMED: "Đã xác nhận",
-    SHIPPED: "Đang giao",
-    DELIVERED: "Đã giao",
-    CANCELLED: "Khách hủy",
-    FAILED: "Bom hàng",
-    FAILED_INSUFFICIENT_STOCK: "Thiếu tồn kho",
-    FAILED_DELIVERY: "Giao thất bại",
-    RETURN_REQUESTED: "Yêu cầu trả hàng",
-    REFUNDED: "Đã hoàn tiền",
-    ON_HOLD: "Tạm giữ"
-  };
-  return map[value] || value || "N/A";
+  return INTERNAL_STATUS_LABELS[value] || humanizeStatusCode(value);
+};
+
+const shippingStatusLabel = (status) => {
+  const value = String(status || "").trim().toLowerCase();
+  if (!value) return "N/A";
+  return GHN_STATUS_LABELS[value] || humanizeStatusCode(value);
 };
 
 const statusTagType = (status) => {
   const value = normalizeStatus(status);
-  if (["DELIVERED", "REFUNDED"].includes(value)) return "success";
-  if (["PENDING", "PROCESSING", "CONFIRMED", "SHIPPED", "RETURN_REQUESTED"].includes(value)) return "warning";
-  if (["FAILED", "FAILED_DELIVERY", "FAILED_INSUFFICIENT_STOCK", "CANCELLED"].includes(value)) return "danger";
+  if (value.includes("DELIVER") || value.includes("SUCCESS") || value.includes("REFUND")) return "success";
+  if (value.includes("FAIL") || value.includes("CANCEL") || value.includes("RETURN")) return "danger";
+  if (value.includes("PENDING") || value.includes("PROCESS") || value.includes("CONFIRM") || value.includes("SHIP")) return "warning";
   return "info";
-};
-
-const nextStatus = (currentStatus) => {
-  const normalized = normalizeStatus(currentStatus);
-  const index = statusFlow.indexOf(normalized);
-  if (index === -1 || index === statusFlow.length - 1) return null;
-  return statusFlow[index + 1];
-};
-
-const isTerminalStatus = (status) => {
-  const value = normalizeStatus(status);
-  return ["DELIVERED", "CANCELLED", "FAILED", "FAILED_INSUFFICIENT_STOCK", "FAILED_DELIVERY", "REFUNDED"].includes(value);
-};
-
-const canMarkCancelled = (status) => {
-  const value = normalizeStatus(status);
-  return !isTerminalStatus(value) && value !== "SHIPPED";
-};
-
-const canMarkFailed = (status) => {
-  return !isTerminalStatus(status);
-};
-
-const canMarkFailedDelivery = (status) => {
-  const value = normalizeStatus(status);
-  return !isTerminalStatus(value) && value === "SHIPPED";
-};
-
-const canMarkRefunded = (status) => {
-  const value = normalizeStatus(status);
-  return ["CANCELLED", "FAILED", "FAILED_DELIVERY", "RETURN_REQUESTED"].includes(value);
 };
 
 const sortedHistory = (history) => {
   return [...(history || [])].sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt));
 };
 
-const extractApiMessage = (error, fallback) => {
-  return (
-    error?.response?.data?.message
-    || error?.message
-    || fallback
-  );
+const toUniqueNormalizedList = (values, normalizer = normalizeStatus) => {
+  const unique = new Set();
+  (Array.isArray(values) ? values : []).forEach((item) => {
+    const normalized = normalizer(item);
+    if (normalized) {
+      unique.add(normalized);
+    }
+  });
+  return [...unique].sort((a, b) => a.localeCompare(b));
+};
+
+const refreshStatusFilterOptions = () => {
+  statusFilterOptions.value = ghnShippingStatusOptions.value.map((code) => ({
+    value: code,
+    label: shippingStatusLabel(code)
+  }));
+  if (statusFilter.value && !ghnShippingStatusOptions.value.includes(statusFilter.value)) {
+    statusFilter.value = "";
+  }
+};
+
+const mergeStatusOptionsFromOrders = (rows) => {
+  const ghnStatuses = toUniqueNormalizedList((rows || []).map((row) => row?.shippingStatus), (value) => String(value || "").trim().toLowerCase());
+  ghnShippingStatusOptions.value = toUniqueNormalizedList([...ghnShippingStatusOptions.value, ...ghnStatuses], (value) => String(value || "").trim().toLowerCase());
+  refreshStatusFilterOptions();
+};
+
+const fetchAdminStatusOptions = async () => {
+  try {
+    const { data } = await orderApi.getAdminStatusOptions();
+    ghnShippingStatusOptions.value = toUniqueNormalizedList(data?.ghnShippingStatuses, (value) => String(value || "").trim().toLowerCase());
+    refreshStatusFilterOptions();
+  } catch (error) {
+    console.error(error);
+    statusFilterOptions.value = [];
+  }
 };
 
 const buildQueryParams = (nextPage = page.value, nextSize = size.value) => {
@@ -362,7 +305,7 @@ const buildQueryParams = (nextPage = page.value, nextSize = size.value) => {
     sortBy: "id",
     direction: "desc",
     q: keyword.value?.trim() || undefined,
-    status: statusFilter.value || undefined,
+    shippingStatus: statusFilter.value || undefined,
     fromDate: fromDate || undefined,
     toDate: toDate || undefined
   };
@@ -373,6 +316,7 @@ const fetchOrders = async (nextPage = page.value) => {
   try {
     const { data } = await orderApi.getAdminOrders(buildQueryParams(nextPage));
     orders.value = Array.isArray(data?.content) ? data.content : [];
+    mergeStatusOptionsFromOrders(orders.value);
     totalElements.value = Number(data?.totalElements || 0);
     page.value = Number(data?.page || 0);
     selectedOrderIds.value = [];
@@ -406,32 +350,6 @@ const clearFilters = () => {
 
 const handleOrderSelectionChange = (rows) => {
   selectedOrderIds.value = Array.isArray(rows) ? rows.map((row) => row.id).filter(Boolean) : [];
-};
-
-const clearOrderSelection = () => {
-  selectedOrderIds.value = [];
-  orderTableRef.value?.clearSelection?.();
-};
-
-const applyBulkStatus = async () => {
-  if (!selectedOrderIds.value.length) return;
-  const normalized = normalizeStatus(bulkStatus.value);
-  if (!normalized) {
-    ElMessage.warning("Vui lòng chọn trạng thái để cập nhật");
-    return;
-  }
-  bulkSubmitting.value = true;
-  try {
-    await orderApi.bulkUpdateStatus(selectedOrderIds.value, normalized);
-    ElMessage.success(`Đã cập nhật ${selectedOrderIds.value.length} đơn hàng`);
-    clearOrderSelection();
-    await fetchOrders(page.value);
-  } catch (error) {
-    console.error(error);
-    ElMessage.error(error?.response?.data?.message || "Không cập nhật được trạng thái hàng loạt");
-  } finally {
-    bulkSubmitting.value = false;
-  }
 };
 
 const escapeHtml = (value) => {
@@ -620,143 +538,11 @@ const exportSelectedInvoices = async () => {
 
 const openDetails = (order) => {
   selectedOrder.value = order;
-  shippingCodeDraft.value = String(order?.shippingCode || "");
-  statusSyncWithGhn.value = true;
   detailsVisible.value = true;
 };
 
-const updateStatus = async (order, targetStatus = null) => {
-  const candidateStatus = targetStatus || nextStatus(order.status);
-  const normalizedNextStatus = normalizeStatus(candidateStatus);
-  if (!normalizedNextStatus || normalizedNextStatus === normalizeStatus(order.status)) return;
-
-  updatingOrderId.value = order.id;
-  try {
-    const payload = {
-      status: normalizedNextStatus,
-      syncWithGhn: statusSyncWithGhn.value,
-      shippingCode: shippingCodeDraft.value?.trim() || undefined
-    };
-    const { data } = await orderApi.updateOrderStatus(order.id, payload);
-    const updated = data || {};
-    const index = orders.value.findIndex((o) => o.id === order.id);
-    if (index !== -1) {
-      orders.value[index] = updated;
-    }
-    if (selectedOrder.value?.id === order.id) {
-      selectedOrder.value = updated;
-    }
-    ElMessage.success(`Đã cập nhật đơn #${order.id} -> ${normalizedNextStatus}`);
-    await fetchOrders(page.value);
-  } catch (error) {
-    console.error(error);
-    ElMessage.error(extractApiMessage(error, "Cập nhật trạng thái thất bại"));
-  } finally {
-    updatingOrderId.value = null;
-  }
-};
-
-const syncOrderWithGhn = async (order) => {
-  if (!order?.id) return;
-  syncingOrderId.value = order.id;
-  try {
-    const { data } = await orderApi.syncOrderStatusWithGhn(order.id);
-    const updated = data || {};
-    const index = orders.value.findIndex((o) => o.id === order.id);
-    if (index !== -1) {
-      orders.value[index] = updated;
-    }
-    if (selectedOrder.value?.id === order.id) {
-      selectedOrder.value = updated;
-      shippingCodeDraft.value = String(updated?.shippingCode || "");
-    }
-    ElMessage.success(`Đã sync GHN cho đơn #${order.id}`);
-  } catch (error) {
-    const message = extractApiMessage(error, "Không thể sync trạng thái GHN");
-    if (error?.response?.status === 400 && message.includes("Cannot sync order")) {
-      ElMessage.warning("GHN chưa cập nhật trạng thái mới hơn để đồng bộ. Vui lòng thử lại sau.");
-      await fetchOrders(page.value);
-      return;
-    }
-    ElMessage.error(message);
-  } finally {
-    syncingOrderId.value = null;
-  }
-};
-
-const markCancelled = async (order) => {
-  try {
-    await confirm({
-      title: "Xác nhận",
-      message: `Đánh dấu đơn #${order.id} là KHÁCH HỦY?`,
-      confirmButtonText: "Xác nhận",
-      cancelButtonText: "Hủy",
-      onConfirm: async () => {
-        await updateStatus(order, "CANCELLED");
-      }
-    });
-  } catch (error) {
-    if (error.message !== "cancel") {
-      ElMessage.error("Không thể cập nhật trạng thái khách hủy");
-    }
-  }
-};
-
-const markFailed = async (order) => {
-  try {
-    await confirm({
-      title: "Xác nhận",
-      message: `Đánh dấu đơn #${order.id} là BOM HÀNG?`,
-      confirmButtonText: "Xác nhận",
-      cancelButtonText: "Hủy",
-      onConfirm: async () => {
-        await updateStatus(order, "FAILED");
-      }
-    });
-  } catch (error) {
-    if (error.message !== "cancel") {
-      ElMessage.error("Không thể cập nhật trạng thái bom hàng");
-    }
-  }
-};
-
-const markFailedDelivery = async (order) => {
-  try {
-    await confirm({
-      title: "Xác nhận",
-      message: `Đánh dấu đơn #${order.id} là GIAO THẤT BẠI?`,
-      confirmButtonText: "Xác nhận",
-      cancelButtonText: "Hủy",
-      onConfirm: async () => {
-        await updateStatus(order, "FAILED_DELIVERY");
-      }
-    });
-  } catch (error) {
-    if (error.message !== "cancel") {
-      ElMessage.error("Không thể cập nhật trạng thái giao thất bại");
-    }
-  }
-};
-
-const markRefunded = async (order) => {
-  try {
-    await confirm({
-      title: "Xác nhận",
-      message: `Đánh dấu đơn #${order.id} là ĐÃ HOÀN TIỀN?`,
-      confirmButtonText: "Xác nhận",
-      cancelButtonText: "Hủy",
-      onConfirm: async () => {
-        await updateStatus(order, "REFUNDED");
-      }
-    });
-  } catch (error) {
-    if (error.message !== "cancel") {
-      ElMessage.error("Không thể cập nhật trạng thái hoàn tiền");
-    }
-  }
-};
-
 onMounted(() => {
+  fetchAdminStatusOptions();
   fetchOrders();
 });
 </script>
@@ -798,29 +584,6 @@ onMounted(() => {
   justify-content: flex-end;
 }
 
-.bulk-toolbar {
-  margin-bottom: 8px;
-  border: 1px dashed #cfd8e3;
-  padding: 8px 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-
-  p {
-    margin: 0;
-    font-size: 13px;
-    color: #475569;
-  }
-}
-
-.bulk-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .search-input {
   width: 100%;
 }
@@ -831,10 +594,6 @@ onMounted(() => {
 
 .date-filter {
   width: 100%;
-}
-
-.bulk-status-select {
-  width: 180px;
 }
 
 .table-wrap {
@@ -941,10 +700,6 @@ onMounted(() => {
   justify-content: flex-start;
 }
 
-.shipping-code-input {
-  width: min(420px, 100%);
-}
-
 .history-box {
   margin-top: 0;
 }
@@ -977,8 +732,7 @@ onMounted(() => {
   }
 
   .status-filter,
-  .date-filter,
-  .bulk-status-select {
+  .date-filter {
     width: 100%;
   }
 

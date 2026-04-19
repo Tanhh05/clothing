@@ -4,6 +4,9 @@ export const orderApi = {
   createOrder(payload) {
     return api.post("/orders", payload);
   },
+  posCheckout(payload) {
+    return api.post("/orders/admin/pos/checkout", payload);
+  },
   getMyOrders() {
     return api.get("/orders/my");
   },
@@ -15,6 +18,9 @@ export const orderApi = {
   },
   getAdminOrders(params) {
     return api.get("/orders/admin", { params });
+  },
+  getAdminStatusOptions() {
+    return api.get("/orders/admin/status-options");
   },
   getAdminSummary() {
     return api.get("/orders/summary");

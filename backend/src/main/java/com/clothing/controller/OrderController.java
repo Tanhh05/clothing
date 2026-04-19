@@ -2,6 +2,7 @@ package com.clothing.controller;
 
 import com.clothing.dto.request.CreateOrderRequest;
 import com.clothing.dto.request.OrderBulkStatusRequest;
+import com.clothing.dto.request.PosCheckoutRequest;
 import com.clothing.dto.request.UpdateOrderStatusRequest;
 import com.clothing.dto.response.AdminDashboardSummaryResponse;
 import com.clothing.dto.response.OrderResponse;
@@ -43,6 +44,15 @@ public class OrderController {
         return ResponseEntity.ok(orderService.createOrder(authentication.getName(), request));
     }
 
+    @PostMapping("/admin/pos/checkout")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<OrderResponse> createPosOrder(
+            Authentication authentication,
+            @Valid @RequestBody PosCheckoutRequest request
+    ) {
+        return ResponseEntity.ok(orderService.createPosOrder(authentication.getName(), request));
+    }
+
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<OrderResponse>> getAllOrders() {
@@ -58,10 +68,17 @@ public class OrderController {
             @RequestParam(defaultValue = "desc") String direction,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String shippingStatus,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate
     ) {
-        return ResponseEntity.ok(orderService.getAdminOrders(page, size, sortBy, direction, q, status, fromDate, toDate));
+        return ResponseEntity.ok(orderService.getAdminOrders(page, size, sortBy, direction, q, status, shippingStatus, fromDate, toDate));
+    }
+
+    @GetMapping("/admin/status-options")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, List<String>>> getAdminOrderStatusOptions() {
+        return ResponseEntity.ok(orderService.getAdminStatusOptions());
     }
 
     @GetMapping("/summary")

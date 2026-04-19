@@ -2,6 +2,8 @@ package com.clothing.controller;
 
 import com.clothing.dto.request.GoogleLoginRequest;
 import com.clothing.dto.request.LoginRequest;
+import com.clothing.dto.request.LogoutRequest;
+import com.clothing.dto.request.RefreshTokenRequest;
 import com.clothing.dto.request.RegisterRequest;
 import com.clothing.dto.response.AuthResponse;
 import com.clothing.service.AuthService;
@@ -36,5 +38,16 @@ public class AuthController {
     @PostMapping("/google")
     public ResponseEntity<AuthResponse> loginWithGoogle(@Valid @RequestBody GoogleLoginRequest request) {
         return ResponseEntity.ok(authService.loginWithGoogle(request.getIdToken()));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return ResponseEntity.ok(authService.refresh(request));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@Valid @RequestBody LogoutRequest request) {
+        authService.logout(request);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -1,0 +1,13 @@
+package com.clothing.dto.request;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class LogoutRequest {
+
+    @NotBlank(message = "refreshToken is required")
+    private String refreshToken;
+}

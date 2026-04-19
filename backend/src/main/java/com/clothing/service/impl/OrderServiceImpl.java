@@ -1,6 +1,8 @@
 package com.clothing.service.impl;
 
 import com.clothing.dto.request.CreateOrderRequest;
+import com.clothing.dto.request.PosCheckoutItemRequest;
+import com.clothing.dto.request.PosCheckoutRequest;
 import com.clothing.dto.request.UpdateOrderStatusRequest;
 import com.clothing.dto.response.AdminDashboardSummaryResponse;
 import com.clothing.dto.response.OrderItemResponse;
@@ -25,14 +27,18 @@ import com.clothing.repository.CartItemRepository;
 import com.clothing.repository.CartRepository;
 import com.clothing.repository.CouponRepository;
 import com.clothing.repository.CouponUsageRepository;
+import com.clothing.repository.DashboardMetricsProjection;
 import com.clothing.repository.OrderItemRepository;
 import com.clothing.repository.OrderRepository;
 import com.clothing.repository.OrderStatusHistoryRepository;
 import com.clothing.repository.ProductRepository;
 import com.clothing.repository.ProductVariantRepository;
+import com.clothing.repository.StatusCountProjection;
+import com.clothing.repository.TopProductSalesProjection;
 import com.clothing.repository.UserAddressRepository;
 import com.clothing.repository.UserRepository;
 import com.clothing.service.GhnShippingService;
+import com.clothing.service.InventoryMovementService;
 import com.clothing.service.OrderService;
 import com.clothing.service.PaymentService;
 import com.clothing.service.AuditLogService;
@@ -52,11 +58,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.text.Normalizer;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -64,6 +70,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.LinkedHashSet;
+import java.util.stream.Collectors;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -71,6 +79,10 @@ public class OrderServiceImpl implements OrderService {
 
     private static final String STATUS_PENDING = "PENDING";
     private static final String SHIPPING_PROVIDER_GHN = "GHN";
+    private static final String SHIPPING_PROVIDER_POS_COUNTER = "POS_COUNTER";
+    private static final String SHIPPING_PROVIDER_POS_SHIP = "POS_SHIP";
+    private static final String STATUS_DELIVERED = "DELIVERED";
+    private static final String INVENTORY_TYPE_POS = "POS_DEDUCT";
     private static final String PAYMENT_MOMO = "MOMO";
     private static final long FAR_DISTANCE_SURCHARGE = 20_000L;
     private static final Set<String> NEAR_PROVINCES = Set.of(
@@ -98,6 +110,7 @@ public class OrderServiceImpl implements OrderService {
     private final AuditLogService auditLogService;
     private final StoreSettingService storeSettingService;
     private final GhnShippingService ghnShippingService;
+    private final InventoryMovementService inventoryMovementService;
 
     public OrderServiceImpl(
             UserRepository userRepository,
@@ -115,7 +128,8 @@ public class OrderServiceImpl implements OrderService {
             PaymentService paymentService,
             AuditLogService auditLogService,
             StoreSettingService storeSettingService,
-            GhnShippingService ghnShippingService
+            GhnShippingService ghnShippingService,
+            InventoryMovementService inventoryMovementService
     ) {
         this.userRepository = userRepository;
         this.cartRepository = cartRepository;
@@ -133,6 +147,7 @@ public class OrderServiceImpl implements OrderService {
         this.auditLogService = auditLogService;
         this.storeSettingService = storeSettingService;
         this.ghnShippingService = ghnShippingService;
+        this.inventoryMovementService = inventoryMovementService;
     }
 
     @Override
@@ -214,11 +229,117 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional
+    public OrderResponse createPosOrder(String adminUsername, PosCheckoutRequest request) {
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new BusinessException("items is required", HttpStatus.BAD_REQUEST);
+        }
+
+        UserEntity admin = getUser(adminUsername);
+        UserEntity customer = request.getCustomerId() == null ? null : userRepository.findById(request.getCustomerId())
+                .orElseThrow(() -> new BusinessException("Customer not found", HttpStatus.BAD_REQUEST));
+        Long orderUserId = customer == null ? admin.getId() : customer.getId();
+
+        List<PosCheckoutItemRequest> items = request.getItems();
+        long subTotal = 0L;
+        for (PosCheckoutItemRequest item : items) {
+            ProductVariantEntity variant = getVariant(item.getVariantId());
+            int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+            if (quantity <= 0) {
+                throw new BusinessException("quantity must be >= 1", HttpStatus.BAD_REQUEST);
+            }
+            int available = variant.getStock() == null ? 0 : variant.getStock();
+            if (available < quantity) {
+                throw new BusinessException("Not enough stock for variant: " + variant.getSku(), HttpStatus.BAD_REQUEST);
+            }
+            subTotal += (variant.getPrice() == null ? 0L : variant.getPrice()) * quantity;
+        }
+
+        long shippingFee = Boolean.TRUE.equals(request.getShipEnabled())
+                ? Math.max(0L, request.getShippingFee() == null ? 0L : request.getShippingFee())
+                : 0L;
+        long manualDiscount = Math.max(0L, request.getManualDiscount() == null ? 0L : request.getManualDiscount());
+        manualDiscount = Math.min(manualDiscount, subTotal);
+
+        ResolvedCoupon resolvedCoupon = resolveBestCoupon(orderUserId, subTotal, request.getVoucherCode());
+        long couponDiscount = resolvedCoupon == null ? 0L : resolvedCoupon.discountAmount;
+        long discountAmount = Math.min(subTotal, couponDiscount + manualDiscount);
+        long total = Math.max(0L, subTotal + shippingFee - discountAmount);
+
+        long paidAmount = Math.max(0L, request.getPaidAmount() == null ? 0L : request.getPaidAmount());
+        if (paidAmount < total) {
+            throw new BusinessException("paidAmount is not enough", HttpStatus.BAD_REQUEST);
+        }
+
+        String paymentMethod = safeTrim(request.getPaymentMethod());
+        if (paymentMethod.isBlank()) {
+            throw new BusinessException("paymentMethod is required", HttpStatus.BAD_REQUEST);
+        }
+
+        if (Boolean.TRUE.equals(request.getShipEnabled())) {
+            validatePosShippingFields(request);
+        }
+
+        OrderEntity order = new OrderEntity();
+        order.setUserId(orderUserId);
+        order.setSubTotal(subTotal);
+        order.setShippingFee(shippingFee);
+        order.setDiscountAmount(discountAmount);
+        order.setCouponId(resolvedCoupon == null ? null : resolvedCoupon.coupon.getId());
+        order.setCouponCode(resolvedCoupon == null ? null : resolvedCoupon.coupon.getCode());
+        order.setTotalPrice(total);
+        order.setPaymentMethod(paymentMethod.toUpperCase(Locale.ROOT));
+        order.setStatus(Boolean.TRUE.equals(request.getShipEnabled()) ? "CONFIRMED" : STATUS_DELIVERED);
+        order.setShippingProvider(Boolean.TRUE.equals(request.getShipEnabled()) ? SHIPPING_PROVIDER_POS_SHIP : SHIPPING_PROVIDER_POS_COUNTER);
+        order.setAddress(buildPosAddress(request, customer));
+        order.setCreatedAt(LocalDateTime.now());
+        OrderEntity savedOrder = orderRepository.save(order);
+
+        for (PosCheckoutItemRequest item : items) {
+            ProductVariantEntity variant = getVariant(item.getVariantId());
+            inventoryMovementService.deductStockByVariantId(
+                    variant.getId(),
+                    item.getQuantity(),
+                    INVENTORY_TYPE_POS,
+                    "POS checkout order #" + savedOrder.getId()
+            );
+
+            OrderItemEntity orderItem = new OrderItemEntity();
+            orderItem.setOrderId(savedOrder.getId());
+            orderItem.setVariantId(variant.getId());
+            orderItem.setQuantity(item.getQuantity());
+            orderItem.setPrice(variant.getPrice());
+            orderItemRepository.save(orderItem);
+        }
+
+        addHistory(savedOrder.getId(), savedOrder.getStatus());
+        if (resolvedCoupon != null) {
+            CouponEntity coupon = resolvedCoupon.coupon;
+            coupon.setUsedCount((coupon.getUsedCount() == null ? 0 : coupon.getUsedCount()) + 1);
+            couponRepository.save(coupon);
+
+            CouponUsageEntity usage = new CouponUsageEntity();
+            usage.setCouponId(coupon.getId());
+            usage.setUserId(orderUserId);
+            usage.setOrderId(savedOrder.getId());
+            usage.setUsedAt(LocalDateTime.now());
+            couponUsageRepository.save(usage);
+        }
+
+        auditLogService.log(
+                "POS_ORDER_CREATED",
+                "ORDER",
+                savedOrder.getId(),
+                "POS checkout by admin " + adminUsername + ", payment " + paymentMethod + ", total " + total
+        );
+
+        return toResponse(savedOrder);
+    }
+
+    @Override
     public List<OrderResponse> getAllOrders() {
-        return orderRepository.findAllByOrderByIdDesc()
-                .stream()
-                .map(this::toResponse)
-                .toList();
+        List<OrderEntity> orders = orderRepository.findAllByOrderByIdDesc();
+        return toResponses(orders);
     }
 
     @Override
@@ -229,6 +350,7 @@ public class OrderServiceImpl implements OrderService {
             String direction,
             String q,
             String status,
+            String shippingStatus,
             LocalDate fromDate,
             LocalDate toDate
     ) {
@@ -245,6 +367,9 @@ public class OrderServiceImpl implements OrderService {
 
         String keyword = (q == null || q.isBlank()) ? null : q.trim().toLowerCase(Locale.ROOT);
         String normalizedStatus = (status == null || status.isBlank()) ? null : normalizeStatus(status);
+        String normalizedShippingStatus = (shippingStatus == null || shippingStatus.isBlank())
+                ? null
+                : ghnShippingService.normalizeGhnStatus(shippingStatus);
         LocalDateTime from = fromDate == null ? null : fromDate.atStartOfDay();
         LocalDateTime to = toDate == null ? null : toDate.atTime(LocalTime.MAX);
 
@@ -253,6 +378,10 @@ public class OrderServiceImpl implements OrderService {
         if (normalizedStatus != null) {
             specification = specification.and((root, query, cb) ->
                     cb.equal(cb.upper(cb.coalesce(root.get("status"), "")), normalizedStatus));
+        }
+        if (normalizedShippingStatus != null) {
+            specification = specification.and((root, query, cb) ->
+                    cb.equal(cb.lower(cb.coalesce(root.get("shippingStatus"), "")), normalizedShippingStatus));
         }
         if (from != null) {
             specification = specification.and((root, query, cb) ->
@@ -271,10 +400,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Page<OrderEntity> orderPage = orderRepository.findAll(specification, pageable);
-        List<OrderResponse> responses = orderPage.getContent()
-                .stream()
-                .map(this::toResponse)
-                .toList();
+        List<OrderResponse> responses = toResponses(orderPage.getContent());
 
         return PageResponse.<OrderResponse>builder()
                 .content(responses)
@@ -289,68 +415,24 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public AdminDashboardSummaryResponse getAdminDashboardSummary() {
-        List<OrderEntity> orders = orderRepository.findAllByOrderByIdDesc();
-        LocalDate today = LocalDate.now(ZoneId.systemDefault());
+        DashboardMetricsProjection metrics = orderRepository.fetchDashboardMetrics();
+        long revenueToday = metrics == null ? 0L : safeLong(metrics.getRevenueToday());
+        long revenue7d = metrics == null ? 0L : safeLong(metrics.getRevenue7d());
+        long revenue30d = metrics == null ? 0L : safeLong(metrics.getRevenue30d());
+        long ordersToday = metrics == null ? 0L : safeLong(metrics.getOrdersToday());
+        long orders7d = metrics == null ? 0L : safeLong(metrics.getOrders7d());
+        long orders30d = metrics == null ? 0L : safeLong(metrics.getOrders30d());
+        long pendingOrders = metrics == null ? 0L : safeLong(metrics.getPendingOrders());
+        long cancelLike30d = metrics == null ? 0L : safeLong(metrics.getCancelLike30d());
+        long total30d = metrics == null ? 0L : safeLong(metrics.getTotal30d());
 
-        long revenueToday = 0L;
-        long revenue7d = 0L;
-        long revenue30d = 0L;
-        long ordersToday = 0L;
-        long orders7d = 0L;
-        long orders30d = 0L;
-        long pendingOrders = 0L;
-        long cancelLike30d = 0L;
-        long total30d = 0L;
         Map<String, Long> statusCounts30d = new HashMap<>();
-        Set<Long> orderIds30dDelivered = new HashSet<>();
-
-        for (OrderEntity order : orders) {
-            LocalDateTime createdAt = order.getCreatedAt();
-            if (createdAt == null) {
-                continue;
-            }
-            LocalDate orderDate = createdAt.toLocalDate();
-            long diffDays = today.toEpochDay() - orderDate.toEpochDay();
-            if (diffDays < 0) {
-                continue;
-            }
-
-            String status = normalizeStatus(order.getStatus());
-            boolean delivered = "DELIVERED".equals(status);
-            long totalPrice = order.getTotalPrice() == null ? 0L : order.getTotalPrice();
-
-            if (diffDays == 0) {
-                ordersToday += 1;
-                if (delivered) {
-                    revenueToday += totalPrice;
-                }
-            }
-            if (diffDays <= 6) {
-                orders7d += 1;
-                if (delivered) {
-                    revenue7d += totalPrice;
-                }
-            }
-            if (diffDays <= 29) {
-                orders30d += 1;
-                total30d += 1;
-                statusCounts30d.merge(status, 1L, Long::sum);
-                if (delivered) {
-                    revenue30d += totalPrice;
-                    orderIds30dDelivered.add(order.getId());
-                }
-                if (isCancelLikeStatus(status)) {
-                    cancelLike30d += 1;
-                }
-            }
-
-            if ("PENDING".equals(status) || "PROCESSING".equals(status) || "CONFIRMED".equals(status)) {
-                pendingOrders += 1;
-            }
+        for (StatusCountProjection row : orderRepository.findStatusCounts30d()) {
+            statusCounts30d.put(normalizeStatus(row.getStatus()), safeLong(row.getTotal()));
         }
 
         double cancelRate = total30d == 0 ? 0D : (cancelLike30d * 100.0D) / total30d;
-        List<ProductSalesStatResponse> topProducts30d = buildTopProducts(orderIds30dDelivered);
+        List<ProductSalesStatResponse> topProducts30d = buildTopProducts();
 
         return AdminDashboardSummaryResponse.builder()
                 .revenueToday(revenueToday)
@@ -367,12 +449,32 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public Map<String, List<String>> getAdminStatusOptions() {
+        List<String> orderStatuses = orderRepository.findDistinctOrderStatuses().stream()
+                .map(this::normalizeStatus)
+                .filter(value -> !value.isBlank())
+                .distinct()
+                .sorted()
+                .toList();
+
+        List<String> ghnShippingStatuses = orderRepository.findDistinctShippingStatuses().stream()
+                .map(ghnShippingService::normalizeGhnStatus)
+                .filter(value -> !value.isBlank())
+                .distinct()
+                .sorted()
+                .toList();
+
+        Map<String, List<String>> options = new HashMap<>();
+        options.put("orderStatuses", orderStatuses);
+        options.put("ghnShippingStatuses", ghnShippingStatuses);
+        return options;
+    }
+
+    @Override
     public List<OrderResponse> getMyOrders(String username) {
         UserEntity user = getUser(username);
-        return orderRepository.findByUserIdOrderByIdDesc(user.getId())
-                .stream()
-                .map(this::toResponse)
-                .toList();
+        List<OrderEntity> orders = orderRepository.findByUserIdOrderByIdDesc(user.getId());
+        return toResponses(orders);
     }
 
     @Override
@@ -383,7 +485,7 @@ public class OrderServiceImpl implements OrderService {
         if (!order.getUserId().equals(user.getId())) {
             throw new BusinessException("Order does not belong to current user", HttpStatus.FORBIDDEN);
         }
-        return toResponse(order);
+        return toResponses(List.of(order)).get(0);
     }
 
     @Override
@@ -561,53 +663,33 @@ public class OrderServiceImpl implements OrderService {
         return affected;
     }
 
-    private List<ProductSalesStatResponse> buildTopProducts(Set<Long> orderIds) {
-        if (orderIds.isEmpty()) {
+    private List<ProductSalesStatResponse> buildTopProducts() {
+        List<TopProductSalesProjection> topRows = orderItemRepository.findTopProductSales30dDelivered();
+        if (topRows.isEmpty()) {
             return List.of();
         }
 
-        Map<Long, Long> quantityByProductId = new HashMap<>();
-        Map<Long, Long> revenueByProductId = new HashMap<>();
-        List<OrderItemEntity> allItems = orderItemRepository.findAll();
-
-        for (OrderItemEntity item : allItems) {
-            if (!orderIds.contains(item.getOrderId())) {
-                continue;
-            }
-            ProductVariantEntity variant = productVariantRepository.findById(item.getVariantId()).orElse(null);
-            if (variant == null) {
-                continue;
-            }
-            Long productId = variant.getProductId();
-            long quantity = item.getQuantity() == null ? 0L : item.getQuantity();
-            long lineRevenue = (item.getPrice() == null ? 0L : item.getPrice()) * quantity;
-            quantityByProductId.merge(productId, quantity, Long::sum);
-            revenueByProductId.merge(productId, lineRevenue, Long::sum);
+        Set<Long> productIds = topRows.stream()
+                .map(TopProductSalesProjection::getProductId)
+                .filter(id -> id != null && id > 0)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<Long, ProductEntity> productById = new HashMap<>();
+        for (ProductEntity product : productRepository.findAllById(productIds)) {
+            productById.put(product.getId(), product);
         }
 
-        return quantityByProductId.entrySet()
-                .stream()
-                .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
-                .limit(5)
-                .map(entry -> {
-                    Long productId = entry.getKey();
-                    ProductEntity product = productRepository.findById(productId).orElse(null);
-                    return ProductSalesStatResponse.builder()
-                            .productId(productId)
-                            .productName(product == null ? ("Product #" + productId) : product.getName())
-                            .totalQuantity(entry.getValue())
-                            .totalRevenue(revenueByProductId.getOrDefault(productId, 0L))
-                            .build();
-                })
-                .toList();
-    }
-
-    private boolean isCancelLikeStatus(String status) {
-        return "CANCELLED".equals(status)
-                || "FAILED".equals(status)
-                || "FAILED_DELIVERY".equals(status)
-                || "FAILED_INSUFFICIENT_STOCK".equals(status)
-                || "REFUNDED".equals(status);
+        List<ProductSalesStatResponse> responses = new ArrayList<>(topRows.size());
+        for (TopProductSalesProjection row : topRows) {
+            Long productId = row.getProductId();
+            ProductEntity product = productById.get(productId);
+            responses.add(ProductSalesStatResponse.builder()
+                    .productId(productId)
+                    .productName(product == null ? ("Product #" + productId) : product.getName())
+                    .totalQuantity(safeLong(row.getTotalQuantity()))
+                    .totalRevenue(safeLong(row.getTotalRevenue()))
+                    .build());
+        }
+        return responses;
     }
 
     private String normalizeStatus(String status) {
@@ -722,58 +804,111 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private OrderResponse toResponse(OrderEntity order) {
-        UserEntity customer = userRepository.findById(order.getUserId()).orElse(null);
-        String customerName = customer == null
-                ? null
-                : (customer.getFullName() != null && !customer.getFullName().isBlank()
-                    ? customer.getFullName().trim()
-                    : customer.getUsername());
+        return toResponses(List.of(order)).get(0);
+    }
 
-        List<OrderItemEntity> items = orderItemRepository.findByOrderIdOrderByIdAsc(order.getId());
-        List<OrderItemResponse> itemResponses = items.stream().map(item -> {
-            ProductVariantEntity variant = getVariant(item.getVariantId());
-            ProductEntity product = productRepository.findById(variant.getProductId()).orElse(null);
-            return OrderItemResponse.builder()
-                    .id(item.getId())
-                    .productId(product == null ? null : product.getId())
-                    .variantId(item.getVariantId())
-                    .sku(variant.getSku())
-                    .productName(product == null ? null : product.getName())
-                    .quantity(item.getQuantity())
-                    .price(item.getPrice())
-                    .lineTotal(item.getPrice() * item.getQuantity())
-                    .build();
-        }).toList();
+    private List<OrderResponse> toResponses(List<OrderEntity> orders) {
+        if (orders == null || orders.isEmpty()) {
+            return List.of();
+        }
 
-        List<OrderStatusHistoryResponse> historyResponses = orderStatusHistoryRepository.findByOrderIdOrderByIdAsc(order.getId())
-                .stream()
-                .map(h -> OrderStatusHistoryResponse.builder()
-                        .status(h.getStatus())
-                        .changedAt(h.getChangedAt())
-                        .build())
+        List<Long> orderIds = orders.stream()
+                .map(OrderEntity::getId)
+                .filter(id -> id != null && id > 0)
                 .toList();
 
-        return OrderResponse.builder()
-                .id(order.getId())
-                .userId(order.getUserId())
-                .customerName(customerName)
-                .totalPrice(order.getTotalPrice())
-                .subTotal(order.getSubTotal())
-                .shippingFee(order.getShippingFee())
-                .discountAmount(order.getDiscountAmount())
-                .appliedVoucherCode(order.getCouponCode())
-                .status(order.getStatus())
-                .paymentMethod(order.getPaymentMethod())
-                .paymentUrl(null)
-                .shippingProvider(order.getShippingProvider())
-                .shippingCode(order.getShippingCode())
-                .shippingStatus(order.getShippingStatus())
-                .shippingUpdatedAt(order.getShippingUpdatedAt())
-                .address(order.getAddress())
-                .createdAt(order.getCreatedAt())
-                .items(itemResponses)
-                .statusHistory(historyResponses)
-                .build();
+        Set<Long> userIds = orders.stream()
+                .map(OrderEntity::getUserId)
+                .filter(id -> id != null && id > 0)
+                .collect(Collectors.toSet());
+        Map<Long, UserEntity> usersById = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(UserEntity::getId, user -> user));
+
+        List<OrderItemEntity> allItems = orderItemRepository.findByOrderIdInOrderByOrderIdAscIdAsc(orderIds);
+        Map<Long, List<OrderItemEntity>> itemsByOrderId = allItems.stream()
+                .collect(Collectors.groupingBy(OrderItemEntity::getOrderId));
+
+        Set<Long> variantIds = allItems.stream()
+                .map(OrderItemEntity::getVariantId)
+                .filter(id -> id != null && id > 0)
+                .collect(Collectors.toSet());
+        Map<Long, ProductVariantEntity> variantById = productVariantRepository.findAllById(variantIds).stream()
+                .collect(Collectors.toMap(ProductVariantEntity::getId, variant -> variant));
+
+        Set<Long> productIds = variantById.values().stream()
+                .map(ProductVariantEntity::getProductId)
+                .filter(id -> id != null && id > 0)
+                .collect(Collectors.toSet());
+        Map<Long, ProductEntity> productById = productRepository.findAllById(productIds).stream()
+                .collect(Collectors.toMap(ProductEntity::getId, product -> product));
+
+        List<OrderStatusHistoryEntity> allHistory = orderStatusHistoryRepository.findByOrderIdInOrderByOrderIdAscIdAsc(orderIds);
+        Map<Long, List<OrderStatusHistoryEntity>> historyByOrderId = allHistory.stream()
+                .collect(Collectors.groupingBy(OrderStatusHistoryEntity::getOrderId));
+
+        List<OrderResponse> responses = new ArrayList<>(orders.size());
+        for (OrderEntity order : orders) {
+            UserEntity customer = usersById.get(order.getUserId());
+            String customerName = customer == null
+                    ? null
+                    : (customer.getFullName() != null && !customer.getFullName().isBlank()
+                        ? customer.getFullName().trim()
+                        : customer.getUsername());
+
+            List<OrderItemResponse> itemResponses = itemsByOrderId.getOrDefault(order.getId(), List.of()).stream()
+                    .map(item -> {
+                        ProductVariantEntity variant = variantById.get(item.getVariantId());
+                        ProductEntity product = variant == null ? null : productById.get(variant.getProductId());
+                        long safePrice = item.getPrice() == null ? 0L : item.getPrice();
+                        int safeQty = item.getQuantity() == null ? 0 : item.getQuantity();
+                        return OrderItemResponse.builder()
+                                .id(item.getId())
+                                .productId(product == null ? null : product.getId())
+                                .variantId(item.getVariantId())
+                                .sku(variant == null ? null : variant.getSku())
+                                .productName(product == null ? null : product.getName())
+                                .quantity(item.getQuantity())
+                                .price(item.getPrice())
+                                .lineTotal(safePrice * safeQty)
+                                .build();
+                    })
+                    .toList();
+
+            List<OrderStatusHistoryResponse> historyResponses = historyByOrderId.getOrDefault(order.getId(), List.of())
+                    .stream()
+                    .map(h -> OrderStatusHistoryResponse.builder()
+                            .status(h.getStatus())
+                            .changedAt(h.getChangedAt())
+                            .build())
+                    .toList();
+
+            responses.add(OrderResponse.builder()
+                    .id(order.getId())
+                    .userId(order.getUserId())
+                    .customerName(customerName)
+                    .totalPrice(order.getTotalPrice())
+                    .subTotal(order.getSubTotal())
+                    .shippingFee(order.getShippingFee())
+                    .discountAmount(order.getDiscountAmount())
+                    .appliedVoucherCode(order.getCouponCode())
+                    .status(order.getStatus())
+                    .paymentMethod(order.getPaymentMethod())
+                    .paymentUrl(null)
+                    .shippingProvider(order.getShippingProvider())
+                    .shippingCode(order.getShippingCode())
+                    .shippingStatus(order.getShippingStatus())
+                    .shippingUpdatedAt(order.getShippingUpdatedAt())
+                    .address(order.getAddress())
+                    .createdAt(order.getCreatedAt())
+                    .items(itemResponses)
+                    .statusHistory(historyResponses)
+                    .build());
+        }
+        return responses;
+    }
+
+    private long safeLong(Long value) {
+        return value == null ? 0L : value;
     }
 
     private void addHistory(Long orderId, String status) {
@@ -917,6 +1052,37 @@ public class OrderServiceImpl implements OrderService {
                 safeTrim(district),
                 safeTrim(ward),
                 safeTrim(address)
+        );
+    }
+
+    private void validatePosShippingFields(PosCheckoutRequest request) {
+        if (safeTrim(request.getRecipientName()).isBlank()) {
+            throw new BusinessException("recipientName is required for shipping", HttpStatus.BAD_REQUEST);
+        }
+        if (safeTrim(request.getPhone()).isBlank()) {
+            throw new BusinessException("phone is required for shipping", HttpStatus.BAD_REQUEST);
+        }
+        if (safeTrim(request.getAddress()).isBlank()) {
+            throw new BusinessException("address is required for shipping", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private String buildPosAddress(PosCheckoutRequest request, UserEntity customer) {
+        if (!Boolean.TRUE.equals(request.getShipEnabled())) {
+            String customerName = customer == null
+                    ? "Khach le"
+                    : firstNonBlank(customer.getFullName(), customer.getUsername(), "Khach le");
+            return "BAN_TAI_QUAY | Khach: " + customerName;
+        }
+
+        return String.format(
+                "SHIP | Nguoi nhan: %s | SDT: %s | Dia chi: %s | Ward: %s | District: %s | Province: %s",
+                safeTrim(request.getRecipientName()),
+                safeTrim(request.getPhone()),
+                safeTrim(request.getAddress()),
+                safeTrim(request.getWard()),
+                safeTrim(request.getDistrict()),
+                safeTrim(request.getProvince())
         );
     }
 
