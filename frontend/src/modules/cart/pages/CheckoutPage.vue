@@ -149,7 +149,22 @@
 
               <div v-if="paymentMethod === 'MOMO'" class="selected-payment-hint">
                 <img :src="momoLogo" alt="MoMo" class="selected-payment-logo">
-                <span>Bạn sẽ được chuyển sang ví MoMo sau khi đặt hàng.</span>
+                <span>Bạn sẽ được chuyển sang cổng MoMo sau khi đặt hàng.</span>
+              </div>
+
+              <div v-if="paymentMethod === 'MOMO'" class="momo-method-box">
+                <div class="momo-method-title">Chọn kênh thanh toán MoMo</div>
+                <el-select v-model="momoRequestType" placeholder="Chọn phương thức trong MoMo">
+                  <el-option
+                    v-for="option in momoRequestTypeOptions"
+                    :key="option.value"
+                    :label="option.label"
+                    :value="option.value"
+                  />
+                </el-select>
+                <p class="momo-method-note">
+                  MoMo sẽ hiển thị luồng thanh toán tương ứng với lựa chọn của bạn.
+                </p>
               </div>
             </el-card>
           </el-space>
@@ -272,6 +287,7 @@ const availableVouchers = ref([]);
 const voucherClearedByUser = ref(false);
 const applyingSavedAddress = ref(false);
 const paymentMethod = ref('COD');
+const momoRequestType = ref('captureWallet');
 const firstName = ref('');
 const shippingAddressLine = ref('');
 const phoneNumber = ref('');
@@ -290,6 +306,11 @@ const addressLoading = ref({
 
 const FAR_DISTANCE_SURCHARGE = 20000;
 const NEAR_PROVINCES = new Set(['ho chi minh', 'binh duong', 'dong nai', 'long an', 'tay ninh', 'ba ria vung tau']);
+const momoRequestTypeOptions = [
+  { value: 'captureWallet', label: 'Ví MoMo' },
+  { value: 'payWithATM', label: 'Thẻ ATM/Nội địa' },
+  { value: 'payWithCC', label: 'Visa/Master/JCB' }
+];
 
 const paymentMethodOptions = computed(() => {
   return [
@@ -329,7 +350,7 @@ const paymentMethodOptions = computed(() => {
       value: 'VNPAY',
       label: 'Thanh toán qua cổng VNPAY',
       description: 'VNPAY',
-      disabled: true
+      disabled: false
     },
     {
       key: 'COD',
@@ -586,15 +607,17 @@ const submitCheckout = async () => {
       province: selectedProvinceName.value,
       district: selectedDistrictName.value,
       ward: selectedWardName.value,
-      voucherCode: appliedVoucherCode.value || undefined
+      voucherCode: appliedVoucherCode.value || undefined,
+      momoRequestType: paymentMethod.value === 'MOMO' ? momoRequestType.value : undefined
     };
 
     const { data } = await orderApi.createOrder(payload);
-    ElMessage.success(`Đặt hàng thành công. Mã đơn #${data?.id ?? ''}`);
-    if (paymentMethod.value === 'MOMO' && data?.paymentUrl) {
+    if ((paymentMethod.value === 'MOMO' || paymentMethod.value === 'VNPAY') && data?.paymentUrl) {
+      ElMessage.success(`Đang chuyển sang cổng ${paymentMethod.value} để thanh toán`);
       window.location.href = data.paymentUrl;
       return;
     }
+    ElMessage.success(`Đặt hàng thành công. Mã đơn #${data?.id ?? ''}`);
     await cartStore.fetchCart();
     router.push('/orders');
   } catch (error) {
@@ -799,6 +822,23 @@ watch(
   object-fit: contain;
   border: none !important;
   box-shadow: none !important;
+}
+
+.momo-method-box {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.momo-method-title {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+.momo-method-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .sticky-side {

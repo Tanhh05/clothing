@@ -33,4 +33,10 @@ public class CreateOrderRequest {
 
     @Size(max = 50, message = "voucherCode max length is 50")
     private String voucherCode;
+
+    @Size(max = 50, message = "momoRequestType max length is 50")
+    private String momoRequestType;
+
+    @Size(max = 20, message = "vnpayBankCode max length is 20")
+    private String vnpayBankCode;
 }

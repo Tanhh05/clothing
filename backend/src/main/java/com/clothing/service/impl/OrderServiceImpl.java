@@ -14,6 +14,7 @@ import com.clothing.entity.CartEntity;
 import com.clothing.entity.CartItemEntity;
 import com.clothing.entity.CouponEntity;
 import com.clothing.entity.CouponUsageEntity;
+import com.clothing.entity.MomoCheckoutSessionEntity;
 import com.clothing.entity.OrderEntity;
 import com.clothing.entity.OrderItemEntity;
 import com.clothing.entity.OrderStatusHistoryEntity;
@@ -21,6 +22,7 @@ import com.clothing.entity.ProductEntity;
 import com.clothing.entity.ProductVariantEntity;
 import com.clothing.entity.UserAddressEntity;
 import com.clothing.entity.UserEntity;
+import com.clothing.entity.VnpayCheckoutSessionEntity;
 import com.clothing.exception.BusinessException;
 import com.clothing.messaging.publisher.OrderEventPublisher;
 import com.clothing.repository.CartItemRepository;
@@ -28,6 +30,7 @@ import com.clothing.repository.CartRepository;
 import com.clothing.repository.CouponRepository;
 import com.clothing.repository.CouponUsageRepository;
 import com.clothing.repository.DashboardMetricsProjection;
+import com.clothing.repository.MomoCheckoutSessionRepository;
 import com.clothing.repository.OrderItemRepository;
 import com.clothing.repository.OrderRepository;
 import com.clothing.repository.OrderStatusHistoryRepository;
@@ -37,12 +40,15 @@ import com.clothing.repository.StatusCountProjection;
 import com.clothing.repository.TopProductSalesProjection;
 import com.clothing.repository.UserAddressRepository;
 import com.clothing.repository.UserRepository;
+import com.clothing.repository.VnpayCheckoutSessionRepository;
 import com.clothing.service.GhnShippingService;
 import com.clothing.service.InventoryMovementService;
 import com.clothing.service.OrderService;
 import com.clothing.service.PaymentService;
 import com.clothing.service.AuditLogService;
 import com.clothing.service.StoreSettingService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -61,8 +67,10 @@ import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.text.Normalizer;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -70,6 +78,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.LinkedHashSet;
 import java.util.stream.Collectors;
 
@@ -84,6 +93,13 @@ public class OrderServiceImpl implements OrderService {
     private static final String STATUS_DELIVERED = "DELIVERED";
     private static final String INVENTORY_TYPE_POS = "POS_DEDUCT";
     private static final String PAYMENT_MOMO = "MOMO";
+    private static final String PAYMENT_VNPAY = "VNPAY";
+    private static final String MOMO_SESSION_STATUS_PENDING = "PENDING";
+    private static final String MOMO_SESSION_STATUS_COMPLETED = "COMPLETED";
+    private static final String VNPAY_SESSION_STATUS_PENDING = "PENDING";
+    private static final String VNPAY_SESSION_STATUS_COMPLETED = "COMPLETED";
+    private static final long MOMO_SESSION_TTL_MINUTES = 30L;
+    private static final long VNPAY_SESSION_TTL_MINUTES = 30L;
     private static final long FAR_DISTANCE_SURCHARGE = 20_000L;
     private static final Set<String> NEAR_PROVINCES = Set.of(
             "ho chi minh",
@@ -99,6 +115,8 @@ public class OrderServiceImpl implements OrderService {
     private final CartItemRepository cartItemRepository;
     private final CouponRepository couponRepository;
     private final CouponUsageRepository couponUsageRepository;
+    private final MomoCheckoutSessionRepository momoCheckoutSessionRepository;
+    private final VnpayCheckoutSessionRepository vnpayCheckoutSessionRepository;
     private final ProductVariantRepository productVariantRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -111,6 +129,7 @@ public class OrderServiceImpl implements OrderService {
     private final StoreSettingService storeSettingService;
     private final GhnShippingService ghnShippingService;
     private final InventoryMovementService inventoryMovementService;
+    private final ObjectMapper objectMapper;
 
     public OrderServiceImpl(
             UserRepository userRepository,
@@ -118,6 +137,8 @@ public class OrderServiceImpl implements OrderService {
             CartItemRepository cartItemRepository,
             CouponRepository couponRepository,
             CouponUsageRepository couponUsageRepository,
+            MomoCheckoutSessionRepository momoCheckoutSessionRepository,
+            VnpayCheckoutSessionRepository vnpayCheckoutSessionRepository,
             ProductVariantRepository productVariantRepository,
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
@@ -129,13 +150,16 @@ public class OrderServiceImpl implements OrderService {
             AuditLogService auditLogService,
             StoreSettingService storeSettingService,
             GhnShippingService ghnShippingService,
-            InventoryMovementService inventoryMovementService
+            InventoryMovementService inventoryMovementService,
+            ObjectMapper objectMapper
     ) {
         this.userRepository = userRepository;
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
         this.couponRepository = couponRepository;
         this.couponUsageRepository = couponUsageRepository;
+        this.momoCheckoutSessionRepository = momoCheckoutSessionRepository;
+        this.vnpayCheckoutSessionRepository = vnpayCheckoutSessionRepository;
         this.productVariantRepository = productVariantRepository;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
@@ -148,6 +172,7 @@ public class OrderServiceImpl implements OrderService {
         this.storeSettingService = storeSettingService;
         this.ghnShippingService = ghnShippingService;
         this.inventoryMovementService = inventoryMovementService;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -159,6 +184,11 @@ public class OrderServiceImpl implements OrderService {
         List<CartItemEntity> cartItems = cartItemRepository.findByCartIdOrderByIdAsc(cart.getId());
         if (cartItems.isEmpty()) {
             throw new BusinessException("Cart is empty", HttpStatus.BAD_REQUEST);
+        }
+
+        String paymentMethod = safeTrim(request.getPaymentMethod()).toUpperCase(Locale.ROOT);
+        if (paymentMethod.isBlank()) {
+            throw new BusinessException("paymentMethod is required", HttpStatus.BAD_REQUEST);
         }
 
         long subTotal = 0L;
@@ -176,6 +206,13 @@ public class OrderServiceImpl implements OrderService {
         long discountAmount = resolvedCoupon == null ? 0L : resolvedCoupon.discountAmount;
         long total = Math.max(0L, subTotal + shippingFee - discountAmount);
 
+        if (PAYMENT_MOMO.equalsIgnoreCase(paymentMethod)) {
+            return createMomoCheckoutSession(user, request, cartItems, subTotal, shippingFee, discountAmount, total, resolvedCoupon);
+        }
+        if (PAYMENT_VNPAY.equalsIgnoreCase(paymentMethod)) {
+            return createVnpayCheckoutSession(user, request, cartItems, subTotal, shippingFee, discountAmount, total, resolvedCoupon);
+        }
+
         OrderEntity order = new OrderEntity();
         order.setUserId(user.getId());
         order.setSubTotal(subTotal);
@@ -185,7 +222,7 @@ public class OrderServiceImpl implements OrderService {
         order.setCouponCode(resolvedCoupon == null ? null : resolvedCoupon.coupon.getCode());
         order.setTotalPrice(total);
         order.setStatus(STATUS_PENDING);
-        order.setPaymentMethod(request.getPaymentMethod().trim());
+        order.setPaymentMethod(paymentMethod);
         order.setShippingProvider(SHIPPING_PROVIDER_GHN);
         order.setAddress(request.getAddress().trim());
         order.setCreatedAt(LocalDateTime.now());
@@ -220,12 +257,7 @@ public class OrderServiceImpl implements OrderService {
         cartItemRepository.deleteByCartId(cart.getId());
         publishOrderCreatedAfterCommit(savedOrder.getId());
         auditLogService.log("ORDER_CREATED", "ORDER", savedOrder.getId(), "Created order by user " + username);
-        OrderResponse response = getMyOrderById(username, savedOrder.getId());
-        if (PAYMENT_MOMO.equalsIgnoreCase(savedOrder.getPaymentMethod())) {
-            String payUrl = paymentService.createMomoPayment(savedOrder);
-            response.setPaymentUrl(payUrl);
-        }
-        return response;
+        return getMyOrderById(username, savedOrder.getId());
     }
 
     @Override
@@ -628,6 +660,101 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    public void handleMomoPaymentIpn(Map<String, Object> payload) {
+        if (payload == null || payload.isEmpty()) {
+            return;
+        }
+        int resultCode = parseInt(payload.get("resultCode"), -1);
+        if (resultCode != 0) {
+            return;
+        }
+
+        String sessionToken = extractMomoSessionToken(payload.get("extraData"));
+        if (sessionToken.isBlank()) {
+            return;
+        }
+
+        MomoCheckoutSessionEntity session = momoCheckoutSessionRepository.findByTokenForUpdate(sessionToken).orElse(null);
+        if (session == null) {
+            return;
+        }
+        if (session.getCreatedOrderId() != null) {
+            if (!MOMO_SESSION_STATUS_COMPLETED.equalsIgnoreCase(session.getStatus())) {
+                session.setStatus(MOMO_SESSION_STATUS_COMPLETED);
+                session.setConsumedAt(LocalDateTime.now());
+                momoCheckoutSessionRepository.save(session);
+            }
+            return;
+        }
+
+        List<MomoCartItemSnapshot> snapshots = parseCartSnapshot(session.getCartItemsPayload());
+        if (snapshots.isEmpty()) {
+            throw new BusinessException("MoMo session cart is empty", HttpStatus.BAD_REQUEST);
+        }
+        CreateOrderRequest request = parseCreateOrderRequestSnapshot(session.getRequestPayload());
+        UserEntity user = userRepository.findById(session.getUserId())
+                .orElseThrow(() -> new BusinessException("User not found for MoMo session", HttpStatus.NOT_FOUND));
+
+        OrderEntity createdOrder = createOrderFromMomoSession(session, user, request, snapshots);
+        session.setStatus(MOMO_SESSION_STATUS_COMPLETED);
+        session.setCreatedOrderId(createdOrder.getId());
+        session.setPaidAt(LocalDateTime.now());
+        session.setConsumedAt(LocalDateTime.now());
+        session.setPaymentTransactionCode(toText(payload.get("orderId")));
+        momoCheckoutSessionRepository.save(session);
+    }
+
+    @Override
+    @Transactional
+    public void handleVnpayPaymentIpn(Map<String, String> payload) {
+        if (payload == null || payload.isEmpty()) {
+            return;
+        }
+        String responseCode = safeTrim(payload.get("vnp_ResponseCode"));
+        String txnStatus = safeTrim(payload.get("vnp_TransactionStatus"));
+        boolean success = "00".equals(responseCode) && (txnStatus.isBlank() || "00".equals(txnStatus));
+        if (!success) {
+            return;
+        }
+
+        String txnRef = safeTrim(payload.get("vnp_TxnRef"));
+        String sessionToken = extractVnpaySessionTokenFromTxnRef(txnRef);
+        if (sessionToken.isBlank()) {
+            return;
+        }
+
+        VnpayCheckoutSessionEntity session = vnpayCheckoutSessionRepository.findByTokenForUpdate(sessionToken).orElse(null);
+        if (session == null) {
+            return;
+        }
+        if (session.getCreatedOrderId() != null) {
+            if (!VNPAY_SESSION_STATUS_COMPLETED.equalsIgnoreCase(session.getStatus())) {
+                session.setStatus(VNPAY_SESSION_STATUS_COMPLETED);
+                session.setConsumedAt(LocalDateTime.now());
+                vnpayCheckoutSessionRepository.save(session);
+            }
+            return;
+        }
+
+        List<MomoCartItemSnapshot> snapshots = parseCartSnapshot(session.getCartItemsPayload());
+        if (snapshots.isEmpty()) {
+            throw new BusinessException("VNPAY session cart is empty", HttpStatus.BAD_REQUEST);
+        }
+        CreateOrderRequest request = parseCreateOrderRequestSnapshot(session.getRequestPayload());
+        UserEntity user = userRepository.findById(session.getUserId())
+                .orElseThrow(() -> new BusinessException("User not found for VNPAY session", HttpStatus.NOT_FOUND));
+
+        OrderEntity createdOrder = createOrderFromVnpaySession(session, user, request, snapshots);
+        session.setStatus(VNPAY_SESSION_STATUS_COMPLETED);
+        session.setCreatedOrderId(createdOrder.getId());
+        session.setPaidAt(LocalDateTime.now());
+        session.setConsumedAt(LocalDateTime.now());
+        session.setPaymentTransactionCode(txnRef);
+        vnpayCheckoutSessionRepository.save(session);
+    }
+
+    @Override
+    @Transactional
     public int bulkUpdateStatus(List<Long> ids, String status) {
         if (ids == null || ids.isEmpty()) {
             throw new BusinessException("ids must not be empty", HttpStatus.BAD_REQUEST);
@@ -663,6 +790,429 @@ public class OrderServiceImpl implements OrderService {
         return affected;
     }
 
+    private OrderResponse createMomoCheckoutSession(
+            UserEntity user,
+            CreateOrderRequest request,
+            List<CartItemEntity> cartItems,
+            long subTotal,
+            long shippingFee,
+            long discountAmount,
+            long total,
+            ResolvedCoupon resolvedCoupon
+    ) {
+        if (!ghnShippingService.canCallShippingApi()) {
+            throw new BusinessException("GHN shipping config is incomplete", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        ReceiverInfo receiverInfo = resolveReceiverInfo(user, request);
+        if (receiverInfo.address.isBlank()
+                || receiverInfo.district.isBlank()
+                || receiverInfo.ward.isBlank()
+                || receiverInfo.phone.isBlank()) {
+            throw new BusinessException(
+                    "Thiếu thông tin nhận hàng để tạo đơn GHN (address/district/ward/phone)",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        if (!isValidShippingPhone(receiverInfo.phone)) {
+            throw new BusinessException(
+                    "Số điện thoại nhận hàng không hợp lệ. Vui lòng nhập đúng 10 số (VD: 09xxxxxxxx)",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        MomoCheckoutSessionEntity session = new MomoCheckoutSessionEntity();
+        String token = UUID.randomUUID().toString().replace("-", "");
+        session.setToken(token);
+        session.setUserId(user.getId());
+        session.setRequestPayload(writeJson(request));
+        session.setCartItemsPayload(writeJson(toMomoCartSnapshot(cartItems)));
+        session.setSubTotal(subTotal);
+        session.setShippingFee(shippingFee);
+        session.setDiscountAmount(discountAmount);
+        session.setTotalPrice(total);
+        session.setCouponId(resolvedCoupon == null ? null : resolvedCoupon.coupon.getId());
+        session.setCouponCode(resolvedCoupon == null ? null : resolvedCoupon.coupon.getCode());
+        session.setStatus(MOMO_SESSION_STATUS_PENDING);
+        session.setCreatedAt(LocalDateTime.now());
+        session.setExpiresAt(LocalDateTime.now().plusMinutes(MOMO_SESSION_TTL_MINUTES));
+        momoCheckoutSessionRepository.save(session);
+
+        String payUrl;
+        try {
+            String extraDataRaw = "sessionToken=" + token;
+            String extraData = Base64.getEncoder().encodeToString(extraDataRaw.getBytes(StandardCharsets.UTF_8));
+            payUrl = paymentService.createMomoPaymentForSession(
+                    token,
+                    total,
+                    "Thanh toan don hang tam",
+                    extraData,
+                    request.getMomoRequestType()
+            );
+        } catch (RuntimeException ex) {
+            momoCheckoutSessionRepository.delete(session);
+            throw ex;
+        }
+
+        return OrderResponse.builder()
+                .id(null)
+                .userId(user.getId())
+                .totalPrice(total)
+                .subTotal(subTotal)
+                .shippingFee(shippingFee)
+                .discountAmount(discountAmount)
+                .appliedVoucherCode(session.getCouponCode())
+                .status("WAITING_PAYMENT")
+                .paymentMethod(PAYMENT_MOMO)
+                .paymentUrl(payUrl)
+                .address(safeTrim(request.getAddress()))
+                .createdAt(session.getCreatedAt())
+                .items(List.of())
+                .statusHistory(List.of())
+                .build();
+    }
+
+    private OrderResponse createVnpayCheckoutSession(
+            UserEntity user,
+            CreateOrderRequest request,
+            List<CartItemEntity> cartItems,
+            long subTotal,
+            long shippingFee,
+            long discountAmount,
+            long total,
+            ResolvedCoupon resolvedCoupon
+    ) {
+        if (!ghnShippingService.canCallShippingApi()) {
+            throw new BusinessException("GHN shipping config is incomplete", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        ReceiverInfo receiverInfo = resolveReceiverInfo(user, request);
+        if (receiverInfo.address.isBlank()
+                || receiverInfo.district.isBlank()
+                || receiverInfo.ward.isBlank()
+                || receiverInfo.phone.isBlank()) {
+            throw new BusinessException(
+                    "Thiếu thông tin nhận hàng để tạo đơn GHN (address/district/ward/phone)",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        if (!isValidShippingPhone(receiverInfo.phone)) {
+            throw new BusinessException(
+                    "Số điện thoại nhận hàng không hợp lệ. Vui lòng nhập đúng 10 số (VD: 09xxxxxxxx)",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        VnpayCheckoutSessionEntity session = new VnpayCheckoutSessionEntity();
+        String token = UUID.randomUUID().toString().replace("-", "");
+        session.setToken(token);
+        session.setUserId(user.getId());
+        session.setRequestPayload(writeJson(request));
+        session.setCartItemsPayload(writeJson(toMomoCartSnapshot(cartItems)));
+        session.setSubTotal(subTotal);
+        session.setShippingFee(shippingFee);
+        session.setDiscountAmount(discountAmount);
+        session.setTotalPrice(total);
+        session.setCouponId(resolvedCoupon == null ? null : resolvedCoupon.coupon.getId());
+        session.setCouponCode(resolvedCoupon == null ? null : resolvedCoupon.coupon.getCode());
+        session.setStatus(VNPAY_SESSION_STATUS_PENDING);
+        session.setCreatedAt(LocalDateTime.now());
+        session.setExpiresAt(LocalDateTime.now().plusMinutes(VNPAY_SESSION_TTL_MINUTES));
+        vnpayCheckoutSessionRepository.save(session);
+
+        String payUrl;
+        try {
+            payUrl = paymentService.createVnpayPaymentForSession(
+                    token,
+                    total,
+                    "Thanh toan don hang tam",
+                    request.getVnpayBankCode()
+            );
+        } catch (RuntimeException ex) {
+            vnpayCheckoutSessionRepository.delete(session);
+            throw ex;
+        }
+
+        return OrderResponse.builder()
+                .id(null)
+                .userId(user.getId())
+                .totalPrice(total)
+                .subTotal(subTotal)
+                .shippingFee(shippingFee)
+                .discountAmount(discountAmount)
+                .appliedVoucherCode(session.getCouponCode())
+                .status("WAITING_PAYMENT")
+                .paymentMethod(PAYMENT_VNPAY)
+                .paymentUrl(payUrl)
+                .address(safeTrim(request.getAddress()))
+                .createdAt(session.getCreatedAt())
+                .items(List.of())
+                .statusHistory(List.of())
+                .build();
+    }
+
+    private OrderEntity createOrderFromMomoSession(
+            MomoCheckoutSessionEntity session,
+            UserEntity user,
+            CreateOrderRequest request,
+            List<MomoCartItemSnapshot> snapshots
+    ) {
+        OrderEntity order = new OrderEntity();
+        order.setUserId(session.getUserId());
+        order.setSubTotal(session.getSubTotal());
+        order.setShippingFee(session.getShippingFee());
+        order.setDiscountAmount(session.getDiscountAmount());
+        order.setCouponId(session.getCouponId());
+        order.setCouponCode(session.getCouponCode());
+        order.setTotalPrice(session.getTotalPrice());
+        order.setStatus(STATUS_PENDING);
+        order.setPaymentMethod(PAYMENT_MOMO);
+        order.setShippingProvider(SHIPPING_PROVIDER_GHN);
+        order.setAddress(safeTrim(request.getAddress()));
+        order.setCreatedAt(LocalDateTime.now());
+        OrderEntity savedOrder = orderRepository.save(order);
+
+        List<CartItemEntity> pseudoCartItems = new ArrayList<>();
+        for (MomoCartItemSnapshot snapshot : snapshots) {
+            Long variantId = snapshot.variantId == null ? null : snapshot.variantId;
+            Integer quantity = snapshot.quantity == null ? null : snapshot.quantity;
+            Long unitPrice = snapshot.unitPrice == null ? null : snapshot.unitPrice;
+            if (variantId == null || quantity == null || quantity <= 0) {
+                continue;
+            }
+            getVariant(variantId);
+
+            OrderItemEntity orderItem = new OrderItemEntity();
+            orderItem.setOrderId(savedOrder.getId());
+            orderItem.setVariantId(variantId);
+            orderItem.setQuantity(quantity);
+            orderItem.setPrice(unitPrice == null || unitPrice < 0 ? 0L : unitPrice);
+            orderItemRepository.save(orderItem);
+
+            CartItemEntity pseudoCartItem = new CartItemEntity();
+            pseudoCartItem.setVariantId(variantId);
+            pseudoCartItem.setQuantity(quantity);
+            pseudoCartItems.add(pseudoCartItem);
+        }
+        if (pseudoCartItems.isEmpty()) {
+            throw new BusinessException("MoMo session has no valid items", HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            tryCreateGhnShippingOrder(savedOrder, user, request, pseudoCartItems);
+        } catch (Exception ex) {
+            log.error("Cannot create GHN shipping order after MoMo paid. orderId={}", savedOrder.getId(), ex);
+            savedOrder.setShippingStatus("CREATE_FAILED");
+            savedOrder.setShippingUpdatedAt(LocalDateTime.now());
+            orderRepository.save(savedOrder);
+        }
+
+        addHistory(savedOrder.getId(), STATUS_PENDING);
+
+        if (session.getCouponId() != null) {
+            CouponEntity coupon = couponRepository.findById(session.getCouponId()).orElse(null);
+            if (coupon != null) {
+                coupon.setUsedCount((coupon.getUsedCount() == null ? 0 : coupon.getUsedCount()) + 1);
+                couponRepository.save(coupon);
+
+                CouponUsageEntity usage = new CouponUsageEntity();
+                usage.setCouponId(coupon.getId());
+                usage.setUserId(savedOrder.getUserId());
+                usage.setOrderId(savedOrder.getId());
+                usage.setUsedAt(LocalDateTime.now());
+                couponUsageRepository.save(usage);
+            }
+        }
+
+        CartEntity cart = cartRepository.findByUserId(savedOrder.getUserId()).orElse(null);
+        if (cart != null) {
+            cartItemRepository.deleteByCartId(cart.getId());
+        }
+
+        publishOrderCreatedAfterCommit(savedOrder.getId());
+        auditLogService.log("ORDER_CREATED", "ORDER", savedOrder.getId(), "Created order after MoMo payment");
+        return savedOrder;
+    }
+
+    private OrderEntity createOrderFromVnpaySession(
+            VnpayCheckoutSessionEntity session,
+            UserEntity user,
+            CreateOrderRequest request,
+            List<MomoCartItemSnapshot> snapshots
+    ) {
+        OrderEntity order = new OrderEntity();
+        order.setUserId(session.getUserId());
+        order.setSubTotal(session.getSubTotal());
+        order.setShippingFee(session.getShippingFee());
+        order.setDiscountAmount(session.getDiscountAmount());
+        order.setCouponId(session.getCouponId());
+        order.setCouponCode(session.getCouponCode());
+        order.setTotalPrice(session.getTotalPrice());
+        order.setStatus(STATUS_PENDING);
+        order.setPaymentMethod(PAYMENT_VNPAY);
+        order.setShippingProvider(SHIPPING_PROVIDER_GHN);
+        order.setAddress(safeTrim(request.getAddress()));
+        order.setCreatedAt(LocalDateTime.now());
+        OrderEntity savedOrder = orderRepository.save(order);
+
+        List<CartItemEntity> pseudoCartItems = new ArrayList<>();
+        for (MomoCartItemSnapshot snapshot : snapshots) {
+            Long variantId = snapshot.variantId == null ? null : snapshot.variantId;
+            Integer quantity = snapshot.quantity == null ? null : snapshot.quantity;
+            Long unitPrice = snapshot.unitPrice == null ? null : snapshot.unitPrice;
+            if (variantId == null || quantity == null || quantity <= 0) {
+                continue;
+            }
+            getVariant(variantId);
+
+            OrderItemEntity orderItem = new OrderItemEntity();
+            orderItem.setOrderId(savedOrder.getId());
+            orderItem.setVariantId(variantId);
+            orderItem.setQuantity(quantity);
+            orderItem.setPrice(unitPrice == null || unitPrice < 0 ? 0L : unitPrice);
+            orderItemRepository.save(orderItem);
+
+            CartItemEntity pseudoCartItem = new CartItemEntity();
+            pseudoCartItem.setVariantId(variantId);
+            pseudoCartItem.setQuantity(quantity);
+            pseudoCartItems.add(pseudoCartItem);
+        }
+        if (pseudoCartItems.isEmpty()) {
+            throw new BusinessException("VNPAY session has no valid items", HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            tryCreateGhnShippingOrder(savedOrder, user, request, pseudoCartItems);
+        } catch (Exception ex) {
+            log.error("Cannot create GHN shipping order after VNPAY paid. orderId={}", savedOrder.getId(), ex);
+            savedOrder.setShippingStatus("CREATE_FAILED");
+            savedOrder.setShippingUpdatedAt(LocalDateTime.now());
+            orderRepository.save(savedOrder);
+        }
+
+        addHistory(savedOrder.getId(), STATUS_PENDING);
+
+        if (session.getCouponId() != null) {
+            CouponEntity coupon = couponRepository.findById(session.getCouponId()).orElse(null);
+            if (coupon != null) {
+                coupon.setUsedCount((coupon.getUsedCount() == null ? 0 : coupon.getUsedCount()) + 1);
+                couponRepository.save(coupon);
+
+                CouponUsageEntity usage = new CouponUsageEntity();
+                usage.setCouponId(coupon.getId());
+                usage.setUserId(savedOrder.getUserId());
+                usage.setOrderId(savedOrder.getId());
+                usage.setUsedAt(LocalDateTime.now());
+                couponUsageRepository.save(usage);
+            }
+        }
+
+        CartEntity cart = cartRepository.findByUserId(savedOrder.getUserId()).orElse(null);
+        if (cart != null) {
+            cartItemRepository.deleteByCartId(cart.getId());
+        }
+
+        publishOrderCreatedAfterCommit(savedOrder.getId());
+        auditLogService.log("ORDER_CREATED", "ORDER", savedOrder.getId(), "Created order after VNPAY payment");
+        return savedOrder;
+    }
+
+    private List<MomoCartItemSnapshot> toMomoCartSnapshot(List<CartItemEntity> cartItems) {
+        List<MomoCartItemSnapshot> snapshots = new ArrayList<>();
+        for (CartItemEntity cartItem : cartItems) {
+            ProductVariantEntity variant = getVariant(cartItem.getVariantId());
+            int quantity = cartItem.getQuantity() == null ? 0 : cartItem.getQuantity();
+            if (quantity <= 0) {
+                continue;
+            }
+            MomoCartItemSnapshot snapshot = new MomoCartItemSnapshot();
+            snapshot.variantId = variant.getId();
+            snapshot.quantity = quantity;
+            snapshot.unitPrice = variant.getPrice() == null ? 0L : variant.getPrice();
+            snapshots.add(snapshot);
+        }
+        return snapshots;
+    }
+
+    private List<MomoCartItemSnapshot> parseCartSnapshot(String payload) {
+        if (payload == null || payload.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<MomoCartItemSnapshot> parsed = objectMapper.readValue(payload, new TypeReference<List<MomoCartItemSnapshot>>() {});
+            return parsed == null ? List.of() : parsed;
+        } catch (Exception ex) {
+            throw new BusinessException("Invalid MoMo cart snapshot payload", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private CreateOrderRequest parseCreateOrderRequestSnapshot(String payload) {
+        if (payload == null || payload.isBlank()) {
+            throw new BusinessException("Missing MoMo request snapshot", HttpStatus.BAD_REQUEST);
+        }
+        try {
+            CreateOrderRequest request = objectMapper.readValue(payload, CreateOrderRequest.class);
+            if (request == null) {
+                throw new BusinessException("Missing MoMo request snapshot", HttpStatus.BAD_REQUEST);
+            }
+            return request;
+        } catch (Exception ex) {
+            throw new BusinessException("Invalid MoMo request snapshot payload", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private String extractMomoSessionToken(Object extraDataObj) {
+        String encoded = toText(extraDataObj);
+        if (encoded.isBlank()) {
+            return "";
+        }
+        String decoded;
+        try {
+            decoded = new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
+        } catch (Exception ex) {
+            decoded = encoded;
+        }
+        String prefix = "sessionToken=";
+        if (decoded.startsWith(prefix)) {
+            return safeTrim(decoded.substring(prefix.length()));
+        }
+        for (String segment : decoded.split("&")) {
+            if (segment.startsWith(prefix)) {
+                return safeTrim(segment.substring(prefix.length()));
+            }
+        }
+        return "";
+    }
+
+    private String extractVnpaySessionTokenFromTxnRef(String txnRef) {
+        String value = safeTrim(txnRef);
+        if (value.isBlank() || !value.startsWith("TMP")) {
+            return "";
+        }
+        int lastDash = value.lastIndexOf('-');
+        if (lastDash <= 3) {
+            return "";
+        }
+        return safeTrim(value.substring(3, lastDash));
+    }
+
+    private int parseInt(Object value, int fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            return Integer.parseInt(String.valueOf(value));
+        } catch (Exception ex) {
+            return fallback;
+        }
+    }
+
+    private String writeJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception ex) {
+            throw new BusinessException("Cannot serialize checkout snapshot", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     private List<ProductSalesStatResponse> buildTopProducts() {
         List<TopProductSalesProjection> topRows = orderItemRepository.findTopProductSales30dDelivered();
         if (topRows.isEmpty()) {
@@ -695,7 +1245,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private String toText(Object value) {
-        return value == null ? "" : String.valueOf(value);
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     private void validateStatusTransition(String currentStatus, String targetStatus, Long orderId) {
@@ -1217,6 +1767,12 @@ public class OrderServiceImpl implements OrderService {
                 .filter(token -> !token.isBlank())
                 .toList();
         return String.join(" ", filtered);
+    }
+
+    private static class MomoCartItemSnapshot {
+        public Long variantId;
+        public Integer quantity;
+        public Long unitPrice;
     }
 
     private static class ResolvedCoupon {

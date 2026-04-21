@@ -48,4 +48,8 @@ public interface OrderService {
     Map<String, List<String>> getAdminStatusOptions();
 
     void handleGhnWebhook(Map<String, Object> payload);
+
+    void handleMomoPaymentIpn(Map<String, Object> payload);
+
+    void handleVnpayPaymentIpn(Map<String, String> payload);
 }

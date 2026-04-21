@@ -1,6 +1,7 @@
 package com.clothing.service.impl;
 
 import com.clothing.config.MomoProperties;
+import com.clothing.config.VnpayProperties;
 import com.clothing.entity.OrderEntity;
 import com.clothing.entity.PaymentEntity;
 import com.clothing.exception.BusinessException;
@@ -22,7 +23,10 @@ import org.springframework.web.client.RestTemplate;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.net.URLEncoder;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -32,38 +36,103 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 @Service
 public class MomoPaymentServiceImpl implements PaymentService {
     private static final Logger log = LoggerFactory.getLogger(MomoPaymentServiceImpl.class);
 
     private static final String METHOD_MOMO = "MOMO";
+    private static final String METHOD_VNPAY = "VNPAY";
     private static final String STATUS_CREATED = "CREATED";
     private static final String STATUS_PAID = "PAID";
     private static final String STATUS_FAILED = "FAILED";
+    private static final DateTimeFormatter VNPAY_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final Set<String> ALLOWED_REQUEST_TYPES = Set.of(
+            "captureWallet",
+            "payWithATM",
+            "payWithCC"
+    );
 
     private final RestTemplate restTemplate;
     private final MomoProperties momoProperties;
+    private final VnpayProperties vnpayProperties;
     private final PaymentRepository paymentRepository;
     private final ObjectMapper objectMapper;
 
-    public MomoPaymentServiceImpl(MomoProperties momoProperties, PaymentRepository paymentRepository) {
+    public MomoPaymentServiceImpl(
+            MomoProperties momoProperties,
+            VnpayProperties vnpayProperties,
+            PaymentRepository paymentRepository
+    ) {
         this.restTemplate = new RestTemplate();
         this.momoProperties = momoProperties;
+        this.vnpayProperties = vnpayProperties;
         this.paymentRepository = paymentRepository;
         this.objectMapper = new ObjectMapper();
     }
 
     @Override
-    public String createMomoPayment(OrderEntity order) {
-        validateConfig();
-
-        String orderId = "ORD" + order.getId() + "-" + System.currentTimeMillis();
-        String requestId = "REQ" + order.getId() + "-" + System.currentTimeMillis();
-        String amount = String.valueOf(order.getTotalPrice());
+    public String createMomoPayment(OrderEntity order, String requestTypeOverride) {
+        if (order == null || order.getId() == null) {
+            throw new BusinessException("Order is required to create MoMo payment", HttpStatus.BAD_REQUEST);
+        }
+        if (order.getTotalPrice() == null || order.getTotalPrice() <= 0) {
+            throw new BusinessException("Order amount must be > 0", HttpStatus.BAD_REQUEST);
+        }
         String orderInfo = "Thanh toan don hang #" + order.getId();
         String extraData = Base64.getEncoder().encodeToString(("orderId=" + order.getId()).getBytes(StandardCharsets.UTF_8));
-        String requestType = momoProperties.getRequestType();
+        return createMomoPaymentInternal(
+                "ORD" + order.getId(),
+                order.getId(),
+                order.getTotalPrice(),
+                orderInfo,
+                extraData,
+                requestTypeOverride
+        );
+    }
+
+    @Override
+    public String createMomoPaymentForSession(
+            String sessionToken,
+            Long amount,
+            String orderInfo,
+            String extraData,
+            String requestTypeOverride
+    ) {
+        if (isBlank(sessionToken)) {
+            throw new BusinessException("sessionToken is required", HttpStatus.BAD_REQUEST);
+        }
+        if (amount == null || amount <= 0) {
+            throw new BusinessException("amount must be > 0", HttpStatus.BAD_REQUEST);
+        }
+        String safeOrderInfo = isBlank(orderInfo) ? "Thanh toan don hang tam" : orderInfo.trim();
+        String safeExtraData = extraData == null ? "" : extraData;
+        return createMomoPaymentInternal(
+                "TMP" + sessionToken.trim(),
+                null,
+                amount,
+                safeOrderInfo,
+                safeExtraData,
+                requestTypeOverride
+        );
+    }
+
+    private String createMomoPaymentInternal(
+            String reference,
+            Long orderIdForPayment,
+            Long amountValue,
+            String orderInfo,
+            String extraData,
+            String requestTypeOverride
+    ) {
+        validateConfig();
+
+        String normalizedRef = isBlank(reference) ? "TMP" : reference.trim();
+        String orderId = normalizedRef + "-" + System.currentTimeMillis();
+        String requestId = "REQ" + normalizedRef + "-" + System.currentTimeMillis();
+        String amount = String.valueOf(amountValue);
+        String requestType = resolveRequestType(requestTypeOverride);
         String partnerClientId = "";
 
         Map<String, Object> payload = new HashMap<>();
@@ -72,7 +141,7 @@ public class MomoPaymentServiceImpl implements PaymentService {
         payload.put("partnerName", "Clothing");
         payload.put("storeId", "ClothingStore");
         payload.put("requestId", requestId);
-        payload.put("amount", order.getTotalPrice());
+        payload.put("amount", amountValue);
         payload.put("orderId", orderId);
         payload.put("orderInfo", orderInfo);
         payload.put("redirectUrl", momoProperties.getRedirectUrl());
@@ -112,9 +181,14 @@ public class MomoPaymentServiceImpl implements PaymentService {
             throw new BusinessException(msg, HttpStatus.BAD_GATEWAY);
         }
 
-        PaymentEntity payment = paymentRepository.findByOrderId(order.getId()).orElseGet(PaymentEntity::new);
-        payment.setOrderId(order.getId());
-        payment.setAmount(order.getTotalPrice());
+        PaymentEntity payment;
+        if (orderIdForPayment != null) {
+            payment = paymentRepository.findByOrderId(orderIdForPayment).orElseGet(PaymentEntity::new);
+        } else {
+            payment = new PaymentEntity();
+        }
+        payment.setOrderId(orderIdForPayment);
+        payment.setAmount(amountValue);
         payment.setMethod(METHOD_MOMO);
         payment.setStatus(STATUS_CREATED);
         payment.setTransactionCode(orderId);
@@ -235,6 +309,55 @@ public class MomoPaymentServiceImpl implements PaymentService {
         paymentRepository.save(payment);
     }
 
+    @Override
+    public String createVnpayPaymentForSession(String sessionToken, Long amount, String orderInfo, String bankCode) {
+        if (isBlank(sessionToken)) {
+            throw new BusinessException("sessionToken is required", HttpStatus.BAD_REQUEST);
+        }
+        if (amount == null || amount <= 0) {
+            throw new BusinessException("amount must be > 0", HttpStatus.BAD_REQUEST);
+        }
+        validateVnpayConfig();
+
+        String txnRef = "TMP" + sessionToken.trim() + "-" + System.currentTimeMillis();
+        String info = isBlank(orderInfo) ? "Thanh toan don hang tam" : orderInfo.trim();
+        String requestUrl = buildVnpayPaymentUrl(txnRef, amount, info, bankCode);
+
+        PaymentEntity payment = new PaymentEntity();
+        payment.setOrderId(null);
+        payment.setAmount(amount);
+        payment.setMethod(METHOD_VNPAY);
+        payment.setStatus(STATUS_CREATED);
+        payment.setTransactionCode(txnRef);
+        payment.setCreatedAt(LocalDateTime.now());
+        paymentRepository.save(payment);
+
+        return requestUrl;
+    }
+
+    @Override
+    public void handleVnpayIpn(Map<String, String> payload) {
+        if (payload == null || payload.isEmpty()) {
+            return;
+        }
+        verifyVnpayIpnSignature(payload);
+
+        String txnRef = safeTrim(payload.get("vnp_TxnRef"));
+        if (txnRef.isBlank()) {
+            return;
+        }
+        PaymentEntity payment = paymentRepository.findByTransactionCode(txnRef).orElse(null);
+        if (payment == null) {
+            return;
+        }
+
+        String responseCode = safeTrim(payload.get("vnp_ResponseCode"));
+        String txnStatus = safeTrim(payload.get("vnp_TransactionStatus"));
+        boolean success = "00".equals(responseCode) && (txnStatus.isBlank() || "00".equals(txnStatus));
+        payment.setStatus(success ? STATUS_PAID : STATUS_FAILED);
+        paymentRepository.save(payment);
+    }
+
     private void verifyMomoIpnSignature(Map<String, Object> payload) {
         String expectedSignature = toText(payload.get("signature"));
         if (expectedSignature.isBlank()) {
@@ -318,6 +441,109 @@ public class MomoPaymentServiceImpl implements PaymentService {
         }
     }
 
+    private void validateVnpayConfig() {
+        if (isBlank(vnpayProperties.getEndpoint())
+                || isBlank(vnpayProperties.getTmnCode())
+                || isBlank(vnpayProperties.getHashSecret())
+                || isBlank(vnpayProperties.getReturnUrl())
+                || isBlank(vnpayProperties.getIpnUrl())) {
+            throw new BusinessException("VNPAY config is incomplete", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private String buildVnpayPaymentUrl(String txnRef, Long amount, String orderInfo, String bankCode) {
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        LocalDateTime expireAt = now.plusMinutes(Math.max(1, vnpayProperties.getExpireMinutes()));
+
+        TreeMap<String, String> params = new TreeMap<>();
+        params.put("vnp_Version", "2.1.0");
+        params.put("vnp_Command", "pay");
+        params.put("vnp_TmnCode", vnpayProperties.getTmnCode().trim());
+        params.put("vnp_Amount", String.valueOf(amount * 100));
+        params.put("vnp_CurrCode", "VND");
+        params.put("vnp_TxnRef", txnRef);
+        params.put("vnp_OrderInfo", orderInfo);
+        params.put("vnp_OrderType", safeTrim(vnpayProperties.getOrderType()).isBlank() ? "other" : vnpayProperties.getOrderType().trim());
+        params.put("vnp_Locale", safeTrim(vnpayProperties.getLocale()).isBlank() ? "vn" : vnpayProperties.getLocale().trim());
+        params.put("vnp_ReturnUrl", vnpayProperties.getReturnUrl().trim());
+        params.put("vnp_IpAddr", safeTrim(vnpayProperties.getIpAddress()).isBlank() ? "127.0.0.1" : vnpayProperties.getIpAddress().trim());
+        params.put("vnp_CreateDate", now.format(VNPAY_TIME_FORMAT));
+        params.put("vnp_ExpireDate", expireAt.format(VNPAY_TIME_FORMAT));
+        String bank = safeTrim(bankCode).toUpperCase(Locale.ROOT);
+        if (!bank.isBlank()) {
+            params.put("vnp_BankCode", bank);
+        }
+
+        String hashData = buildVnpaySigningData(params);
+        String secureHash = signHmacSha512(hashData, vnpayProperties.getHashSecret());
+
+        String query = params.entrySet().stream()
+                .map(entry -> urlEncode(entry.getKey()) + "=" + urlEncode(entry.getValue()))
+                .collect(Collectors.joining("&"));
+        return vnpayProperties.getEndpoint().trim()
+                + "?" + query
+                + "&vnp_SecureHash=" + secureHash;
+    }
+
+    private void verifyVnpayIpnSignature(Map<String, String> payload) {
+        String expectedSignature = safeTrim(payload.get("vnp_SecureHash"));
+        if (expectedSignature.isBlank()) {
+            throw new BusinessException("Missing VNPAY secure hash", HttpStatus.BAD_REQUEST);
+        }
+        if (isBlank(vnpayProperties.getHashSecret())) {
+            throw new BusinessException("VNPAY hash secret is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        TreeMap<String, String> fields = new TreeMap<>();
+        for (Map.Entry<String, String> entry : payload.entrySet()) {
+            String key = entry.getKey();
+            if (isBlank(key)
+                    || "vnp_SecureHash".equalsIgnoreCase(key)
+                    || "vnp_SecureHashType".equalsIgnoreCase(key)) {
+                continue;
+            }
+            fields.put(key, safeTrim(entry.getValue()));
+        }
+
+        String rawData = buildVnpaySigningData(fields);
+        String signed = signHmacSha512(rawData, vnpayProperties.getHashSecret());
+        if (!signed.equalsIgnoreCase(expectedSignature)) {
+            throw new BusinessException("Invalid VNPAY signature", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private String buildVnpaySigningData(Map<String, String> params) {
+        return params.entrySet().stream()
+                .map(entry -> entry.getKey() + "=" + urlEncode(entry.getValue()))
+                .collect(Collectors.joining("&"));
+    }
+
+    private String resolveRequestType(String requestTypeOverride) {
+        String configured = normalizeRequestType(momoProperties.getRequestType());
+        String requested = normalizeRequestType(requestTypeOverride);
+        String selected = requested == null ? configured : requested;
+        if (selected == null) {
+            throw new BusinessException(
+                    "MoMo requestType không hợp lệ. Hỗ trợ: captureWallet, payWithATM, payWithCC",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        return selected;
+    }
+
+    private String normalizeRequestType(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim();
+        for (String allowed : ALLOWED_REQUEST_TYPES) {
+            if (allowed.equalsIgnoreCase(normalized)) {
+                return allowed;
+            }
+        }
+        return null;
+    }
+
     private String signHmacSha256(String data, String secretKey) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
@@ -334,6 +560,30 @@ public class MomoPaymentServiceImpl implements PaymentService {
         }
     }
 
+    private String signHmacSha512(String data, String secretKey) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA512");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA512");
+            mac.init(secretKeySpec);
+            byte[] rawHmac = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(rawHmac.length * 2);
+            for (byte b : rawHmac) {
+                sb.append(String.format(Locale.ROOT, "%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception ex) {
+            throw new BusinessException("Cannot sign VNPAY request", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private String urlEncode(String value) {
+        try {
+            return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8).replace("+", "%20");
+        } catch (Exception ex) {
+            throw new BusinessException("Cannot encode VNPAY payload", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     private int parseInt(Object value, int fallback) {
         if (value == null) return fallback;
         try {
@@ -345,6 +595,10 @@ public class MomoPaymentServiceImpl implements PaymentService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String safeTrim(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private String toText(Object value) {
