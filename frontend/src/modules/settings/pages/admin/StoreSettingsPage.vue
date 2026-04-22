@@ -74,7 +74,7 @@
 
 <script setup>
 import { onMounted, reactive } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import { storeSettingsApi } from "@/modules/settings/api/storeSettingsApi";
 
 const settings = reactive({

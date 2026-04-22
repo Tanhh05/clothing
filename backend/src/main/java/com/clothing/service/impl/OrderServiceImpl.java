@@ -18,6 +18,7 @@ import com.clothing.entity.MomoCheckoutSessionEntity;
 import com.clothing.entity.OrderEntity;
 import com.clothing.entity.OrderItemEntity;
 import com.clothing.entity.OrderStatusHistoryEntity;
+import com.clothing.entity.PaymentEntity;
 import com.clothing.entity.ProductEntity;
 import com.clothing.entity.ProductVariantEntity;
 import com.clothing.entity.UserAddressEntity;
@@ -34,6 +35,7 @@ import com.clothing.repository.MomoCheckoutSessionRepository;
 import com.clothing.repository.OrderItemRepository;
 import com.clothing.repository.OrderRepository;
 import com.clothing.repository.OrderStatusHistoryRepository;
+import com.clothing.repository.PaymentRepository;
 import com.clothing.repository.ProductRepository;
 import com.clothing.repository.ProductVariantRepository;
 import com.clothing.repository.StatusCountProjection;
@@ -87,6 +89,7 @@ public class OrderServiceImpl implements OrderService {
     private static final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
 
     private static final String STATUS_PENDING = "PENDING";
+    private static final String STATUS_WAITING_PAYMENT = "WAITING_PAYMENT";
     private static final String SHIPPING_PROVIDER_GHN = "GHN";
     private static final String SHIPPING_PROVIDER_POS_COUNTER = "POS_COUNTER";
     private static final String SHIPPING_PROVIDER_POS_SHIP = "POS_SHIP";
@@ -98,6 +101,7 @@ public class OrderServiceImpl implements OrderService {
     private static final String MOMO_SESSION_STATUS_COMPLETED = "COMPLETED";
     private static final String VNPAY_SESSION_STATUS_PENDING = "PENDING";
     private static final String VNPAY_SESSION_STATUS_COMPLETED = "COMPLETED";
+    private static final String VNPAY_SESSION_STATUS_EXPIRED = "EXPIRED";
     private static final long MOMO_SESSION_TTL_MINUTES = 30L;
     private static final long VNPAY_SESSION_TTL_MINUTES = 30L;
     private static final long FAR_DISTANCE_SURCHARGE = 20_000L;
@@ -121,6 +125,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+    private final PaymentRepository paymentRepository;
     private final OrderEventPublisher orderEventPublisher;
     private final ProductRepository productRepository;
     private final UserAddressRepository userAddressRepository;
@@ -143,6 +148,7 @@ public class OrderServiceImpl implements OrderService {
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
             OrderStatusHistoryRepository orderStatusHistoryRepository,
+            PaymentRepository paymentRepository,
             OrderEventPublisher orderEventPublisher,
             ProductRepository productRepository,
             UserAddressRepository userAddressRepository,
@@ -164,6 +170,7 @@ public class OrderServiceImpl implements OrderService {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.orderStatusHistoryRepository = orderStatusHistoryRepository;
+        this.paymentRepository = paymentRepository;
         this.orderEventPublisher = orderEventPublisher;
         this.productRepository = productRepository;
         this.userAddressRepository = userAddressRepository;
@@ -271,6 +278,7 @@ public class OrderServiceImpl implements OrderService {
         UserEntity customer = request.getCustomerId() == null ? null : userRepository.findById(request.getCustomerId())
                 .orElseThrow(() -> new BusinessException("Customer not found", HttpStatus.BAD_REQUEST));
         Long orderUserId = customer == null ? admin.getId() : customer.getId();
+        Long couponEligibilityUserId = customer == null ? null : customer.getId();
 
         List<PosCheckoutItemRequest> items = request.getItems();
         long subTotal = 0L;
@@ -293,20 +301,20 @@ public class OrderServiceImpl implements OrderService {
         long manualDiscount = Math.max(0L, request.getManualDiscount() == null ? 0L : request.getManualDiscount());
         manualDiscount = Math.min(manualDiscount, subTotal);
 
-        ResolvedCoupon resolvedCoupon = resolveBestCoupon(orderUserId, subTotal, request.getVoucherCode());
+        ResolvedCoupon resolvedCoupon = resolveBestCoupon(couponEligibilityUserId, subTotal, request.getVoucherCode());
         long couponDiscount = resolvedCoupon == null ? 0L : resolvedCoupon.discountAmount;
         long discountAmount = Math.min(subTotal, couponDiscount + manualDiscount);
         long total = Math.max(0L, subTotal + shippingFee - discountAmount);
-
-        long paidAmount = Math.max(0L, request.getPaidAmount() == null ? 0L : request.getPaidAmount());
-        if (paidAmount < total) {
-            throw new BusinessException("paidAmount is not enough", HttpStatus.BAD_REQUEST);
-        }
 
         String paymentMethod = safeTrim(request.getPaymentMethod());
         if (paymentMethod.isBlank()) {
             throw new BusinessException("paymentMethod is required", HttpStatus.BAD_REQUEST);
         }
+        String normalizedPaymentMethod = paymentMethod.toUpperCase(Locale.ROOT);
+        boolean useMomoPosPayment = "BANK_TRANSFER".equals(normalizedPaymentMethod) || PAYMENT_MOMO.equals(normalizedPaymentMethod);
+
+        // POS counter allows checkout without forcing "paid amount" input.
+        // Cash handover reconciliation can be handled outside checkout flow.
 
         if (Boolean.TRUE.equals(request.getShipEnabled())) {
             validatePosShippingFields(request);
@@ -320,10 +328,13 @@ public class OrderServiceImpl implements OrderService {
         order.setCouponId(resolvedCoupon == null ? null : resolvedCoupon.coupon.getId());
         order.setCouponCode(resolvedCoupon == null ? null : resolvedCoupon.coupon.getCode());
         order.setTotalPrice(total);
-        order.setPaymentMethod(paymentMethod.toUpperCase(Locale.ROOT));
-        order.setStatus(Boolean.TRUE.equals(request.getShipEnabled()) ? "CONFIRMED" : STATUS_DELIVERED);
+        order.setPaymentMethod(useMomoPosPayment ? PAYMENT_MOMO : normalizedPaymentMethod);
+        order.setStatus(useMomoPosPayment
+                ? STATUS_WAITING_PAYMENT
+                : (Boolean.TRUE.equals(request.getShipEnabled()) ? "CONFIRMED" : STATUS_DELIVERED));
         order.setShippingProvider(Boolean.TRUE.equals(request.getShipEnabled()) ? SHIPPING_PROVIDER_POS_SHIP : SHIPPING_PROVIDER_POS_COUNTER);
         order.setAddress(buildPosAddress(request, customer));
+        order.setNote(safeTrim(request.getNote()));
         order.setCreatedAt(LocalDateTime.now());
         OrderEntity savedOrder = orderRepository.save(order);
 
@@ -350,12 +361,14 @@ public class OrderServiceImpl implements OrderService {
             coupon.setUsedCount((coupon.getUsedCount() == null ? 0 : coupon.getUsedCount()) + 1);
             couponRepository.save(coupon);
 
-            CouponUsageEntity usage = new CouponUsageEntity();
-            usage.setCouponId(coupon.getId());
-            usage.setUserId(orderUserId);
-            usage.setOrderId(savedOrder.getId());
-            usage.setUsedAt(LocalDateTime.now());
-            couponUsageRepository.save(usage);
+            if (couponEligibilityUserId != null) {
+                CouponUsageEntity usage = new CouponUsageEntity();
+                usage.setCouponId(coupon.getId());
+                usage.setUserId(couponEligibilityUserId);
+                usage.setOrderId(savedOrder.getId());
+                usage.setUsedAt(LocalDateTime.now());
+                couponUsageRepository.save(usage);
+            }
         }
 
         auditLogService.log(
@@ -364,6 +377,11 @@ public class OrderServiceImpl implements OrderService {
                 savedOrder.getId(),
                 "POS checkout by admin " + adminUsername + ", payment " + paymentMethod + ", total " + total
         );
+
+        if (useMomoPosPayment) {
+            String payUrl = paymentService.createMomoPayment(savedOrder, "captureWallet");
+            return toResponseWithPaymentUrl(savedOrder, payUrl);
+        }
 
         return toResponse(savedOrder);
     }
@@ -671,6 +689,7 @@ public class OrderServiceImpl implements OrderService {
 
         String sessionToken = extractMomoSessionToken(payload.get("extraData"));
         if (sessionToken.isBlank()) {
+            syncPosOrderStatusFromMomoPayment(payload);
             return;
         }
 
@@ -704,6 +723,39 @@ public class OrderServiceImpl implements OrderService {
         momoCheckoutSessionRepository.save(session);
     }
 
+    private void syncPosOrderStatusFromMomoPayment(Map<String, Object> payload) {
+        String transactionCode = toText(payload.get("orderId"));
+        if (transactionCode.isBlank()) {
+            return;
+        }
+
+        PaymentEntity payment = paymentRepository.findByTransactionCode(transactionCode).orElse(null);
+        if (payment == null || payment.getOrderId() == null) {
+            return;
+        }
+        OrderEntity order = orderRepository.findById(payment.getOrderId()).orElse(null);
+        if (order == null) {
+            return;
+        }
+        if (!PAYMENT_MOMO.equalsIgnoreCase(safeTrim(order.getPaymentMethod()))) {
+            return;
+        }
+        if (!STATUS_WAITING_PAYMENT.equalsIgnoreCase(safeTrim(order.getStatus()))) {
+            return;
+        }
+
+        String nextStatus = SHIPPING_PROVIDER_POS_SHIP.equalsIgnoreCase(safeTrim(order.getShippingProvider()))
+                ? "CONFIRMED"
+                : STATUS_DELIVERED;
+        applyOrderStatus(order, nextStatus, false);
+        auditLogService.log(
+                "POS_ORDER_PAID_MOMO",
+                "ORDER",
+                order.getId(),
+                "POS order paid by MoMo transaction " + transactionCode + ", status -> " + nextStatus
+        );
+    }
+
     @Override
     @Transactional
     public void handleVnpayPaymentIpn(Map<String, String> payload) {
@@ -725,6 +777,14 @@ public class OrderServiceImpl implements OrderService {
 
         VnpayCheckoutSessionEntity session = vnpayCheckoutSessionRepository.findByTokenForUpdate(sessionToken).orElse(null);
         if (session == null) {
+            return;
+        }
+        if (session.getExpiresAt() != null
+                && session.getExpiresAt().isBefore(LocalDateTime.now())
+                && VNPAY_SESSION_STATUS_PENDING.equalsIgnoreCase(session.getStatus())) {
+            session.setStatus(VNPAY_SESSION_STATUS_EXPIRED);
+            session.setConsumedAt(LocalDateTime.now());
+            vnpayCheckoutSessionRepository.save(session);
             return;
         }
         if (session.getCreatedOrderId() != null) {
@@ -1262,6 +1322,7 @@ public class OrderServiceImpl implements OrderService {
 
     private boolean isAllowedTransition(String currentStatus, String targetStatus) {
         return switch (currentStatus) {
+            case STATUS_WAITING_PAYMENT -> Set.of(STATUS_DELIVERED, "CONFIRMED", "CANCELLED", "FAILED").contains(targetStatus);
             case "PENDING" -> Set.of("PROCESSING", "CANCELLED", "FAILED").contains(targetStatus);
             case "PROCESSING" -> Set.of("CONFIRMED", "CANCELLED", "FAILED").contains(targetStatus);
             case "CONFIRMED" -> Set.of("SHIPPED", "CANCELLED", "FAILED").contains(targetStatus);
@@ -1348,6 +1409,32 @@ public class OrderServiceImpl implements OrderService {
         return toResponses(List.of(order)).get(0);
     }
 
+    private OrderResponse toResponseWithPaymentUrl(OrderEntity order, String paymentUrl) {
+        OrderResponse base = toResponse(order);
+        return OrderResponse.builder()
+                .id(base.getId())
+                .userId(base.getUserId())
+                .customerName(base.getCustomerName())
+                .totalPrice(base.getTotalPrice())
+                .subTotal(base.getSubTotal())
+                .shippingFee(base.getShippingFee())
+                .discountAmount(base.getDiscountAmount())
+                .appliedVoucherCode(base.getAppliedVoucherCode())
+                .status(base.getStatus())
+                .paymentMethod(base.getPaymentMethod())
+                .paymentUrl(paymentUrl)
+                .shippingProvider(base.getShippingProvider())
+                .shippingCode(base.getShippingCode())
+                .shippingStatus(base.getShippingStatus())
+                .shippingUpdatedAt(base.getShippingUpdatedAt())
+                .address(base.getAddress())
+                .note(base.getNote())
+                .createdAt(base.getCreatedAt())
+                .items(base.getItems())
+                .statusHistory(base.getStatusHistory())
+                .build();
+    }
+
     private List<OrderResponse> toResponses(List<OrderEntity> orders) {
         if (orders == null || orders.isEmpty()) {
             return List.of();
@@ -1395,6 +1482,9 @@ public class OrderServiceImpl implements OrderService {
                     : (customer.getFullName() != null && !customer.getFullName().isBlank()
                         ? customer.getFullName().trim()
                         : customer.getUsername());
+            if (isPosGuestOrder(order)) {
+                customerName = "Khách lẻ";
+            }
 
             List<OrderItemResponse> itemResponses = itemsByOrderId.getOrDefault(order.getId(), List.of()).stream()
                     .map(item -> {
@@ -1440,12 +1530,23 @@ public class OrderServiceImpl implements OrderService {
                     .shippingStatus(order.getShippingStatus())
                     .shippingUpdatedAt(order.getShippingUpdatedAt())
                     .address(order.getAddress())
+                    .note(order.getNote())
                     .createdAt(order.getCreatedAt())
                     .items(itemResponses)
                     .statusHistory(historyResponses)
                     .build());
         }
         return responses;
+    }
+
+    private boolean isPosGuestOrder(OrderEntity order) {
+        if (order == null) return false;
+        String provider = safeTrim(order.getShippingProvider()).toUpperCase(Locale.ROOT);
+        if (!provider.startsWith("POS_")) {
+            return false;
+        }
+        String address = safeTrim(order.getAddress()).toLowerCase(Locale.ROOT);
+        return address.contains("khach: khach le") || address.contains("khách: khách lẻ");
     }
 
     private long safeLong(Long value) {
@@ -1697,27 +1798,22 @@ public class OrderServiceImpl implements OrderService {
                 .filter(coupon -> coupon.getEndDate() == null || !coupon.getEndDate().isBefore(now))
                 .filter(coupon -> coupon.getMinOrderValue() == null || subTotal >= coupon.getMinOrderValue())
                 .filter(coupon -> coupon.getQuantity() == null || (coupon.getUsedCount() == null ? 0 : coupon.getUsedCount()) < coupon.getQuantity())
-                .filter(coupon -> !couponUsageRepository.existsByCouponIdAndUserId(coupon.getId(), userId))
+                .filter(coupon -> userId == null || !couponUsageRepository.existsByCouponIdAndUserId(coupon.getId(), userId))
                 .toList();
 
-        if (candidates.isEmpty()) return null;
-
-        CouponEntity preferred = null;
         if (preferredCode != null && !preferredCode.isBlank()) {
             String normalized = preferredCode.trim().toUpperCase(Locale.ROOT);
-            preferred = candidates.stream()
+            CouponEntity preferred = candidates.stream()
                     .filter(coupon -> normalized.equalsIgnoreCase(coupon.getCode()))
                     .findFirst()
                     .orElseThrow(() -> new BusinessException("Voucher không hợp lệ hoặc không áp dụng được", HttpStatus.BAD_REQUEST));
-        }
-
-        if (preferred != null) {
             long discount = calculateCouponDiscount(preferred, subTotal);
             if (discount <= 0) {
                 throw new BusinessException("Voucher không tạo được giảm giá", HttpStatus.BAD_REQUEST);
             }
             return new ResolvedCoupon(preferred, discount);
         }
+        if (candidates.isEmpty()) return null;
 
         return candidates.stream()
                 .map(coupon -> new ResolvedCoupon(coupon, calculateCouponDiscount(coupon, subTotal)))

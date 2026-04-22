@@ -126,7 +126,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import api from "@/services/api";
 import ProductCard from "@/modules/product/components/ProductCard.vue";
 import { useProductStore } from "@/modules/product/store/productStore";
@@ -182,14 +182,45 @@ const resultSummary = computed(() => {
   return `${store.totalElements} SẢN PHẨM`;
 });
 
+const normalizeSlug = (value) => {
+  if (!value) return "";
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+};
+
+const categoryPathById = (categoryId) => {
+  if (!Number.isFinite(Number(categoryId))) return "/products";
+  const category = categories.value.find((item) => Number(item?.id) === Number(categoryId));
+  if (!category) return "/products";
+  const slug = String(category?.slug || "").trim() || normalizeSlug(category?.name);
+  return slug ? `/products/category/${slug}` : "/products";
+};
+
+const resolveCategoryIdBySlug = (slug) => {
+  const normalized = normalizeSlug(slug);
+  if (!normalized) return null;
+  const matched = categories.value.find((item) => {
+    const rawSlug = String(item?.slug || "").trim();
+    const candidate = rawSlug || normalizeSlug(item?.name);
+    return normalizeSlug(candidate) === normalized;
+  });
+  return matched?.id ?? null;
+};
+
 const updateQuery = (patch = {}, resetPage = false) => {
   const nextQuery = { ...route.query, ...patch };
+  delete nextQuery.category;
   if (resetPage) delete nextQuery.page;
   Object.keys(nextQuery).forEach((key) => {
     const value = nextQuery[key];
     if (value == null || value === "" || value === false) delete nextQuery[key];
   });
-  router.push({ path: "/products", query: nextQuery });
+  const path = categoryPathById(store.filters.category);
+  router.push({ path, query: nextQuery });
 };
 
 const handlePageChange = (val) => {
@@ -218,12 +249,9 @@ const handleSizeChange = () => {
 const handleCategoryFilter = (catId) => {
   const nextCategory = store.filters.category === catId ? null : catId;
   const nextQuery = { ...route.query };
-  if (nextCategory == null) {
-    delete nextQuery.category;
-  } else {
-    nextQuery.category = String(nextCategory);
-  }
-  router.push({ path: "/products", query: nextQuery });
+  delete nextQuery.category;
+  store.filters.category = nextCategory;
+  router.push({ path: categoryPathById(nextCategory), query: nextQuery });
 };
 
 const applySearch = () => {
@@ -250,6 +278,7 @@ const fetchCategories = async () => {
 };
 
 const syncFiltersFromRoute = () => {
+  const categorySlugParam = Array.isArray(route.params.categorySlug) ? route.params.categorySlug[0] : route.params.categorySlug;
   const categoryQuery = Array.isArray(route.query.category) ? route.query.category[0] : route.query.category;
   const qQuery = Array.isArray(route.query.q) ? route.query.q[0] : route.query.q;
   const sortByQuery = Array.isArray(route.query.sortBy) ? route.query.sortBy[0] : route.query.sortBy;
@@ -258,12 +287,20 @@ const syncFiltersFromRoute = () => {
   const pageQuery = Array.isArray(route.query.page) ? route.query.page[0] : route.query.page;
   const stockQuery = Array.isArray(route.query.stock) ? route.query.stock[0] : route.query.stock;
 
-  const hasCategory = typeof categoryQuery === "string" && categoryQuery.trim() !== "";
-  const parsedCategory = hasCategory ? Number(categoryQuery) : NaN;
+  const hasCategoryQuery = typeof categoryQuery === "string" && categoryQuery.trim() !== "";
+  const parsedCategoryFromQuery = hasCategoryQuery ? Number(categoryQuery) : NaN;
+  const hasCategorySlug = typeof categorySlugParam === "string" && categorySlugParam.trim() !== "";
+  const parsedCategoryFromSlug = hasCategorySlug ? resolveCategoryIdBySlug(categorySlugParam) : null;
   const parsedSize = Number(sizeQuery);
   const parsedPage = Number(pageQuery);
 
-  store.filters.category = Number.isFinite(parsedCategory) ? parsedCategory : null;
+  if (parsedCategoryFromSlug != null) {
+    store.filters.category = Number(parsedCategoryFromSlug);
+  } else if (Number.isFinite(parsedCategoryFromQuery)) {
+    store.filters.category = parsedCategoryFromQuery;
+  } else {
+    store.filters.category = null;
+  }
   store.filters.q = typeof qQuery === "string" ? qQuery.trim() : "";
   store.filters.sortBy = typeof sortByQuery === "string" && sortByQuery.trim() ? sortByQuery.trim() : "id";
   store.filters.direction = directionQuery === "asc" ? "asc" : "desc";
@@ -325,10 +362,14 @@ const colorSummary = (product) => uniqueSummary((product.variants || []).map((it
 const sizeSummary = (product) => uniqueSummary((product.variants || []).map((item) => item.size));
 const formatPrice = (value) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(value || 0);
 
-watch(() => route.query, syncFiltersFromRoute, { immediate: true });
+watch(() => route.fullPath, syncFiltersFromRoute, { immediate: true });
 
 onMounted(() => {
-  fetchCategories();
+  fetchCategories().then(() => {
+    if (route.params.categorySlug) {
+      syncFiltersFromRoute();
+    }
+  });
 });
 </script>
 

@@ -185,7 +185,7 @@ import {
   ChatDotRound,
   Setting
 } from "@element-plus/icons-vue";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import { useAuthStore } from "@/store/authStore";
 import { searchApi } from "@/modules/search/api/searchApi";
 import { categoryApi } from "@/modules/category/api/categoryApi";

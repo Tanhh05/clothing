@@ -231,7 +231,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import { RefreshRight, Search, View } from "@element-plus/icons-vue";
 import { warehouseApi } from "@/modules/warehouse/api/warehouseApi";
 

@@ -15,6 +15,10 @@ const routes = [
         component: () => import("@/modules/product/pages/client/ProductListPage.vue")
       },
       {
+        path: "products/category/:categorySlug",
+        component: () => import("@/modules/product/pages/client/ProductListPage.vue")
+      },
+      {
         path: "products/:slug",
         component: () => import("@/modules/product/pages/client/ProductDetailPage.vue")
       },
@@ -129,6 +133,10 @@ const routes = [
       {
         path: "",
         component: () => import("@/modules/pos/pages/admin/PosCounterPage.vue")
+      },
+      {
+        path: "payment",
+        component: () => import("@/modules/pos/pages/admin/PosTransferQrPage.vue")
       }
     ]
   },

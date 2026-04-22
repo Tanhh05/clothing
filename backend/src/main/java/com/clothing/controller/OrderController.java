@@ -2,12 +2,15 @@ package com.clothing.controller;
 
 import com.clothing.dto.request.CreateOrderRequest;
 import com.clothing.dto.request.OrderBulkStatusRequest;
+import com.clothing.dto.request.PosDraftUpsertRequest;
 import com.clothing.dto.request.PosCheckoutRequest;
 import com.clothing.dto.request.UpdateOrderStatusRequest;
 import com.clothing.dto.response.AdminDashboardSummaryResponse;
 import com.clothing.dto.response.OrderResponse;
 import com.clothing.dto.response.PageResponse;
+import com.clothing.dto.response.PosDraftResponse;
 import com.clothing.service.OrderService;
+import com.clothing.service.PosDraftService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +20,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -31,9 +36,11 @@ import java.util.Map;
 public class OrderController {
 
     private final OrderService orderService;
+    private final PosDraftService posDraftService;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, PosDraftService posDraftService) {
         this.orderService = orderService;
+        this.posDraftService = posDraftService;
     }
 
     @PostMapping
@@ -51,6 +58,34 @@ public class OrderController {
             @Valid @RequestBody PosCheckoutRequest request
     ) {
         return ResponseEntity.ok(orderService.createPosOrder(authentication.getName(), request));
+    }
+
+    @PutMapping("/admin/pos/draft")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PosDraftResponse> savePosDraft(
+            Authentication authentication,
+            @Valid @RequestBody PosDraftUpsertRequest request
+    ) {
+        return ResponseEntity.ok(posDraftService.saveDraft(authentication.getName(), request));
+    }
+
+    @GetMapping("/admin/pos/draft")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PosDraftResponse> getPosDraft(
+            Authentication authentication,
+            @RequestParam String terminalId
+    ) {
+        return ResponseEntity.ok(posDraftService.getDraft(authentication.getName(), terminalId));
+    }
+
+    @DeleteMapping("/admin/pos/draft")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> deletePosDraft(
+            Authentication authentication,
+            @RequestParam String terminalId
+    ) {
+        posDraftService.deleteDraft(authentication.getName(), terminalId);
+        return ResponseEntity.ok(Map.of("deleted", true));
     }
 
     @GetMapping

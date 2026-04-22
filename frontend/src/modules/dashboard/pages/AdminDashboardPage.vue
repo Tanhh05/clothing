@@ -198,7 +198,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import { orderApi } from "@/modules/order/api/orderApi";
 import { adminApi } from "@/modules/dashboard/api/adminApi";
 

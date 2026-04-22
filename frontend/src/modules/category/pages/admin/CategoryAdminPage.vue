@@ -192,7 +192,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { Search, Plus } from "@element-plus/icons-vue";
 import { categoryApi } from "@/modules/category/api/categoryApi";

@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/address")
@@ -33,5 +34,14 @@ public class AddressController {
     @GetMapping("/wards")
     public ResponseEntity<List<AddressUnitResponse>> getWards(@RequestParam Long districtId) {
         return ResponseEntity.ok(addressService.getWards(districtId));
+    }
+
+    @GetMapping("/shipping-fee")
+    public ResponseEntity<Map<String, Long>> getShippingFee(
+            @RequestParam Long districtId,
+            @RequestParam String wardCode
+    ) {
+        long fee = addressService.getShippingFee(districtId, wardCode);
+        return ResponseEntity.ok(Map.of("fee", fee));
     }
 }

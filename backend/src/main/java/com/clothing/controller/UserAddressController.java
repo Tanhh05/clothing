@@ -10,6 +10,7 @@ import com.clothing.repository.UserRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -43,6 +44,17 @@ public class UserAddressController {
                 .map(this::toResponse)
                 .toList();
         return ResponseEntity.ok(responses);
+    }
+
+    @GetMapping("/admin/users/{userId}/default")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserAddressResponse> getDefaultAddressByUserId(@PathVariable Long userId) {
+        UserAddressEntity entity = userAddressRepository.findByUserIdAndIsDefaultTrue(userId)
+                .orElseGet(() -> userAddressRepository.findByUserIdOrderByIdDesc(userId).stream().findFirst().orElse(null));
+        if (entity == null) {
+            throw new BusinessException("Address not found", HttpStatus.NOT_FOUND);
+        }
+        return ResponseEntity.ok(toResponse(entity));
     }
 
     @PostMapping

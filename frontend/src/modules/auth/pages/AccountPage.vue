@@ -143,7 +143,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import { useAuthStore } from "@/store/authStore";
 import { userAddressApi } from "@/modules/address/api/userAddressApi";
 import { addressApi } from "@/modules/address/api/addressApi";

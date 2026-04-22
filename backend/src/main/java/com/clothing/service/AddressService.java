@@ -11,4 +11,6 @@ public interface AddressService {
     List<AddressUnitResponse> getDistricts(Long provinceId);
 
     List<AddressUnitResponse> getWards(Long districtId);
+
+    long getShippingFee(Long districtId, String wardCode);
 }

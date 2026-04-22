@@ -135,7 +135,7 @@
 
 <script setup>
 import { onMounted, ref } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import { Search } from "@element-plus/icons-vue";
 import { customerApi } from "@/modules/customer/api/customerApi";
 

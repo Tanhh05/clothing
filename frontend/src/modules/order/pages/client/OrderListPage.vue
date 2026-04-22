@@ -262,7 +262,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import { Plus, Refresh, Search } from "@element-plus/icons-vue";
 import { useOrderStore } from "@/modules/order/store/orderStore";
 import { orderApi } from "@/modules/order/api/orderApi";

@@ -67,7 +67,7 @@
 
 <script setup>
 import { onMounted, ref, watch } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import ProductCard from "@/modules/product/components/ProductCard.vue";
 import { useWishlistStore } from "@/store/wishlistStore";
 import { productApi } from "@/modules/product/api/productApi";

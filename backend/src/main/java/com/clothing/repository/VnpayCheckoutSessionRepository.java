@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 public interface VnpayCheckoutSessionRepository extends JpaRepository<VnpayCheckoutSessionEntity, Long> {
@@ -14,4 +15,6 @@ public interface VnpayCheckoutSessionRepository extends JpaRepository<VnpayCheck
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select s from VnpayCheckoutSessionEntity s where s.token = :token")
     Optional<VnpayCheckoutSessionEntity> findByTokenForUpdate(@Param("token") String token);
+
+    long deleteByStatusAndExpiresAtBefore(String status, LocalDateTime expiresAt);
 }

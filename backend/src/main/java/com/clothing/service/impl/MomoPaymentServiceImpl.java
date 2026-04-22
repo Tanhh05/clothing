@@ -80,6 +80,15 @@ public class MomoPaymentServiceImpl implements PaymentService {
         if (order.getTotalPrice() == null || order.getTotalPrice() <= 0) {
             throw new BusinessException("Order amount must be > 0", HttpStatus.BAD_REQUEST);
         }
+        PaymentEntity existingPayment = paymentRepository.findByOrderId(order.getId()).orElse(null);
+        if (existingPayment != null
+                && !STATUS_PAID.equalsIgnoreCase(String.valueOf(existingPayment.getStatus()))
+                && !STATUS_FAILED.equalsIgnoreCase(String.valueOf(existingPayment.getStatus()))) {
+            throw new BusinessException(
+                    "Đơn hàng này đã có mã QR thanh toán đang chờ xử lý",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
         String orderInfo = "Thanh toan don hang #" + order.getId();
         String extraData = Base64.getEncoder().encodeToString(("orderId=" + order.getId()).getBytes(StandardCharsets.UTF_8));
         return createMomoPaymentInternal(

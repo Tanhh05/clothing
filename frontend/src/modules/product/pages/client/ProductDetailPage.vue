@@ -7,7 +7,7 @@
         <div class="breadcrumb-nav">
           <el-breadcrumb separator="/">
             <el-breadcrumb-item :to="{ path: '/' }">Trang Chủ</el-breadcrumb-item>
-            <el-breadcrumb-item :to="{ path: '/products', query: { category: product.categoryId } }">
+            <el-breadcrumb-item :to="categoryBreadcrumbTo">
               {{ product.categoryName }}
             </el-breadcrumb-item>
             <el-breadcrumb-item>{{ product.name }}</el-breadcrumb-item>
@@ -223,7 +223,7 @@ import { reviewApi } from '../../api/reviewApi';
 import { ShoppingBag, InfoFilled, Right } from '@element-plus/icons-vue';
 import { useCartStore } from '@/store/cartStore';
 import { useWishlistStore } from '@/store/wishlistStore';
-import { ElMessage } from 'element-plus';
+import { ElMessage } from "@/utils/dialogMessage";
 import ProductCard from '@/modules/product/components/ProductCard.vue';
 import { getRecentlyViewedProducts, trackRecentlyViewedProduct } from '@/modules/product/utils/recentlyViewed';
 
@@ -238,6 +238,24 @@ const selectedColor = ref('');
 const selectedSize = ref('');
 const infoDialogVisible = ref(false);
 const infoDialogTitle = ref('');
+
+const normalizeSlug = (value) => {
+  if (!value) return "";
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+};
+
+const categoryBreadcrumbTo = computed(() => {
+  const slug = normalizeSlug(product.value?.categoryName);
+  if (!slug) {
+    return { path: "/products" };
+  }
+  return { path: `/products/category/${slug}` };
+});
 const infoDialogContent = ref('');
 const relatedProducts = ref([]);
 const recentViewedProducts = ref([]);

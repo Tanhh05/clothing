@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 public interface MomoCheckoutSessionRepository extends JpaRepository<MomoCheckoutSessionEntity, Long> {
@@ -14,4 +15,6 @@ public interface MomoCheckoutSessionRepository extends JpaRepository<MomoCheckou
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select s from MomoCheckoutSessionEntity s where s.token = :token")
     Optional<MomoCheckoutSessionEntity> findByTokenForUpdate(@Param("token") String token);
+
+    long deleteByStatusAndExpiresAtBefore(String status, LocalDateTime expiresAt);
 }

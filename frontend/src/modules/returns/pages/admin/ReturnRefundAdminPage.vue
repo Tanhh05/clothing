@@ -78,7 +78,8 @@
 
 <script setup>
 import { onMounted, ref, watch } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessageBox } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import { ArrowDown } from "@element-plus/icons-vue";
 import { returnApi } from "@/modules/returns/api/returnApi";
 

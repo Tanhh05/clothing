@@ -63,6 +63,9 @@ public class OrderEntity {
     @Column(columnDefinition = "TEXT")
     private String address;
 
+    @Column(columnDefinition = "TEXT")
+    private String note;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 }

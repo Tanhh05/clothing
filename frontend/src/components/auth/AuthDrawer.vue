@@ -157,7 +157,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useConfirmDialog } from '@/composables/useConfirmDialog';
-import { ElMessage } from 'element-plus';
+import { ElMessage } from "@/utils/dialogMessage";
 
 const props = defineProps({
   modelValue: Boolean

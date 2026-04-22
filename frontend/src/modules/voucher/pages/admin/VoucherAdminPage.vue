@@ -103,7 +103,7 @@
 
 <script setup>
 import { onMounted, ref } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import { voucherApi } from "@/modules/voucher/api/voucherApi";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
@@ -130,10 +130,16 @@ const formatDate = (value) => (value ? new Date(value).toLocaleString("vi-VN") :
 const formatCurrency = (value) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(Number(value) || 0);
 const formatDiscount = (type, value) => {
   const normalized = String(type || "").toUpperCase();
-  if (normalized === "PERCENT") {
+  if (normalized === "PERCENT" || normalized === "PERCENTAGE") {
     return `Giảm ${Number(value) || 0}%`;
   }
   return `Giảm ${formatCurrency(value)}`;
+};
+const normalizeDiscountType = (value) => {
+  const normalized = String(value || "").toUpperCase();
+  if (normalized === "PERCENTAGE") return "PERCENT";
+  if (normalized === "FIXED") return "AMOUNT";
+  return normalized || "PERCENT";
 };
 const toLocalDateTime = (value) => {
   if (!value) return null;
@@ -166,6 +172,7 @@ const openEdit = (row) => {
   editingId.value = row.id;
   form.value = {
     ...row,
+    discountType: normalizeDiscountType(row.discountType),
     startAt: row.startAt ? new Date(row.startAt) : null,
     endAt: row.endAt ? new Date(row.endAt) : null
   };
@@ -183,8 +190,12 @@ const saveVoucher = async () => {
     return;
   }
   const payload = {
-    ...form.value,
     code,
+    discountType: normalizeDiscountType(form.value.discountType),
+    discountValue: Number(form.value.discountValue || 0),
+    minOrderValue: Number(form.value.minOrderValue || 0),
+    maxUsage: Number(form.value.maxUsage || 0),
+    status: String(form.value.status || "ACTIVE").toUpperCase(),
     startAt: toLocalDateTime(form.value.startAt),
     endAt: toLocalDateTime(form.value.endAt)
   };

@@ -170,7 +170,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useCartStore } from '@/store/cartStore';
 import { Delete, Right, Ticket } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage } from "@/utils/dialogMessage";
 import api from '@/services/api';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useStoreSettingsStore } from '@/store/storeSettingsStore';

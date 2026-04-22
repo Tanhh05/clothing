@@ -70,7 +70,7 @@
 
 <script setup>
 import { onMounted, ref } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import { notificationAdminApi } from "@/modules/notification/api/notificationAdminApi";
 
 const form = ref({

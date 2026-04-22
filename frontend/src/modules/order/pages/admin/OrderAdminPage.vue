@@ -52,6 +52,10 @@
             <template #default="{ row }">
               <div class="summary-cell">
                 <span><strong>TT:</strong> {{ paymentLabel(row.paymentMethod) }}</span>
+                <el-tag size="small" :type="orderSourceTagType(row.shippingProvider)">{{ orderSourceLabel(row.shippingProvider) }}</el-tag>
+                <span><strong>Tạm tính:</strong> {{ formatCurrency(financialsOf(row).subtotal) }}</span>
+                <span><strong>Giảm:</strong> -{{ formatCurrency(financialsOf(row).discount) }}</span>
+                <span v-if="row.appliedVoucherCode"><strong>Mã giảm:</strong> {{ row.appliedVoucherCode }}</span>
                 <span><strong>Tổng:</strong> {{ formatCurrency(row.totalPrice) }}</span>
                 <el-tag size="small" :type="statusTagType(row.shippingStatus)">{{ shippingStatusLabel(row.shippingStatus) }}</el-tag>
                 <span><strong>GHN:</strong> {{ row.shippingCode || "Chưa có mã" }}</span>
@@ -97,7 +101,13 @@
               <p><strong>Mã đơn:</strong> #{{ selectedOrder.id }}</p>
               <p><strong>Khách hàng:</strong> {{ customerDisplay(selectedOrder) }}</p>
               <p><strong>Địa chỉ:</strong> {{ selectedOrder.address || "N/A" }}</p>
-              <p><strong>Tổng tiền:</strong> {{ formatCurrency(selectedOrder.totalPrice) }}</p>
+              <p><strong>Ghi chú:</strong> {{ selectedOrder.note || "Không có" }}</p>
+              <p><strong>Loại đơn:</strong> {{ orderSourceLabel(selectedOrder.shippingProvider) }}</p>
+              <p><strong>Mã giảm giá:</strong> {{ selectedOrder.appliedVoucherCode || "Không áp dụng" }}</p>
+              <p><strong>Tạm tính:</strong> {{ formatCurrency(financialsOf(selectedOrder).subtotal) }}</p>
+              <p><strong>Giảm giá:</strong> -{{ formatCurrency(financialsOf(selectedOrder).discount) }}</p>
+              <p><strong>Phí ship:</strong> {{ formatCurrency(financialsOf(selectedOrder).shippingFee) }}</p>
+              <p><strong>Tổng tiền:</strong> {{ formatCurrency(financialsOf(selectedOrder).grandTotal) }}</p>
               <p><strong>Mã vận đơn GHN:</strong> {{ selectedOrder.shippingCode || "Chưa có" }}</p>
               <p><strong>Trạng thái GHN:</strong> {{ shippingStatusLabel(selectedOrder.shippingStatus) }}</p>
             </div>
@@ -145,7 +155,7 @@
 
 <script setup>
 import { onMounted, ref, watch } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { orderApi } from "@/modules/order/api/orderApi";
 
@@ -180,6 +190,22 @@ const formatDateTime = (value) => {
   return date.toLocaleString("vi-VN");
 };
 
+const financialsOf = (order) => {
+  const rows = Array.isArray(order?.items) ? order.items : [];
+  const calculatedSubtotal = rows.reduce((sum, row) => sum + (Number(row?.lineTotal) || 0), 0);
+  const subtotal = Number(order?.subTotal ?? calculatedSubtotal);
+  const shippingFee = Number(order?.shippingFee || 0);
+  const discount = Number(order?.discountAmount || 0);
+  const computedTotal = Math.max(0, subtotal + shippingFee - discount);
+  const grandTotal = Number(order?.totalPrice ?? computedTotal);
+  return {
+    subtotal: Number.isFinite(subtotal) ? subtotal : 0,
+    shippingFee: Number.isFinite(shippingFee) ? shippingFee : 0,
+    discount: Number.isFinite(discount) ? discount : 0,
+    grandTotal: Number.isFinite(grandTotal) ? grandTotal : 0
+  };
+};
+
 const paymentLabel = (method) => {
   const value = String(method || "").toUpperCase();
   if (value === "COD") return "COD";
@@ -187,7 +213,30 @@ const paymentLabel = (method) => {
   return method || "N/A";
 };
 
+const orderSourceLabel = (provider) => {
+  const value = String(provider || "").trim().toUpperCase();
+  if (value === "POS_SHIP") return "Mua giao hàng";
+  if (value === "POS_COUNTER") return "Mua tại quầy";
+  return "Đơn online";
+};
+
+const orderSourceTagType = (provider) => {
+  const value = String(provider || "").trim().toUpperCase();
+  if (value === "POS_SHIP") return "warning";
+  if (value === "POS_COUNTER") return "success";
+  return "info";
+};
+
 const customerDisplay = (order) => {
+  const provider = String(order?.shippingProvider || "").toUpperCase();
+  const isPosOrder = provider.startsWith("POS_");
+  const hasCustomerName = Boolean(String(order?.customerName || "").trim());
+  if (isPosOrder && !hasCustomerName) {
+    return "Khách lẻ";
+  }
+  if (isPosOrder && String(order?.address || "").includes("Khach: Khach le")) {
+    return "Khách lẻ";
+  }
   return order?.customerName || `User #${order?.userId ?? "N/A"}`;
 };
 
@@ -368,9 +417,10 @@ const renderInvoiceSection = (order) => {
   const address = order.address || "N/A";
   const payment = paymentLabel(order.paymentMethod);
   const status = statusLabel(order.status);
+  const note = order.note || "Không có";
   const rows = Array.isArray(order.items) ? order.items : [];
-  const subtotal = rows.reduce((sum, row) => sum + (Number(row?.lineTotal) || 0), 0);
-  const grandTotal = Number(order.totalPrice || subtotal || 0);
+  const financials = financialsOf(order);
+  const voucherCode = order.appliedVoucherCode || "Không áp dụng";
 
   const itemRowsHtml = rows.length
     ? rows
@@ -407,6 +457,8 @@ const renderInvoiceSection = (order) => {
             <p><strong>Địa chỉ:</strong> ${escapeHtml(address)}</p>
             <p><strong>Thanh toán:</strong> ${escapeHtml(payment)}</p>
             <p><strong>Trạng thái đơn:</strong> ${escapeHtml(status)}</p>
+            <p><strong>Mã giảm giá:</strong> ${escapeHtml(voucherCode)}</p>
+            <p><strong>Ghi chú:</strong> ${escapeHtml(note)}</p>
           </section>
 
           <table>
@@ -424,12 +476,13 @@ const renderInvoiceSection = (order) => {
           </table>
 
           <section class="summary">
-            <p><span>Tạm tính</span><strong>${formatCurrency(subtotal)}</strong></p>
-            <p><span>Phí vận chuyển</span><strong>${formatCurrency(0)}</strong></p>
-            <p class="total"><span>Tổng cộng</span><strong>${formatCurrency(grandTotal)}</strong></p>
+            <p><span>Tạm tính</span><strong>${formatCurrency(financials.subtotal)}</strong></p>
+            <p><span>Giảm giá</span><strong>-${formatCurrency(financials.discount)}</strong></p>
+            <p><span>Phí vận chuyển</span><strong>${formatCurrency(financials.shippingFee)}</strong></p>
+            <p class="total"><span>Tổng cộng</span><strong>${formatCurrency(financials.grandTotal)}</strong></p>
           </section>
 
-          <p class="footer">Ghi chú: Hóa đơn được xuất từ hệ thống quản trị và có giá trị lưu trữ nội bộ.</p>
+          <p class="footer">Hóa đơn được xuất từ hệ thống quản trị và có giá trị lưu trữ nội bộ.</p>
     </section>
   `;
 };

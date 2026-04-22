@@ -61,6 +61,47 @@ public class GhnAddressServiceImpl implements AddressService {
         return mapAddressUnits(data, "WardCode", "WardName");
     }
 
+    @Override
+    public long getShippingFee(Long districtId, String wardCode) {
+        if (districtId == null) {
+            throw new BusinessException("districtId is required", HttpStatus.BAD_REQUEST);
+        }
+        String safeWardCode = safeTrim(wardCode);
+        if (safeWardCode.isBlank()) {
+            throw new BusinessException("wardCode is required", HttpStatus.BAD_REQUEST);
+        }
+        if (ghnProperties.getToken() == null || ghnProperties.getToken().isBlank()) {
+            throw new BusinessException("GHN token is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        if (ghnProperties.getShopId() == null || ghnProperties.getShopId().isBlank()) {
+            throw new BusinessException("GHN shop id is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("service_type_id", 2);
+        payload.put("to_district_id", districtId);
+        payload.put("to_ward_code", safeWardCode);
+        payload.put("height", 10);
+        payload.put("length", 20);
+        payload.put("weight", 500);
+        payload.put("width", 20);
+        payload.put("insurance_value", 0);
+
+        JsonNode root = callShippingApi(HttpMethod.POST, "/fee", payload);
+        JsonNode data = root.get("data");
+        if (data == null || data.isNull()) {
+            throw new BusinessException("Invalid GHN shipping fee response", HttpStatus.BAD_GATEWAY);
+        }
+        long total = data.path("total").asLong(-1L);
+        if (total < 0) {
+            total = data.path("service_fee").asLong(-1L);
+        }
+        if (total < 0) {
+            throw new BusinessException("GHN shipping fee is missing", HttpStatus.BAD_GATEWAY);
+        }
+        return Math.max(0L, total);
+    }
+
     private JsonNode callGhn(HttpMethod method, String path, Object body) {
         if (ghnProperties.getToken() == null || ghnProperties.getToken().isBlank()) {
             throw new BusinessException("GHN token is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
@@ -107,6 +148,64 @@ public class GhnAddressServiceImpl implements AddressService {
             throw new BusinessException(message, HttpStatus.BAD_GATEWAY);
         }
         return root.get("data");
+    }
+
+    private JsonNode callShippingApi(HttpMethod method, String path, Object body) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Token", ghnProperties.getToken().trim());
+        headers.set("ShopId", ghnProperties.getShopId().trim());
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<?> entity = body == null ? new HttpEntity<>(headers) : new HttpEntity<>(body, headers);
+        ResponseEntity<JsonNode> response = null;
+        BusinessException lastException = null;
+        for (String baseUrl : candidateShippingBaseUrls()) {
+            try {
+                response = restTemplate.exchange(baseUrl + path, method, entity, JsonNode.class);
+                lastException = null;
+                break;
+            } catch (HttpStatusCodeException ex) {
+                lastException = new BusinessException(
+                        "GHN shipping API error (" + ex.getStatusCode().value() + "): " + compactBody(ex.getResponseBodyAsString()),
+                        HttpStatus.BAD_GATEWAY
+                );
+                if (ex.getStatusCode().value() != 401) {
+                    throw lastException;
+                }
+            } catch (Exception ex) {
+                lastException = new BusinessException("Failed to call GHN shipping API", HttpStatus.BAD_GATEWAY);
+            }
+        }
+        if (response == null) {
+            throw lastException == null
+                    ? new BusinessException("Failed to call GHN shipping API", HttpStatus.BAD_GATEWAY)
+                    : lastException;
+        }
+
+        JsonNode root = response.getBody();
+        if (root == null) {
+            throw new BusinessException("Invalid GHN shipping response", HttpStatus.BAD_GATEWAY);
+        }
+        int code = root.path("code").asInt(200);
+        if (code != 200) {
+            String message = root.path("message").asText("GHN shipping API error");
+            throw new BusinessException(message, HttpStatus.BAD_GATEWAY);
+        }
+        return root;
+    }
+
+    private List<String> candidateShippingBaseUrls() {
+        String primary = trimTrailingSlash(safeTrim(ghnProperties.getShippingBaseUrl()));
+        if (primary.isBlank()) {
+            primary = "https://online-gateway.ghn.vn/shiip/public-api/v2/shipping-order";
+        }
+        String alt = alternateGateway(primary);
+        Set<String> urls = new LinkedHashSet<>();
+        urls.add(primary);
+        if (!alt.isBlank()) {
+            urls.add(alt);
+        }
+        return new ArrayList<>(urls);
     }
 
     private List<String> candidateMasterDataBaseUrls() {

@@ -54,4 +54,7 @@ public class PosCheckoutRequest {
     private String ward;
 
     private String address;
+
+    @Size(max = 2000, message = "note max length is 2000")
+    private String note;
 }

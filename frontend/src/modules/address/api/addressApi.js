@@ -9,5 +9,8 @@ export const addressApi = {
   },
   getWards(districtId) {
     return api.get("/address/wards", { params: { districtId } });
+  },
+  getShippingFee(districtId, wardCode) {
+    return api.get("/address/shipping-fee", { params: { districtId, wardCode } });
   }
 };

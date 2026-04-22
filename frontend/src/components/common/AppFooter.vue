@@ -18,7 +18,7 @@
           <ul>
             <li v-if="loadingCategories">Đang tải...</li>
             <li v-else v-for="item in sportLinks" :key="item.id">
-              <router-link v-if="typeof item.id === 'number'" :to="{ path: '/products', query: { category: String(item.id) } }">{{ item.name }}</router-link>
+              <router-link v-if="typeof item.id === 'number'" :to="toCategoryPath(item)">{{ item.name }}</router-link>
               <a v-else href="#">{{ item.name }}</a>
             </li>
           </ul>
@@ -29,7 +29,7 @@
           <ul>
             <li v-if="loadingCategories">Đang tải...</li>
             <li v-else v-for="item in collectionLinks" :key="item.id">
-              <router-link v-if="typeof item.id === 'number'" :to="{ path: '/products', query: { category: String(item.id) } }">{{ item.name }}</router-link>
+              <router-link v-if="typeof item.id === 'number'" :to="toCategoryPath(item)">{{ item.name }}</router-link>
               <a v-else href="#">{{ item.name }}</a>
             </li>
           </ul>
@@ -139,6 +139,21 @@ const mapLink = computed(() => {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address.value)}`;
 });
 const currentYear = new Date().getFullYear();
+
+const normalizeSlug = (value) => {
+  if (!value) return "";
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+};
+
+const toCategoryPath = (category) => {
+  const slug = String(category?.slug || "").trim() || normalizeSlug(category?.name);
+  return slug ? `/products/category/${slug}` : "/products";
+};
 
 const fetchFooterData = async () => {
   loadingProducts.value = true;

@@ -22,7 +22,7 @@
         <router-link
           v-for="cat in topCategories"
           :key="cat.id"
-          :to="`/products?category=${cat.id}`"
+          :to="toCategoryPath(cat)"
           class="category-chip"
         >
           {{ cat.name }}
@@ -97,6 +97,21 @@ const trendingProducts = ref([]);
 const recommendedProducts = ref([]);
 const currentBanner = ref(null);
 const recentViewedProducts = computed(() => getRecentlyViewedProducts().slice(0, 4));
+
+const normalizeSlug = (value) => {
+  if (!value) return "";
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+};
+
+const toCategoryPath = (category) => {
+  const slug = String(category?.slug || "").trim() || normalizeSlug(category?.name);
+  return slug ? `/products/category/${slug}` : "/products";
+};
 
 const getProductStock = (product) => {
   return (product.variants || []).reduce((sum, variant) => sum + (variant.stock || 0), 0);

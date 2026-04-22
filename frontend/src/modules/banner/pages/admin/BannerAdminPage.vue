@@ -133,7 +133,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { Plus } from "@element-plus/icons-vue";
 import { bannerApi } from "@/modules/banner/api/bannerApi";

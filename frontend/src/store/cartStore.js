@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { cartApi } from '../modules/cart/api/cartApi';
 import { useAuthStore } from './authStore';
-import { ElMessage } from 'element-plus';
+import { ElMessage } from "@/utils/dialogMessage";
 
 export const useCartStore = defineStore('cartStore', {
   state: () => ({

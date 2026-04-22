@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { wishlistApi } from "@/modules/wishlist/api/wishlistApi";
 import { useAuthStore } from "@/store/authStore";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 
 export const useWishlistStore = defineStore("wishlistStore", {
   state: () => ({

@@ -1,9 +1,12 @@
 <template>
   <header class="app-header">
     <div class="promo-top" @click="isPromoOpen = !isPromoOpen">
-      <span>MIỄN PHÍ VẬN CHUYỂN CHO THÀNH VIÊN ADICLUB VÀ TẤT CẢ ĐƠN HÀNG TRÊN ỨNG DỤNG
-</span>
-      <el-icon><ArrowDown v-if="!isPromoOpen" /><ArrowUp v-else /></el-icon>
+      <div class="promo-marquee">
+        <span class="promo-marquee-text">
+          MIỄN PHÍ VẬN CHUYỂN CHO THÀNH VIÊN ADICLUB VÀ TẤT CẢ ĐƠN HÀNG TRÊN ỨNG DỤNG
+        </span>
+      </div>
+      <el-icon class="promo-toggle-icon"><ArrowDown v-if="!isPromoOpen" /><ArrowUp v-else /></el-icon>
     </div>
 
     <el-collapse-transition>
@@ -61,16 +64,16 @@
               class="mega-column"
             >
               <h4 class="menu-heading">
-                <RouterLink :to="`/products?category=${column.id}`">
+                <RouterLink :to="toCategoryPath(column)">
                   {{ column.title }}
                 </RouterLink>
               </h4>
               <el-menu-item
                 v-for="link in column.links"
                 :key="link.id"
-                :index="`/products?category=${link.id}`"
+                :index="toCategoryPath(link)"
               >
-                <RouterLink :to="`/products?category=${link.id}`">
+                <RouterLink :to="toCategoryPath(link)">
                   {{ link.name }}
                 </RouterLink>
               </el-menu-item>
@@ -221,7 +224,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Search, User, ShoppingBag, ArrowDown, ArrowUp, Close, Bell } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage } from "@/utils/dialogMessage";
 import api from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
@@ -322,6 +325,21 @@ const goToAccount = () => {
   router.push('/auth/login');
 };
 
+const normalizeSlug = (value) => {
+  if (!value) return "";
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+};
+
+const toCategoryPath = (category) => {
+  const slug = String(category?.slug || "").trim() || normalizeSlug(category?.name || category?.title);
+  return slug ? `/products/category/${slug}` : "/products";
+};
+
 const categoriesByParent = computed(() => {
   const map = {};
   const menuCategories = categories.value
@@ -350,7 +368,7 @@ const topMenuItems = computed(() => {
   return roots.map((item) => ({
     key: String(item.id),
     label: (item.name || '').toUpperCase(),
-    to: `/products?category=${item.id}`
+    to: toCategoryPath(item)
   }));
 });
 
@@ -365,9 +383,10 @@ const megaMenuMap = computed(() => {
       return {
         id: child.id,
         title: child.name,
+        slug: child.slug,
         links: grandChildren.length
-          ? grandChildren.map((node) => ({ id: node.id, name: node.name }))
-          : [{ id: child.id, name: `All ${child.name}` }]
+          ? grandChildren.map((node) => ({ id: node.id, name: node.name, slug: node.slug }))
+          : [{ id: child.id, name: `All ${child.name}`, slug: child.slug }]
       };
     });
   }
@@ -562,13 +581,39 @@ onBeforeUnmount(() => {
   font-weight: 600;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 8px;
+  padding: 0 12px;
   cursor: pointer;
   transition: opacity 0.2s;
 
   &:hover {
     opacity: 0.9;
+  }
+}
+
+.promo-marquee {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.promo-marquee-text {
+  display: inline-block;
+  padding-left: 100%;
+  animation: promo-marquee 14s linear infinite;
+}
+
+.promo-toggle-icon {
+  flex-shrink: 0;
+}
+
+@keyframes promo-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
   }
 }
 

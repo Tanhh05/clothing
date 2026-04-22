@@ -24,6 +24,7 @@ public class OrderResponse {
     private String shippingStatus;
     private LocalDateTime shippingUpdatedAt;
     private String address;
+    private String note;
     private Long subTotal;
     private Long shippingFee;
     private Long discountAmount;
