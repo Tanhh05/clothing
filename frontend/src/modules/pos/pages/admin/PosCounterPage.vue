@@ -1,300 +1,352 @@
 <template>
-  <section class="pos-counter-page admin-page-shell" v-loading="loading">
-    <el-card shadow="never" class="kv-header-card">
-      <div class="kv-header">
-        <div class="kv-header-title">
-          <strong>Bán hàng tại quầy</strong>
-          <span>F2/F3 tìm hàng · F8 thanh toán · F9 in hóa đơn</span>
-        </div>
-        <el-space wrap>
-          <el-button @click="goBackToAdmin">Quay lại</el-button>
-          <el-button :icon="Refresh" @click="bootstrap">Làm mới</el-button>
-          <el-button type="primary" :icon="Plus" @click="createInvoiceTab">Tạo hóa đơn</el-button>
-        </el-space>
-      </div>
-      <el-tabs v-model="activeInvoiceId" type="card" closable @tab-remove="removeInvoiceTab">
-        <el-tab-pane
-          v-for="tab in invoices"
-          :key="tab.id"
-          :name="tab.id"
-          :label="tab.code + (tab.status === 'PAID' ? ' • Đã thanh toán' : '')"
-        />
-      </el-tabs>
-    </el-card>
+  <section class="pos-page" v-loading="loading">
+    <el-container class="pos-shell">
+      <el-header class="pos-header">
+        <el-row :gutter="10" align="middle">
+          <el-col :xs="24" :lg="8">
+            <div class="pos-search-box">
+              <el-input ref="searchInputRef" v-model="productKeyword" clearable placeholder="Tìm sản phẩm / mã vạch">
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
 
-    <div class="kv-layout">
-      <el-card shadow="never" class="kv-products">
-        <div class="kv-panel-head">
-          <el-space>
-            <el-icon><Search /></el-icon>
-            <strong>Danh sách hàng hóa</strong>
-          </el-space>
-          <el-space>
-            <el-tag effect="plain">{{ filteredProducts.length }} sản phẩm</el-tag>
-            <el-tag type="success" effect="plain">{{ cartQuantity }} món trong giỏ</el-tag>
-          </el-space>
-        </div>
+              <el-card v-if="productKeyword.trim()" shadow="always" class="pos-search-dropdown">
+                <el-empty v-if="!paginatedProducts.length" description="Không có sản phẩm phù hợp" :image-size="56" />
 
-        <el-input
-          ref="searchInputRef"
-          v-model="productKeyword"
-          clearable
-          placeholder="Tìm theo tên sản phẩm, SKU, size, màu"
-          class="kv-search"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
+                <div v-else class="pos-search-list">
+                  <div
+                    v-for="product in paginatedProducts"
+                    :key="product.id"
+                    class="pos-search-item-compact"
+                    @click="addProductToInvoice(product)"
+                  >
+                    <el-image :src="product.imageUrl || fallbackImage" fit="cover" class="pos-search-thumb" @error="onVariantImageError" />
+                    <div class="pos-search-content">
+                      <div class="pos-search-row-1">
+                        <strong class="pos-search-name">{{ product.productName }}</strong>
+                        <strong class="pos-search-price">{{ selectedVariantPrice(product) }}</strong>
+                      </div>
+                      <div class="pos-search-sku">{{ selectedVariant(product)?.sku || "-" }}</div>
+                      <div class="pos-search-meta">Tồn: {{ selectedVariantStock(product) }}</div>
+                    </div>
+                  </div>
+                  <el-button text type="primary" class="pos-search-footer" @click="openProductCreateDrawer">
+                    + Thêm mới hàng hóa
+                  </el-button>
+                </div>
 
-        <div class="kv-variant-list">
-          <article v-for="product in paginatedProducts" :key="product.id" class="kv-variant-card">
-            <img
-              :src="product.imageUrl || fallbackImage"
-              alt="product"
-              class="kv-variant-thumb"
-              @error="onVariantImageError"
-            />
-            <div class="kv-variant-main">
-              <p class="kv-variant-name">{{ product.productName }}</p>
-              <p class="kv-variant-meta">
-                {{ product.variants.length }} biến thể
-              </p>
-              <div class="kv-variant-attrs">
-                <el-select
-                  v-model="getProductSelection(product).size"
-                  placeholder="Size"
-                  class="kv-variant-select"
-                  @change="syncColorSelection(product)"
-                >
-                  <el-option
-                    v-for="item in sizeOptions(product)"
-                    :key="`size-${product.id}-${item.value}`"
-                    :label="item.label"
-                    :value="item.value"
-                  />
-                </el-select>
-                <el-select
-                  v-model="getProductSelection(product).color"
-                  placeholder="Màu"
-                  class="kv-variant-select"
-                >
-                  <el-option
-                    v-for="item in colorOptions(product)"
-                    :key="`color-${product.id}-${item.value}`"
-                    :label="item.label"
-                    :value="item.value"
-                  />
-                </el-select>
-              </div>
-              <p class="kv-variant-pick">
-                Giá: <strong>{{ selectedVariantPrice(product) }}</strong> · Tồn: {{ selectedVariantStock(product) }}
-              </p>
-            </div>
-            <el-input-number
-              v-model="getProductSelection(product).tempQty"
-              :min="1"
-              :max="selectedVariantStock(product)"
-              controls-position="right"
-              size="small"
-            />
-            <el-button type="primary" :icon="CirclePlus" @click="addProductToInvoice(product)">Thêm</el-button>
-          </article>
-        </div>
-        <div class="kv-pagination">
-          <el-pagination
-            v-model:current-page="productPage"
-            :page-size="PRODUCTS_PER_PAGE"
-            :total="filteredProducts.length"
-            layout="prev, pager, next"
-            background
-            small
-          />
-        </div>
-      </el-card>
-
-      <el-card shadow="never" class="kv-order">
-        <div class="kv-panel-head">
-          <el-space>
-            <el-icon><Tickets /></el-icon>
-            <strong>{{ activeInvoice.code }}</strong>
-            <el-tag v-if="activeInvoice.orderId" effect="plain">Order #{{ activeInvoice.orderId }}</el-tag>
-          </el-space>
-          <el-space>
-            <el-tag effect="plain">{{ activeInvoice.items.length }} dòng SP</el-tag>
-            <el-tag :type="activeInvoice.status === 'PAID' ? 'success' : 'warning'" effect="dark">
-              {{ activeInvoice.status === "PAID" ? "ĐÃ THANH TOÁN" : "TẠM GIỮ" }}
-            </el-tag>
-          </el-space>
-        </div>
-
-        <el-table :data="activeInvoice.items" size="small" stripe class="kv-cart-table" empty-text="Chưa có sản phẩm">
-          <el-table-column label="Sản phẩm" min-width="220">
-            <template #default="{ row }">
-              <div class="item-cell">
-                <strong>{{ row.productName }}</strong>
-                <span>{{ row.sku }} · {{ row.size || "-" }} / {{ row.color || "-" }}</span>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="SL" width="120">
-            <template #default="{ row }">
-              <el-input-number
-                :model-value="row.quantity"
-                :min="1"
-                :max="row.maxStock || 9999"
-                size="small"
-                controls-position="right"
-                @change="(value) => updateItemQty(row.variantId, value)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="Giá" width="130">
-            <template #default="{ row }">{{ formatCurrency(row.price) }}</template>
-          </el-table-column>
-          <el-table-column label="Thành tiền" width="130">
-            <template #default="{ row }">{{ formatCurrency(row.quantity * row.price) }}</template>
-          </el-table-column>
-          <el-table-column width="66">
-            <template #default="{ row }">
-              <el-button type="danger" text :icon="Delete" @click="removeItem(row.variantId)" />
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <div class="kv-form-grid">
-          <el-form-item label="Khách hàng">
-            <el-select
-              v-model="activeInvoice.customerId"
-              filterable
-              clearable
-              placeholder="Khách lẻ"
-              @change="handleCustomerChange"
-            >
-              <el-option label="Khách lẻ" :value="null" />
-              <el-option
-                v-for="customer in customerOptions"
-                :key="customer.id"
-                :label="customerLabel(customer)"
-                :value="customer.id"
-              />
-            </el-select>
-          </el-form-item>
-
-          <el-form-item label="Voucher">
-            <el-space wrap>
-              <el-select
-                v-model="activeInvoice.voucherCode"
-                filterable
-                clearable
-                placeholder="Không áp dụng"
-                @change="validateVoucherSelection"
-              >
-                <el-option
-                  v-for="voucher in voucherOptions"
-                  :key="voucher.code"
-                  :label="voucherLabel(voucher)"
-                  :value="voucher.code"
+                <el-pagination
+                  v-if="filteredProducts.length > PRODUCTS_PER_PAGE"
+                  v-model:current-page="productPage"
+                  :page-size="PRODUCTS_PER_PAGE"
+                  :total="filteredProducts.length"
+                  layout="prev, pager, next"
+                  background
+                  class="pos-pagination"
                 />
-              </el-select>
-              <el-button plain :icon="MagicStick" @click="applyBestVoucher">Gợi ý</el-button>
-            </el-space>
-          </el-form-item>
-
-          <el-form-item label="Giảm tay">
-            <el-input-number v-model="activeInvoice.manualDiscount" :min="0" :step="1000" controls-position="right" />
-          </el-form-item>
-
-          <el-form-item label="Giao hàng">
-            <el-switch v-model="activeInvoice.shipEnabled" />
-          </el-form-item>
-        </div>
-
-        <el-collapse-transition>
-          <div v-if="activeInvoice.shipEnabled" class="kv-ship-box">
-            <el-alert type="info" show-icon :closable="false" title="Đơn ship: nhập thông tin người nhận." />
-            <div class="kv-ship-grid">
-              <el-input v-model="activeInvoice.recipientName" placeholder="Tên người nhận" />
-              <el-input v-model="activeInvoice.phone" placeholder="Số điện thoại" />
-              <el-select
-                v-model="activeInvoice.provinceId"
-                filterable
-                placeholder="Tỉnh/Thành phố"
-                :loading="addressLoading.provinces"
-                @change="handleProvinceChange"
-              >
-                <el-option v-for="item in provinces" :key="item.id" :label="item.name" :value="item.id" />
-              </el-select>
-              <el-select
-                v-model="activeInvoice.districtId"
-                filterable
-                placeholder="Quận/Huyện"
-                :disabled="!activeInvoice.provinceId"
-                :loading="addressLoading.districts"
-                @change="handleDistrictChange"
-              >
-                <el-option v-for="item in districts" :key="item.id" :label="item.name" :value="item.id" />
-              </el-select>
-              <el-select
-                v-model="activeInvoice.wardId"
-                filterable
-                placeholder="Phường/Xã"
-                :disabled="!activeInvoice.districtId"
-                :loading="addressLoading.wards"
-                @change="handleWardChange"
-              >
-                <el-option v-for="item in wards" :key="item.id" :label="item.name" :value="item.id" />
-              </el-select>
-              <el-input-number v-model="activeInvoice.shippingFee" :min="0" :step="5000" controls-position="right" />
+              </el-card>
             </div>
-            <el-input
-              v-model="activeInvoice.address"
-              type="textarea"
-              :rows="2"
-              placeholder="Số nhà, tên đường, toà nhà..."
-            />
-          </div>
-        </el-collapse-transition>
+          </el-col>
+          <el-col :xs="24" :lg="11" class="pos-tab-col">
+            <el-tabs v-model="activeInvoiceId" type="card" closable @tab-remove="removeInvoiceTab">
+              <el-tab-pane v-for="tab in invoices" :key="tab.id" :name="tab.id" :label="tab.code" />
+            </el-tabs>
+            <el-button type="primary" :icon="Plus" @click="createInvoiceTab"></el-button>
+          </el-col>
+          <el-col :xs="24" :lg="5" class="pos-header-actions">
+            <el-button :icon="Refresh" @click="bootstrap">Làm mới</el-button>
+            <el-button :icon="Printer" @click="printInvoice">In</el-button>
+            <el-button @click="goBackToAdmin">Thoát</el-button>
+          </el-col>
+        </el-row>
+      </el-header>
 
-        <div class="kv-payment-row">
-          <el-form-item label="Thanh toán">
-            <el-radio-group v-model="activeInvoice.paymentMethod">
-              <el-radio-button label="CASH">Tiền mặt</el-radio-button>
-              <el-radio-button label="BANK_TRANSFER">Chuyển khoản</el-radio-button>
-              <el-radio-button label="CARD">Thẻ</el-radio-button>
-            </el-radio-group>
-          </el-form-item>
-          <el-form-item label="Khách đưa">
-            <el-input-number v-model="activeInvoice.paidAmount" :min="0" :step="10000" controls-position="right" />
-          </el-form-item>
-        </div>
+      <el-main class="pos-main">
+        <el-row :gutter="10" class="pos-row">
+          <el-col :xs="24" :lg="17" class="pos-left-col">
+            <el-card shadow="never" class="pos-card pos-order-card">
+              <el-table :data="activeInvoice.items" size="small" stripe empty-text="Chưa có sản phẩm trong hóa đơn">
+                <el-table-column label="Sản phẩm" min-width="240">
+                  <template #default="{ row }">
+                    <el-space direction="vertical" alignment="flex-start" :size="2">
+                      <strong>{{ row.productName }}</strong>
+                      <el-space :size="6" wrap>
+                        <el-select
+                          :model-value="normalizeVariantAttr(row.size)"
+                          size="small"
+                          placeholder="Size"
+                          style="width: 92px"
+                          @change="(size) => handleCartSizeChange(row, size)"
+                        >
+                          <el-option
+                            v-for="item in cartSizeOptions(row)"
+                            :key="`cart-size-${row.variantId}-${item.value}`"
+                            :label="item.label"
+                            :value="item.value"
+                          />
+                        </el-select>
+                        <el-select
+                          :model-value="normalizeVariantAttr(row.color)"
+                          size="small"
+                          placeholder="Màu"
+                          style="width: 110px"
+                          @change="(color) => handleCartColorChange(row, color)"
+                        >
+                          <el-option
+                            v-for="item in cartColorOptions(row)"
+                            :key="`cart-color-${row.variantId}-${item.value}`"
+                            :label="item.label"
+                            :value="item.value"
+                          />
+                        </el-select>
+                        <span>{{ row.sku }}</span>
+                      </el-space>
+                    </el-space>
+                  </template>
+                </el-table-column>
+                <el-table-column label="SL" width="120" align="center" header-align="center">
+                  <template #default="{ row }">
+                    <el-input-number
+                      :model-value="row.quantity"
+                      :min="1"
+                      :max="row.maxStock || 9999"
+                      size="small"
+                      controls-position="right"
+                      class="pos-qty-input"
+                      @change="(value) => updateItemQty(row.variantId, value)"
+                    />
+                  </template>
+                </el-table-column>
+                <el-table-column label="Giá" width="130">
+                  <template #default="{ row }">{{ formatCurrency(row.price) }}</template>
+                </el-table-column>
+                <el-table-column label="Thành tiền" width="140">
+                  <template #default="{ row }">{{ formatCurrency(row.quantity * row.price) }}</template>
+                </el-table-column>
+                <el-table-column width="72">
+                  <template #default="{ row }">
+                    <el-button type="danger" plain :icon="Delete" size="small" @click="removeItem(row.variantId)">Xóa</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-card>
 
-        <div class="kv-summary">
-          <div><span>Tạm tính</span><strong>{{ formatCurrency(subTotal) }}</strong></div>
-          <div><span>Giảm voucher</span><strong>- {{ formatCurrency(voucherDiscount) }}</strong></div>
-          <div><span>Giảm thủ công</span><strong>- {{ formatCurrency(safeManualDiscount) }}</strong></div>
-          <div><span>Phí ship</span><strong>{{ formatCurrency(shippingFee) }}</strong></div>
-          <div><span>Khách thanh toán</span><strong>{{ formatCurrency(paidAmount) }}</strong></div>
-          <div class="kv-total"><span>Tổng cần thu</span><strong>{{ formatCurrency(totalAmount) }}</strong></div>
-          <div><span>Tiền thừa</span><strong>{{ formatCurrency(changeAmount) }}</strong></div>
-        </div>
+            <el-card shadow="never" class="pos-card pos-note-card">
+              <el-input v-model="activeInvoice.note" placeholder="Ghi chú đơn hàng" clearable>
+                <template #prefix>
+                  <el-icon><Tickets /></el-icon>
+                </template>
+              </el-input>
+            </el-card>
+          </el-col>
 
-        <div class="kv-action-row">
-          <el-button type="warning" plain :icon="Delete" @click="clearCurrentInvoice">Xóa trắng</el-button>
-          <el-button type="success" plain :icon="Printer" @click="printInvoice">In hóa đơn</el-button>
-          <el-button type="primary" :icon="Select" @click="checkoutInvoice">Thanh toán ngay</el-button>
-        </div>
-      </el-card>
-    </div>
+          <el-col :xs="24" :lg="7" class="pos-right-col">
+            <el-card shadow="never" class="pos-card pos-sidebar-card">
+              <el-form label-position="top">
+                <el-form-item label="Khách hàng" class="pos-customer-form-item">
+                  <div class="pos-customer-search">
+                    <el-input
+                      v-model="customerKeyword"
+                      clearable
+                      placeholder="Tìm khách hàng (F4)"
+                      class="pos-customer-input"
+                      @keyup.enter="applyCustomerSearch()"
+                      @clear="clearCustomerSearch"
+                    >
+                      <template #prefix>
+                        <el-icon><Search /></el-icon>
+                      </template>
+                    </el-input>
+                    <el-button :icon="Plus" class="pos-customer-add-btn" @click="handleAddCustomerClick" />
+                  </div>
+                  <div v-if="showCustomerSuggestions" class="pos-customer-suggestion-list">
+                    <button
+                      v-for="customer in filteredCustomerSuggestions"
+                      :key="customer.id"
+                      type="button"
+                      class="pos-customer-suggestion-item"
+                      @click="selectCustomerSuggestion(customer)"
+                    >
+                      {{ customerLabel(customer) }}
+                    </button>
+                  </div>
+                  <div class="pos-customer-result">
+                    {{ activeInvoice.customer ? customerLabel(activeInvoice.customer) : "Khách lẻ" }}
+                  </div>
+                </el-form-item>
+
+                <el-form-item label="Voucher">
+                  <el-select
+                    v-model="activeInvoice.voucherCode"
+                    filterable
+                    clearable
+                    placeholder="Không áp dụng"
+                    @change="validateVoucherSelection"
+                  >
+                    <el-option
+                      v-for="voucher in voucherOptions"
+                      :key="voucher.code"
+                      :label="voucherLabel(voucher)"
+                      :value="voucher.code"
+                    />
+                  </el-select>
+                  <el-button text :icon="MagicStick" @click="applyBestVoucher">Gợi ý voucher</el-button>
+                  <el-text v-if="activeInvoice.voucherCode" type="primary">
+                    Đã áp mã: {{ activeInvoice.voucherCode }} (giảm {{ formatCurrency(voucherDiscount) }})
+                  </el-text>
+                </el-form-item>
+
+                <el-form-item label="Loại đơn hàng">
+                  <el-radio-group v-model="fulfillmentMode">
+                    <el-radio value="COUNTER" @click="handleFulfillmentRadioClick('COUNTER')">Mua tại quầy</el-radio>
+                    <el-radio value="DELIVERY" @click="handleFulfillmentRadioClick('DELIVERY')">Mua giao hàng</el-radio>
+                  </el-radio-group>
+                </el-form-item>
+                <el-alert
+                  v-if="activeInvoice.shipEnabled"
+                  title="Đang bật giao hàng. Vui lòng nhập địa chỉ trong ngăn kéo bên phải."
+                  type="info"
+                  :closable="false"
+                  show-icon
+                />
+                <el-alert
+                  v-else
+                  title="Đơn mua tại quầy (không tính phí ship)"
+                  type="success"
+                  :closable="false"
+                  show-icon
+                />
+
+                <el-descriptions :column="1" border>
+                  <el-descriptions-item label="Tổng tiền hàng">{{ formatCurrency(subTotal) }}</el-descriptions-item>
+                  <el-descriptions-item label="Tạm tính (gồm phí ship)">{{ formatCurrency(subTotal + shippingFee) }}</el-descriptions-item>
+                  <el-descriptions-item label="Giảm giá">{{ formatCurrency(voucherDiscount + safeManualDiscount) }}</el-descriptions-item>
+                  <el-descriptions-item label="Phí ship">{{ formatCurrency(shippingFee) }}</el-descriptions-item>
+                  <el-descriptions-item label="Khách cần trả">{{ formatCurrency(totalAmount) }}</el-descriptions-item>
+                </el-descriptions>
+
+                <el-form-item label="Thanh toán">
+                  <el-radio-group v-model="activeInvoice.paymentMethod">
+                    <el-radio value="CASH">Tiền mặt</el-radio>
+                    <el-radio value="BANK_TRANSFER">Chuyển khoản</el-radio>
+                  </el-radio-group>
+                </el-form-item>
+              </el-form>
+
+              <el-card v-if="activeInvoice.paymentMethod === 'BANK_TRANSFER'" shadow="never" class="pos-card pos-qr-card">
+                <el-alert
+                  :title="
+                    activeInvoice.orderId && activeInvoice.paymentUrl
+                      ? `Đơn #${activeInvoice.orderId} đang chờ thanh toán trên MoMo IoT`
+                      : 'Nhấn THANH TOÁN để chuyển sang giao diện MoMo IoT'
+                  "
+                  type="info"
+                  :closable="false"
+                  show-icon
+                />
+                <el-button
+                  v-if="activeInvoice.orderId && activeInvoice.paymentUrl"
+                  @click="openMomoIotPage(activeInvoice.orderId, activeInvoice.paymentUrl)"
+                >
+                  Mở lại MoMo IoT
+                </el-button>
+              </el-card>
+
+              <el-button :icon="Select" type="primary" class="pos-checkout-btn" @click="checkoutInvoice">THANH TOÁN</el-button>
+            </el-card>
+          </el-col>
+        </el-row>
+      </el-main>
+    </el-container>
+
+    <el-drawer
+      v-model="deliveryDrawerVisible"
+      title="Thông tin giao hàng"
+      direction="rtl"
+      size="clamp(360px, 29.2vw, 520px)"
+      :modal="false"
+      :with-header="true"
+      :append-to-body="true"
+      class="pos-ship-drawer"
+    >
+      <el-form label-position="top">
+        <el-form-item label="Tên người nhận">
+          <el-input v-model="activeInvoice.recipientName" />
+        </el-form-item>
+        <el-form-item label="Số điện thoại">
+          <el-input v-model="activeInvoice.phone" />
+        </el-form-item>
+        <el-form-item label="Tỉnh/Thành">
+          <el-select
+            v-model="activeInvoice.provinceId"
+            filterable
+            placeholder="Tỉnh/Thành phố"
+            :loading="addressLoading.provinces"
+            @change="handleProvinceChange"
+          >
+            <el-option v-for="item in provinces" :key="item.id" :label="item.name" :value="item.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="Quận/Huyện">
+          <el-select
+            v-model="activeInvoice.districtId"
+            filterable
+            placeholder="Quận/Huyện"
+            :disabled="!activeInvoice.provinceId"
+            :loading="addressLoading.districts"
+            @change="handleDistrictChange"
+          >
+            <el-option v-for="item in districts" :key="item.id" :label="item.name" :value="item.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="Phường/Xã">
+          <el-select
+            v-model="activeInvoice.wardId"
+            filterable
+            placeholder="Phường/Xã"
+            :disabled="!activeInvoice.districtId"
+            :loading="addressLoading.wards"
+            @change="handleWardChange"
+          >
+            <el-option v-for="item in wards" :key="item.id" :label="item.name" :value="item.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="Địa chỉ chi tiết">
+          <el-input v-model="activeInvoice.address" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-form-item label="Phương thức giao hàng">
+          <el-radio-group v-model="activeInvoice.deliveryMethod">
+            <el-radio value="GHN">GHN</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-alert
+          :title="`Phí ship tự động: ${formatCurrency(shippingFee)}`"
+          type="info"
+          :closable="false"
+          show-icon
+          v-loading="addressLoading.shippingFee"
+        />
+      </el-form>
+      <template #footer>
+        <el-button @click="closeShipDrawer">Đóng</el-button>
+        <el-button type="primary" @click="confirmDeliveryMethod">Xác nhận phương thức giao hàng</el-button>
+      </template>
+    </el-drawer>
+
+    <ProductAdminPage
+      v-if="productCreateDrawerVisible"
+      create-only
+      @close-request="productCreateDrawerVisible = false"
+      @created="handleProductCreated"
+    />
   </section>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
 import {
-  CirclePlus,
   Delete,
   MagicStick,
   Plus,
@@ -308,12 +360,15 @@ import { productApi } from "@/modules/product/api/productApi";
 import { customerApi } from "@/modules/customer/api/customerApi";
 import { voucherApi } from "@/modules/voucher/api/voucherApi";
 import { orderApi } from "@/modules/order/api/orderApi";
+import { posDraftApi } from "@/modules/pos/api/posDraftApi";
 import { addressApi } from "@/modules/address/api/addressApi";
+import ProductAdminPage from "@/modules/product/pages/admin/ProductAdminPage.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 const loading = ref(false);
 const router = useRouter();
 const productKeyword = ref("");
+const customerKeyword = ref("");
 const searchInputRef = ref(null);
 const products = ref([]);
 const customers = ref([]);
@@ -324,12 +379,23 @@ const wards = ref([]);
 const addressLoading = ref({
   provinces: false,
   districts: false,
-  wards: false
+  wards: false,
+  shippingFee: false
 });
 const PRODUCTS_PER_PAGE = 5;
 const productPage = ref(1);
 const fallbackImage = "https://via.placeholder.com/72x72?text=IMG";
+const deliveryDrawerVisible = ref(false);
+const productCreateDrawerVisible = ref(false);
 const productSelections = ref({});
+const POS_DRAFT_STORAGE_KEY_PREFIX = "pos_counter_draft_v1";
+const POS_TERMINAL_ID_KEY = "pos_counter_terminal_id";
+const POS_DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+const terminalId = ref("");
+let saveLocalDraftTimer = null;
+let saveServerDraftTimer = null;
+let isSavingServerDraft = false;
+let isRestoringDraft = false;
 
 const invoiceSeed = ref(1);
 
@@ -341,6 +407,7 @@ const createInvoice = () => {
     id,
     code,
     orderId: null,
+    paymentUrl: "",
     status: "DRAFT",
     items: [],
     customerId: null,
@@ -348,6 +415,8 @@ const createInvoice = () => {
     voucherCode: "",
     manualDiscount: 0,
     shipEnabled: false,
+    deliveryMethod: "GHN",
+    deliveryMethodConfirmed: false,
     shippingFee: 0,
     recipientName: "",
     phone: "",
@@ -360,14 +429,48 @@ const createInvoice = () => {
     ward: "",
     paymentMethod: "CASH",
     paidAmount: 0,
-    paidAt: null
+    paidAt: null,
+    note: ""
   };
 };
+
+const hasInvoiceMeaningfulData = (invoice) => {
+  if (!invoice) return false;
+  return Boolean(
+    (Array.isArray(invoice.items) && invoice.items.length > 0)
+      || invoice.customerId
+      || String(invoice.voucherCode || "").trim()
+      || Number(invoice.manualDiscount || 0) > 0
+      || Number(invoice.shippingFee || 0) > 0
+      || String(invoice.note || "").trim()
+      || String(invoice.status || "").toUpperCase() === "WAITING_PAYMENT"
+      || invoice.orderId
+      || String(invoice.paymentUrl || "").trim()
+  );
+};
+
+const getOrCreateTerminalId = () => {
+  try {
+    const existing = localStorage.getItem(POS_TERMINAL_ID_KEY);
+    if (existing && existing.trim()) return existing.trim();
+    const generated = `pos-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    localStorage.setItem(POS_TERMINAL_ID_KEY, generated);
+    return generated;
+  } catch (_error) {
+    return `pos-${Date.now()}`;
+  }
+};
+
+const localDraftStorageKey = () => `${POS_DRAFT_STORAGE_KEY_PREFIX}_${terminalId.value || "default"}`;
 
 const initialInvoice = createInvoice();
 const invoices = ref([initialInvoice]);
 const activeInvoiceId = ref(initialInvoice.id);
-const { confirm } = useConfirmDialog();
+const { confirm, showAlert } = useConfirmDialog();
+const notifyInfo = (message) => void showAlert(message, "Thông báo");
+const notifySuccess = (message) => void showAlert(message, "Thành công");
+const notifyWarning = (message) => void showAlert(message, "Cảnh báo");
+const notifyError = (message) => void showAlert(message, "Lỗi");
 
 const activeInvoice = computed(() => invoices.value.find((item) => item.id === activeInvoiceId.value) || null);
 
@@ -396,7 +499,7 @@ const normalizedProducts = computed(() => {
 
 const filteredProducts = computed(() => {
   const q = productKeyword.value.trim().toLowerCase();
-  if (!q) return normalizedProducts.value;
+  if (!q) return [];
   return normalizedProducts.value.filter((product) => {
     const variantBlob = product.variants
       .map((variant) => `${variant.sku || ""} ${variant.size || ""} ${variant.color || ""}`)
@@ -425,6 +528,9 @@ watch(filteredProducts, (items) => {
 
 watch(activeInvoiceId, async () => {
   if (!activeInvoice.value) return;
+  customerKeyword.value = activeInvoice.value.customer
+    ? activeInvoice.value.customer.fullName || activeInvoice.value.customer.phone || String(activeInvoice.value.customer.id)
+    : "";
   if (activeInvoice.value.provinceId) {
     await fetchDistricts(activeInvoice.value.provinceId);
   } else {
@@ -437,11 +543,205 @@ watch(activeInvoiceId, async () => {
   }
 });
 
+watch(
+  () => activeInvoice.value?.shipEnabled,
+  async (enabled) => {
+    if (!enabled) {
+      if (activeInvoice.value) {
+        activeInvoice.value.shippingFee = 0;
+      }
+      return;
+    }
+    await hydrateShippingFromCustomer();
+    recalculateShippingFee();
+  }
+);
+
+const clearPosDraftStorage = () => {
+  try {
+    localStorage.removeItem(localDraftStorageKey());
+  } catch (_error) {
+    // Ignore storage errors.
+  }
+};
+
+const buildDraftPayload = () => ({
+  savedAt: Date.now(),
+  activeInvoiceId: activeInvoiceId.value,
+  invoices: invoices.value.map((invoice) => ({
+    ...invoice,
+    customer: null
+  }))
+});
+
+const savePosDraftToStorage = () => {
+  if (isRestoringDraft) return;
+  const hasMeaningfulData = invoices.value.some(hasInvoiceMeaningfulData);
+  if (!hasMeaningfulData) {
+    clearPosDraftStorage();
+    return;
+  }
+  try {
+    localStorage.setItem(localDraftStorageKey(), JSON.stringify(buildDraftPayload()));
+  } catch (_error) {
+    // Ignore storage quota/runtime errors to avoid blocking POS flow.
+  }
+};
+
+const deletePosDraftOnServer = async () => {
+  if (!terminalId.value) return;
+  try {
+    await posDraftApi.deleteDraft(terminalId.value);
+  } catch (_error) {
+    // Keep local fallback and continue POS flow.
+  }
+};
+
+const savePosDraftToServer = async () => {
+  if (isRestoringDraft || isSavingServerDraft || !terminalId.value) return;
+  const hasMeaningfulData = invoices.value.some(hasInvoiceMeaningfulData);
+  if (!hasMeaningfulData) {
+    await deletePosDraftOnServer();
+    return;
+  }
+  isSavingServerDraft = true;
+  try {
+    await posDraftApi.saveDraft({
+      terminalId: terminalId.value,
+      payload: buildDraftPayload()
+    });
+  } catch (_error) {
+    // Keep local fallback and continue POS flow.
+  } finally {
+    isSavingServerDraft = false;
+  }
+};
+
+const schedulePosDraftSave = () => {
+  if (isRestoringDraft) return;
+  if (saveLocalDraftTimer) {
+    clearTimeout(saveLocalDraftTimer);
+  }
+  saveLocalDraftTimer = setTimeout(() => {
+    savePosDraftToStorage();
+  }, 700);
+  if (saveServerDraftTimer) {
+    clearTimeout(saveServerDraftTimer);
+  }
+  saveServerDraftTimer = setTimeout(() => {
+    void savePosDraftToServer();
+  }, 5000);
+};
+
+const applyDraftPayload = async (parsed, sourceLabel) => {
+  const savedAt = Number(parsed?.savedAt || 0);
+  const draftInvoices = Array.isArray(parsed?.invoices) ? parsed.invoices : [];
+  if (!savedAt || Date.now() - savedAt > POS_DRAFT_TTL_MS || !draftInvoices.length) {
+    return false;
+  }
+
+  try {
+    await confirm({
+      title: "Khôi phục nháp POS",
+      message: `Phát hiện dữ liệu nháp chưa hoàn tất (${sourceLabel}). Bạn có muốn khôi phục?`,
+      confirmButtonText: "Khôi phục",
+      cancelButtonText: "Bỏ qua"
+    });
+  } catch {
+    return false;
+  }
+
+  isRestoringDraft = true;
+  try {
+    const restoredInvoices = draftInvoices.map((draft) => {
+      const fallback = createInvoice();
+      const customerId = draft?.customerId ?? null;
+      return {
+        ...fallback,
+        ...draft,
+        id: String(draft?.id || fallback.id),
+        code: String(draft?.code || fallback.code),
+        customerId,
+        customer: customerId ? customerOptions.value.find((item) => item.id === customerId) || null : null,
+        items: Array.isArray(draft?.items) ? draft.items : [],
+        paymentUrl: String(draft?.paymentUrl || "")
+      };
+    });
+
+    const maxCode = restoredInvoices.reduce((max, invoice) => {
+      const matched = String(invoice.code || "").match(/^HD(\d+)$/);
+      const number = matched ? Number(matched[1]) : 0;
+      return Math.max(max, Number.isFinite(number) ? number : 0);
+    }, 0);
+    if (maxCode > 0) {
+      invoiceSeed.value = maxCode + 1;
+    }
+
+    invoices.value = restoredInvoices;
+    const restoredActiveId = String(parsed?.activeInvoiceId || "");
+    activeInvoiceId.value = restoredInvoices.some((item) => item.id === restoredActiveId)
+      ? restoredActiveId
+      : restoredInvoices[0].id;
+    notifySuccess(`Đã khôi phục nháp POS từ ${sourceLabel}`);
+    return true;
+  } finally {
+    isRestoringDraft = false;
+  }
+};
+
+const restorePosDraftFromServer = async () => {
+  if (!terminalId.value) return false;
+  try {
+    const { data } = await posDraftApi.getDraft(terminalId.value);
+    const payload = data?.payload;
+    if (!payload || typeof payload !== "object") return false;
+    return await applyDraftPayload(payload, "server");
+  } catch (_error) {
+    return false;
+  }
+};
+
+const restorePosDraftFromStorage = async () => {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(localDraftStorageKey());
+  } catch (_error) {
+    raw = null;
+  }
+  if (!raw) return false;
+
+  let parsed = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (_error) {
+    clearPosDraftStorage();
+    return false;
+  }
+  const restored = await applyDraftPayload(parsed, "local");
+  if (!restored) {
+    clearPosDraftStorage();
+  }
+  return restored;
+};
+
 const customerOptions = computed(() =>
   customers.value.filter((item) => String(item.status || "").toUpperCase() === "ACTIVE")
 );
 const voucherOptions = computed(() =>
   vouchers.value.filter((item) => String(item.status || "").toUpperCase() === "ACTIVE")
+);
+const filteredCustomerSuggestions = computed(() => {
+  const keyword = customerKeyword.value.trim().toLowerCase();
+  if (!keyword) return [];
+  return customerOptions.value
+    .filter((item) => {
+      const blob = `${item.id} ${item.fullName || ""} ${item.phone || ""} ${item.email || ""}`.toLowerCase();
+      return blob.includes(keyword);
+    })
+    .slice(0, 8);
+});
+const showCustomerSuggestions = computed(
+  () => Boolean(customerKeyword.value.trim()) && filteredCustomerSuggestions.value.length > 0
 );
 const cartQuantity = computed(() => {
   if (!activeInvoice.value) return 0;
@@ -484,6 +784,51 @@ const shippingFee = computed(() => {
 const totalAmount = computed(() => Math.max(0, subTotal.value - voucherDiscount.value - safeManualDiscount.value + shippingFee.value));
 const paidAmount = computed(() => Math.max(0, Number(activeInvoice.value?.paidAmount || 0)));
 const changeAmount = computed(() => Math.max(0, paidAmount.value - totalAmount.value));
+const isMomoTransfer = computed(() => activeInvoice.value?.paymentMethod === "BANK_TRANSFER");
+const resetShippingState = () => {
+  if (!activeInvoice.value) return;
+  activeInvoice.value.shippingFee = 0;
+  activeInvoice.value.recipientName = "";
+  activeInvoice.value.phone = "";
+  activeInvoice.value.address = "";
+  activeInvoice.value.provinceId = "";
+  activeInvoice.value.districtId = "";
+  activeInvoice.value.wardId = "";
+  activeInvoice.value.province = "";
+  activeInvoice.value.district = "";
+  activeInvoice.value.ward = "";
+  activeInvoice.value.deliveryMethodConfirmed = false;
+  deliveryDrawerVisible.value = false;
+};
+const fulfillmentMode = computed({
+  get: () => (activeInvoice.value?.shipEnabled ? "DELIVERY" : "COUNTER"),
+  set: (mode) => {
+    if (!activeInvoice.value) return;
+    const isDelivery = mode === "DELIVERY";
+    activeInvoice.value.shipEnabled = isDelivery;
+    activeInvoice.value.deliveryMethodConfirmed = false;
+    deliveryDrawerVisible.value = isDelivery;
+    if (!isDelivery) {
+      resetShippingState();
+      activeInvoice.value.shipEnabled = false;
+    }
+    if (isDelivery && activeInvoice.value.customerId) {
+      void hydrateShippingFromCustomer().then(() => recalculateShippingFee());
+    }
+  }
+});
+const handleFulfillmentRadioClick = (mode) => {
+  if (!activeInvoice.value) return;
+  if (mode === "DELIVERY") {
+    if (activeInvoice.value.shipEnabled) {
+      deliveryDrawerVisible.value = true;
+      return;
+    }
+    fulfillmentMode.value = "DELIVERY";
+    return;
+  }
+  fulfillmentMode.value = "COUNTER";
+};
 
 const activeStep = computed(() => {
   if (!activeInvoice.value) return 0;
@@ -576,6 +921,82 @@ const selectedVariantPrice = (product) => {
   return formatCurrency(selectedVariant(product)?.price || 0);
 };
 
+const getItemVariants = (item) => {
+  if (Array.isArray(item?.productVariants) && item.productVariants.length) {
+    return item.productVariants;
+  }
+  const product = normalizedProducts.value.find((entry) => entry.id === item?.productId);
+  return product?.variants || [];
+};
+
+const cartSizeOptions = (item) => {
+  const variants = getItemVariants(item);
+  return [...new Set(variants.map((variant) => normalizeVariantAttr(variant.size)))].map(toVariantOption);
+};
+
+const cartColorOptions = (item, size = item?.size) => {
+  const normalizedSize = normalizeVariantAttr(size);
+  const variants = getItemVariants(item);
+  const colorsBySize = variants
+    .filter((variant) => normalizeVariantAttr(variant.size) === normalizedSize)
+    .map((variant) => normalizeVariantAttr(variant.color));
+  const colors = colorsBySize.length ? colorsBySize : variants.map((variant) => normalizeVariantAttr(variant.color));
+  return [...new Set(colors)].map(toVariantOption);
+};
+
+const resolveItemVariant = (item, size = item?.size, color = item?.color) => {
+  const variants = getItemVariants(item);
+  const normalizedSize = normalizeVariantAttr(size);
+  const normalizedColor = normalizeVariantAttr(color);
+  return (
+    variants.find(
+      (variant) =>
+        normalizeVariantAttr(variant.size) === normalizedSize && normalizeVariantAttr(variant.color) === normalizedColor
+    ) ||
+    variants.find((variant) => normalizeVariantAttr(variant.size) === normalizedSize) ||
+    variants[0] ||
+    null
+  );
+};
+
+const applyItemVariant = (item, nextVariant) => {
+  if (!activeInvoice.value || !item || !nextVariant) return;
+  const duplicated = activeInvoice.value.items.find((entry) => entry !== item && entry.variantId === nextVariant.variantId);
+  if (duplicated) {
+    const mergedQty = Number(duplicated.quantity || 0) + Number(item.quantity || 0);
+    if (mergedQty > Number(nextVariant.stock || 0)) {
+      notifyWarning("Không thể đổi biến thể vì vượt tồn kho");
+      return;
+    }
+    duplicated.quantity = mergedQty;
+    duplicated.maxStock = Number(nextVariant.stock || duplicated.maxStock || 0);
+    activeInvoice.value.items = activeInvoice.value.items.filter((entry) => entry !== item);
+    return;
+  }
+  item.variantId = nextVariant.variantId;
+  item.sku = nextVariant.sku;
+  item.size = nextVariant.size;
+  item.color = nextVariant.color;
+  item.price = Number(nextVariant.price || 0);
+  item.maxStock = Number(nextVariant.stock || 0);
+  if (item.quantity > item.maxStock) {
+    item.quantity = Math.max(1, item.maxStock);
+    notifyWarning("Số lượng được điều chỉnh theo tồn kho của biến thể mới");
+  }
+};
+
+const handleCartSizeChange = (item, size) => {
+  const colors = cartColorOptions(item, size);
+  const fallbackColor = colors.find((entry) => entry.value === normalizeVariantAttr(item.color))?.value || colors[0]?.value || "";
+  const nextVariant = resolveItemVariant(item, size, fallbackColor);
+  applyItemVariant(item, nextVariant);
+};
+
+const handleCartColorChange = (item, color) => {
+  const nextVariant = resolveItemVariant(item, item?.size, color);
+  applyItemVariant(item, nextVariant);
+};
+
 const customerLabel = (customer) => {
   const name = customer.fullName || customer.username || "N/A";
   const phone = customer.phone || "N/A";
@@ -600,9 +1021,22 @@ const goBackToAdmin = () => {
   router.push("/admin");
 };
 
+const openProductCreateDrawer = async () => {
+  if (productCreateDrawerVisible.value) {
+    productCreateDrawerVisible.value = false;
+    await nextTick();
+  }
+  productCreateDrawerVisible.value = true;
+};
+
+const handleProductCreated = async () => {
+  productCreateDrawerVisible.value = false;
+  await loadProducts();
+};
+
 const removeInvoiceTab = async (tabId) => {
   if (invoices.value.length <= 1) {
-    ElMessage.warning("Cần giữ ít nhất một hóa đơn");
+    notifyWarning("Cần giữ ít nhất một hóa đơn");
     return;
   }
   const tab = invoices.value.find((item) => item.id === tabId);
@@ -634,12 +1068,12 @@ const addProductToInvoice = (product) => {
   const selection = getProductSelection(product);
   const variant = selectedVariant(product);
   if (!variant) {
-    ElMessage.warning("Sản phẩm chưa có biến thể hợp lệ");
+    notifyWarning("Sản phẩm chưa có biến thể hợp lệ");
     return;
   }
   const qty = Math.max(1, Number(selection.tempQty || 1));
   if (qty > Number(variant.stock || 0)) {
-    ElMessage.warning("Số lượng vượt tồn kho");
+    notifyWarning("Số lượng vượt tồn kho");
     return;
   }
 
@@ -647,7 +1081,7 @@ const addProductToInvoice = (product) => {
   if (existing) {
     const nextQty = existing.quantity + qty;
     if (nextQty > existing.maxStock) {
-      ElMessage.warning("Không thể thêm, vượt tồn kho");
+      notifyWarning("Không thể thêm, vượt tồn kho");
       return;
     }
     existing.quantity = nextQty;
@@ -661,10 +1095,13 @@ const addProductToInvoice = (product) => {
       color: variant.color,
       quantity: qty,
       price: variant.price,
-      maxStock: variant.stock
+      maxStock: variant.stock,
+      productVariants: product.variants.map((entry) => ({ ...entry }))
     });
   }
   selection.tempQty = 1;
+  productKeyword.value = "";
+  productPage.value = 1;
 };
 
 const updateItemQty = (variantId, nextQty) => {
@@ -679,69 +1116,191 @@ const removeItem = (variantId) => {
   activeInvoice.value.items = activeInvoice.value.items.filter((item) => item.variantId !== variantId);
 };
 
-const handleCustomerChange = (customerId) => {
+const handleCustomerChange = async (customerId) => {
   if (!activeInvoice.value) return;
   activeInvoice.value.customer = customerOptions.value.find((item) => item.id === customerId) || null;
+  await hydrateShippingFromCustomer();
+  if (activeInvoice.value.shipEnabled) {
+    await recalculateShippingFee();
+  }
+};
+
+const clearCustomerSearch = () => {
+  if (!activeInvoice.value) return;
+  activeInvoice.value.customerId = null;
+  activeInvoice.value.customer = null;
+  customerKeyword.value = "";
+  activeInvoice.value.shipEnabled = false;
+  resetShippingState();
+};
+
+const applyCustomerSearch = async (silent = false) => {
+  if (!activeInvoice.value) return;
+  const keyword = customerKeyword.value.trim().toLowerCase();
+  if (!keyword) {
+    clearCustomerSearch();
+    return;
+  }
+  const matched = filteredCustomerSuggestions.value[0] || null;
+  if (!matched) {
+    if (!silent) {
+      notifyWarning("Không tìm thấy khách hàng phù hợp");
+    }
+    return;
+  }
+  activeInvoice.value.customerId = matched.id;
+  await handleCustomerChange(matched.id);
+  customerKeyword.value = matched.fullName || matched.phone || String(matched.id);
+};
+
+const selectCustomerSuggestion = async (customer) => {
+  if (!activeInvoice.value || !customer) return;
+  activeInvoice.value.customerId = customer.id;
+  await handleCustomerChange(customer.id);
+  customerKeyword.value = customer.fullName || customer.phone || String(customer.id);
+};
+
+const handleAddCustomerClick = () => {
+  notifyInfo("Vui lòng tạo khách hàng ở màn hình quản lý khách hàng");
+};
+
+const normalizeAddressName = (value) => String(value || "").trim().toLowerCase();
+
+const findAddressUnitByName = (units, name) => {
+  const normalized = normalizeAddressName(name);
+  if (!normalized) return null;
+  return units.find((item) => normalizeAddressName(item.name) === normalized) || null;
+};
+
+const hydrateShippingFromCustomer = async () => {
+  if (!activeInvoice.value || !activeInvoice.value.customerId) return;
+  const customer = customerOptions.value.find((item) => item.id === activeInvoice.value.customerId) || null;
+  if (customer) {
+    activeInvoice.value.recipientName = customer.fullName || customer.username || "";
+    activeInvoice.value.phone = customer.phone || "";
+  }
+  activeInvoice.value.address = "";
+  activeInvoice.value.province = "";
+  activeInvoice.value.district = "";
+  activeInvoice.value.ward = "";
+  activeInvoice.value.provinceId = "";
+  activeInvoice.value.districtId = "";
+  activeInvoice.value.wardId = "";
+  activeInvoice.value.shippingFee = 0;
+  try {
+    const { data } = await customerApi.getDefaultAddress(activeInvoice.value.customerId);
+    if (!data) return;
+
+    activeInvoice.value.recipientName = data.recipientName || customer?.fullName || activeInvoice.value.recipientName || "";
+    activeInvoice.value.phone = data.phone || customer?.phone || activeInvoice.value.phone || "";
+    activeInvoice.value.address = data.addressLine || activeInvoice.value.address || "";
+    activeInvoice.value.province = data.province || "";
+    activeInvoice.value.district = data.district || "";
+    activeInvoice.value.ward = data.ward || "";
+
+    if (!provinces.value.length) {
+      await fetchProvinces();
+    }
+    const province = findAddressUnitByName(provinces.value, data.province);
+    if (!province) return;
+
+    activeInvoice.value.provinceId = province.id;
+    await fetchDistricts(province.id);
+    const district = findAddressUnitByName(districts.value, data.district);
+    if (!district) return;
+
+    activeInvoice.value.districtId = district.id;
+    await fetchWards(district.id);
+    const ward = findAddressUnitByName(wards.value, data.ward);
+    if (!ward) return;
+
+    activeInvoice.value.wardId = ward.id;
+  } catch (_error) {
+    // Customer may not have default address, keep fallback from profile.
+  }
 };
 
 const validateVoucherSelection = () => {
   if (!activeInvoice.value?.voucherCode) return;
   if (!selectedVoucher.value) {
-    ElMessage.warning("Voucher không hợp lệ");
+    notifyWarning("Voucher không hợp lệ");
     activeInvoice.value.voucherCode = "";
     return;
   }
   if (subTotal.value < Number(selectedVoucher.value.minOrderValue || 0)) {
-    ElMessage.warning("Đơn chưa đạt điều kiện tối thiểu của voucher");
+    notifyWarning("Đơn chưa đạt điều kiện tối thiểu của voucher");
   }
 };
 
 const applyBestVoucher = async () => {
   if (subTotal.value <= 0) {
-    ElMessage.warning("Chưa có sản phẩm để áp voucher");
+    notifyWarning("Chưa có sản phẩm để áp voucher");
     return;
   }
   try {
     const { data } = await voucherApi.getBestVoucher(subTotal.value);
     if (!data?.code) {
       activeInvoice.value.voucherCode = "";
-      ElMessage.info("Không có voucher phù hợp");
+      notifyInfo("Không có voucher phù hợp");
       return;
     }
     activeInvoice.value.voucherCode = data.code;
-    ElMessage.success(`Đã áp voucher tốt nhất: ${data.code}`);
+    notifySuccess(`Đã áp voucher tốt nhất: ${data.code}`);
   } catch (error) {
     console.error(error);
-    ElMessage.error("Không gợi ý được voucher");
+    notifyError("Không gợi ý được voucher");
   }
 };
 
 const validateBeforeCheckout = () => {
   if (!activeInvoice.value.items.length) {
-    ElMessage.warning("Hóa đơn chưa có sản phẩm");
+    notifyWarning("Hóa đơn chưa có sản phẩm");
+    return false;
+  }
+  if (activeInvoice.value.voucherCode && voucherDiscount.value <= 0) {
+    notifyWarning("Mã giảm giá đã chọn không còn hợp lệ hoặc đơn chưa đủ điều kiện áp dụng");
     return false;
   }
   if (activeInvoice.value.shipEnabled) {
     const required = [
       activeInvoice.value.recipientName,
       activeInvoice.value.phone,
-      activeInvoice.value.address
+      activeInvoice.value.address,
+      activeInvoice.value.provinceId,
+      activeInvoice.value.districtId,
+      activeInvoice.value.wardId
     ].every((value) => String(value || "").trim());
     if (!required) {
-      ElMessage.warning("Vui lòng nhập đầy đủ thông tin ship");
+      notifyWarning("Vui lòng nhập đầy đủ thông tin ship");
       return false;
     }
-  }
-  if (paidAmount.value < totalAmount.value) {
-    ElMessage.warning("Số tiền khách đưa chưa đủ");
-    return false;
+    if (!activeInvoice.value.deliveryMethod) {
+      notifyWarning("Vui lòng chọn phương thức giao hàng");
+      return false;
+    }
+    if (!activeInvoice.value.deliveryMethodConfirmed) {
+      notifyWarning("Vui lòng xác nhận phương thức giao hàng");
+      return false;
+    }
+  } else {
+    activeInvoice.value.shippingFee = 0;
+    activeInvoice.value.deliveryMethodConfirmed = false;
   }
   return true;
 };
 
 const checkoutInvoice = async () => {
   if (activeInvoice.value?.status === "PAID" && activeInvoice.value?.orderId) {
-    ElMessage.info("Hóa đơn này đã thanh toán");
+    notifyInfo("Hóa đơn này đã thanh toán");
+    return;
+  }
+  const isBankTransfer = activeInvoice.value?.paymentMethod === "BANK_TRANSFER";
+  if (isBankTransfer && activeInvoice.value?.status === "WAITING_PAYMENT" && activeInvoice.value?.orderId) {
+    if (activeInvoice.value.paymentUrl) {
+      openMomoIotPage(activeInvoice.value.orderId, activeInvoice.value.paymentUrl);
+      return;
+    }
+    notifyWarning("Hóa đơn đang chờ thanh toán. Vui lòng tạo hóa đơn mới nếu cần.");
     return;
   }
   if (!validateBeforeCheckout()) return;
@@ -756,25 +1315,93 @@ const checkoutInvoice = async () => {
       voucherCode: activeInvoice.value.voucherCode || null,
       manualDiscount: safeManualDiscount.value,
       shippingFee: shippingFee.value,
-      paidAmount: paidAmount.value,
+      paidAmount: isMomoTransfer.value ? 0 : Math.max(paidAmount.value, totalAmount.value),
       shipEnabled: Boolean(activeInvoice.value.shipEnabled),
       recipientName: activeInvoice.value.recipientName || null,
       phone: activeInvoice.value.phone || null,
       province: activeInvoice.value.province || null,
       district: activeInvoice.value.district || null,
       ward: activeInvoice.value.ward || null,
-      address: activeInvoice.value.address || null
+      address: activeInvoice.value.address || null,
+      note: activeInvoice.value.note || null
     };
     const { data } = await orderApi.posCheckout(payload);
-    activeInvoice.value.status = "PAID";
-    activeInvoice.value.paidAt = new Date().toISOString();
     activeInvoice.value.orderId = data?.id || null;
-    ElMessage.success(`Đã thanh toán ${activeInvoice.value.code}${data?.id ? ` (Order #${data.id})` : ""}`);
+    if (data?.status === "WAITING_PAYMENT" && data?.paymentMethod === "MOMO" && data?.paymentUrl) {
+      activeInvoice.value.status = "WAITING_PAYMENT";
+      activeInvoice.value.paymentUrl = data.paymentUrl;
+      activeInvoice.value.paidAt = null;
+      openMomoIotPage(data.id, data.paymentUrl);
+      notifySuccess(`Đã chuyển sang giao diện MoMo IoT cho ${activeInvoice.value.code}`);
+    } else {
+      activeInvoice.value.status = "PAID";
+      activeInvoice.value.paymentUrl = "";
+      activeInvoice.value.paidAt = new Date().toISOString();
+      notifySuccess(`Đã thanh toán ${activeInvoice.value.code}${data?.id ? ` (Order #${data.id})` : ""}`);
+      clearInvoiceData();
+    }
     await loadProducts();
   } catch (error) {
     console.error(error);
-    ElMessage.error(error?.response?.data?.message || "Thanh toán thất bại");
+    const message = error?.response?.data?.message || "Thanh toán thất bại";
+    const normalizedMessage = String(message).toLowerCase();
+    if (
+      normalizedMessage.includes("số tiền khách đưa chưa đủ")
+      || normalizedMessage.includes("paidamount is not enough")
+      || normalizedMessage.includes("paid amount is not enough")
+    ) {
+      await showAlert(message, "Thông báo thanh toán");
+      return;
+    }
+    notifyError(message);
   }
+};
+
+const openMomoIotPage = (orderId, payUrl) => {
+  const safeOrderId = Number(orderId || 0);
+  const safePayUrl = String(payUrl || "").trim();
+  if (!safeOrderId || !safePayUrl) {
+    notifyWarning("Không tìm thấy thông tin thanh toán MoMo cho hóa đơn này");
+    return;
+  }
+  const popup = window.open(safePayUrl, "_blank", "noopener,noreferrer");
+  if (!popup) {
+    notifyWarning("Trình duyệt đang chặn popup. Hãy cho phép popup để mở MoMo mà vẫn giữ màn POS.");
+  }
+};
+
+const clearInvoiceData = () => {
+  if (!activeInvoice.value) return;
+  deliveryDrawerVisible.value = false;
+  customerKeyword.value = "";
+  productKeyword.value = "";
+  const reset = createInvoice();
+  activeInvoice.value.code = reset.code;
+  activeInvoice.value.orderId = null;
+  activeInvoice.value.paymentUrl = "";
+  activeInvoice.value.status = "DRAFT";
+  activeInvoice.value.items = [];
+  activeInvoice.value.customerId = null;
+  activeInvoice.value.customer = null;
+  activeInvoice.value.voucherCode = "";
+  activeInvoice.value.manualDiscount = 0;
+  activeInvoice.value.shipEnabled = false;
+  activeInvoice.value.deliveryMethod = "GHN";
+  activeInvoice.value.deliveryMethodConfirmed = false;
+  activeInvoice.value.shippingFee = 0;
+  activeInvoice.value.recipientName = "";
+  activeInvoice.value.phone = "";
+  activeInvoice.value.address = "";
+  activeInvoice.value.provinceId = "";
+  activeInvoice.value.districtId = "";
+  activeInvoice.value.wardId = "";
+  activeInvoice.value.province = "";
+  activeInvoice.value.district = "";
+  activeInvoice.value.ward = "";
+  activeInvoice.value.paymentMethod = "CASH";
+  activeInvoice.value.paidAmount = 0;
+  activeInvoice.value.paidAt = null;
+  activeInvoice.value.note = "";
 };
 
 const clearCurrentInvoice = async () => {
@@ -789,36 +1416,12 @@ const clearCurrentInvoice = async () => {
   } catch {
     return;
   }
-  const keepCode = activeInvoice.value.code;
-  const reset = createInvoice();
-  activeInvoice.value.items = [];
-  activeInvoice.value.customerId = null;
-  activeInvoice.value.customer = null;
-  activeInvoice.value.voucherCode = "";
-  activeInvoice.value.manualDiscount = 0;
-  activeInvoice.value.shipEnabled = false;
-  activeInvoice.value.shippingFee = 0;
-  activeInvoice.value.recipientName = "";
-  activeInvoice.value.phone = "";
-  activeInvoice.value.address = "";
-  activeInvoice.value.provinceId = "";
-  activeInvoice.value.districtId = "";
-  activeInvoice.value.wardId = "";
-  activeInvoice.value.province = "";
-  activeInvoice.value.district = "";
-  activeInvoice.value.ward = "";
-  activeInvoice.value.paymentMethod = "CASH";
-  activeInvoice.value.paidAmount = 0;
-  activeInvoice.value.status = "DRAFT";
-  activeInvoice.value.paidAt = null;
-  activeInvoice.value.orderId = null;
-  activeInvoice.value.code = keepCode;
-  activeInvoice.value.id = activeInvoice.value.id || reset.id;
+  clearInvoiceData();
 };
 
 const printInvoice = () => {
   if (!activeInvoice.value || !activeInvoice.value.items.length) {
-    ElMessage.warning("Chưa có dữ liệu hóa đơn để in");
+    notifyWarning("Chưa có dữ liệu hóa đơn để in");
     return;
   }
   const invoice = activeInvoice.value;
@@ -845,7 +1448,7 @@ const printInvoice = () => {
 
   const printWindow = window.open("", "_blank", "width=820,height=720");
   if (!printWindow) {
-    ElMessage.error("Trình duyệt chặn popup in");
+    notifyError("Trình duyệt chặn popup in");
     return;
   }
   printWindow.document.write(html);
@@ -895,7 +1498,7 @@ const fetchProvinces = async () => {
     provinces.value = Array.isArray(data) ? data : [];
   } catch (_error) {
     provinces.value = [];
-    ElMessage.error("Không thể tải danh sách tỉnh/thành từ GHN");
+    notifyError("Không thể tải danh sách tỉnh/thành từ GHN");
   } finally {
     addressLoading.value.provinces = false;
   }
@@ -912,7 +1515,7 @@ const fetchDistricts = async (provinceId) => {
     districts.value = Array.isArray(data) ? data : [];
   } catch (_error) {
     districts.value = [];
-    ElMessage.error("Không thể tải danh sách quận/huyện");
+    notifyError("Không thể tải danh sách quận/huyện");
   } finally {
     addressLoading.value.districts = false;
   }
@@ -929,7 +1532,7 @@ const fetchWards = async (districtId) => {
     wards.value = Array.isArray(data) ? data : [];
   } catch (_error) {
     wards.value = [];
-    ElMessage.error("Không thể tải danh sách phường/xã");
+    notifyError("Không thể tải danh sách phường/xã");
   } finally {
     addressLoading.value.wards = false;
   }
@@ -943,6 +1546,8 @@ const handleProvinceChange = async (provinceId) => {
   activeInvoice.value.wardId = "";
   activeInvoice.value.district = "";
   activeInvoice.value.ward = "";
+  activeInvoice.value.deliveryMethodConfirmed = false;
+  activeInvoice.value.shippingFee = 0;
   wards.value = [];
   await fetchDistricts(provinceId);
 };
@@ -953,13 +1558,66 @@ const handleDistrictChange = async (districtId) => {
   activeInvoice.value.district = selected?.name || "";
   activeInvoice.value.wardId = "";
   activeInvoice.value.ward = "";
+  activeInvoice.value.deliveryMethodConfirmed = false;
+  activeInvoice.value.shippingFee = 0;
   await fetchWards(districtId);
 };
 
-const handleWardChange = (wardId) => {
+const handleWardChange = async (wardId) => {
   if (!activeInvoice.value) return;
   const selected = wards.value.find((item) => item.id === wardId);
   activeInvoice.value.ward = selected?.name || "";
+  activeInvoice.value.deliveryMethodConfirmed = false;
+  await recalculateShippingFee();
+};
+
+const closeShipDrawer = () => {
+  deliveryDrawerVisible.value = false;
+};
+
+const confirmDeliveryMethod = async () => {
+  if (!activeInvoice.value) return;
+  activeInvoice.value.shipEnabled = true;
+  if (!activeInvoice.value.deliveryMethod) {
+    notifyWarning("Vui lòng chọn phương thức giao hàng");
+    return;
+  }
+  // Confirm shipping mode first, fee can be recalculated once address is complete.
+  const hasFullAddress = [
+    activeInvoice.value.provinceId,
+    activeInvoice.value.districtId,
+    activeInvoice.value.wardId
+  ].every((value) => String(value || "").trim());
+  if (hasFullAddress) {
+    await recalculateShippingFee();
+  } else {
+    activeInvoice.value.shippingFee = 0;
+  }
+  activeInvoice.value.deliveryMethodConfirmed = true;
+  notifySuccess(`Đã xác nhận phương thức giao hàng: ${activeInvoice.value.deliveryMethod}`);
+  closeShipDrawer();
+};
+
+const recalculateShippingFee = async () => {
+  if (!activeInvoice.value || !activeInvoice.value.shipEnabled) return;
+  const districtId = Number(activeInvoice.value.districtId || 0);
+  const wardCode = String(activeInvoice.value.wardId || "").trim();
+  if (!districtId || !wardCode) {
+    activeInvoice.value.shippingFee = 0;
+    return;
+  }
+  try {
+    addressLoading.value.shippingFee = true;
+    const { data } = await addressApi.getShippingFee(districtId, wardCode);
+    const fee = Number(data?.fee ?? data ?? 0);
+    activeInvoice.value.shippingFee = Math.max(0, Number.isFinite(fee) ? fee : 0);
+  } catch (error) {
+    console.error(error);
+    activeInvoice.value.shippingFee = 0;
+    notifyError("Không tính được phí ship GHN");
+  } finally {
+    addressLoading.value.shippingFee = false;
+  }
 };
 
 const bootstrap = async () => {
@@ -969,7 +1627,7 @@ const bootstrap = async () => {
     if (!invoices.value.length) createInvoiceTab();
   } catch (error) {
     console.error(error);
-    ElMessage.error("Không tải được dữ liệu POS");
+    notifyError("Không tải được dữ liệu POS");
   } finally {
     loading.value = false;
   }
@@ -992,297 +1650,314 @@ const handleKeydown = (event) => {
 };
 
 onMounted(() => {
-  bootstrap();
+  terminalId.value = getOrCreateTerminalId();
+  bootstrap().then(async () => {
+    const restoredFromServer = await restorePosDraftFromServer();
+    if (!restoredFromServer) {
+      await restorePosDraftFromStorage();
+    }
+  });
   window.addEventListener("keydown", handleKeydown);
 });
 
 onBeforeUnmount(() => {
+  if (saveLocalDraftTimer) {
+    clearTimeout(saveLocalDraftTimer);
+    saveLocalDraftTimer = null;
+  }
+  if (saveServerDraftTimer) {
+    clearTimeout(saveServerDraftTimer);
+    saveServerDraftTimer = null;
+  }
+  savePosDraftToStorage();
+  void savePosDraftToServer();
   window.removeEventListener("keydown", handleKeydown);
 });
+
+watch(invoices, schedulePosDraftSave, { deep: true });
+watch(activeInvoiceId, schedulePosDraftSave);
 </script>
 
-<style scoped lang="scss">
-.pos-counter-page {
-  display: grid;
-  gap: 14px;
-  --kv-border: #d6dce6;
-  --kv-bg: #f5f7fb;
-  --kv-primary: #0f4f9f;
-  --kv-soft: #eef3fb;
-
-  :deep(.el-card),
-  :deep(.el-card__body),
-  :deep(.el-button),
-  :deep(.el-input__wrapper),
-  :deep(.el-textarea__inner),
-  :deep(.el-select__wrapper),
-  :deep(.el-input-number),
-  :deep(.el-input-number__decrease),
-  :deep(.el-input-number__increase),
-  :deep(.el-tabs__item),
-  :deep(.el-tabs--card > .el-tabs__header .el-tabs__nav),
-  :deep(.el-table),
-  :deep(.el-table__inner-wrapper),
-  :deep(.el-tag),
-  :deep(.el-alert),
-  :deep(.el-radio-button__inner) {
-    border-radius: 0 !important;
-  }
+<style scoped>
+.pos-page {
+  height: 100vh;
+  background: var(--el-bg-color-page);
 }
 
-.kv-header-card,
-.kv-products,
-.kv-order {
-  border-radius: 0;
-  border-color: var(--kv-border);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-
-  :deep(.el-card__body) {
-    padding: 14px;
-  }
+.pos-shell {
+  height: 100%;
 }
 
-.kv-header {
+.pos-header {
+  height: auto;
+  padding: 8px 10px 4px;
+  border-bottom: 1px solid var(--el-border-color-light);
+  background: var(--el-bg-color);
+  overflow: visible;
+}
+
+.pos-search-box {
+  position: relative;
+}
+
+.pos-search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  z-index: 30;
+  max-height: 420px;
+}
+
+.pos-search-dropdown :deep(.el-card__body) {
+  max-height: 380px;
+  overflow: auto;
+  padding: 8px;
+}
+
+.pos-search-item-compact {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 10px;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.kv-header-title {
-  display: grid;
-}
-
-.kv-header-title strong {
-  font-size: 18px;
-  color: #0f172a;
-}
-
-.kv-header-title span {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.kv-layout {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: 1.2fr 1fr;
-}
-
-.kv-panel-head {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-}
-
-.kv-search {
-  margin-bottom: 10px;
-}
-
-.kv-variant-list {
-  display: grid;
-  gap: 10px;
-}
-
-.kv-pagination {
-  margin-top: 10px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.kv-variant-card {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 10px;
   padding: 10px;
-  border: 1px solid var(--kv-border);
-  border-radius: 0;
-  background: var(--kv-bg);
-  transition: border-color 0.2s ease, background 0.2s ease;
+  border: 1px solid var(--el-border-color-light);
+  background: #edf2fb;
+  cursor: pointer;
 }
 
-.kv-variant-card:hover {
-  border-color: #94a3b8;
-  background: #ffffff;
+.pos-search-item-compact + .pos-search-item-compact {
+  margin-top: 8px;
 }
 
-.kv-variant-thumb {
-  width: 72px;
-  height: 72px;
-  object-fit: cover;
-  border: 1px solid var(--kv-border);
-  background: #ffffff;
+.pos-search-thumb {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border: 1px solid var(--el-border-color-lighter);
 }
 
-.kv-variant-main {
+.pos-search-content {
   display: grid;
-  gap: 5px;
-}
-
-.kv-variant-name {
-  margin: 0;
-  font-weight: 700;
-  color: #111827;
-}
-
-.kv-variant-meta {
-  margin: 0;
-  font-size: 12px;
-  color: #64748b;
-}
-
-.kv-variant-pick {
-  margin: 0;
-  font-size: 12px;
-  color: #475569;
-}
-
-.kv-variant-pick strong {
-  color: #0f172a;
-}
-
-.kv-variant-attrs {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.kv-variant-select {
+  gap: 2px;
+  min-width: 0;
   width: 100%;
 }
 
-.kv-variant-price-row strong {
-  color: #b42318;
-}
-
-.kv-variant-price-row span {
-  font-size: 12px;
-  color: #475569;
-}
-
-.kv-cart-table {
-  margin-bottom: 10px;
-  border: 1px solid #e2e8f0;
-}
-
-.item-cell {
-  display: grid;
-}
-
-.item-cell span {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.kv-form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 12px;
-  padding: 10px;
-  border: 1px solid #e2e8f0;
-  background: #fafcff;
-}
-
-.kv-ship-box {
-  display: grid;
-  gap: 10px;
-  margin-top: 6px;
-  border: 1px solid #dbe7ff;
-  background: var(--kv-soft);
-  padding: 10px;
-}
-
-.kv-ship-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.pos-search-row-1 {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 8px;
 }
 
-.kv-payment-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 12px;
-  margin-top: 8px;
+.pos-search-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.kv-summary {
+.pos-search-price {
+  color: var(--el-color-primary);
+  min-width: 88px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pos-search-sku {
+  line-height: 1.25;
+  font-weight: 500;
+}
+
+.pos-search-meta {
+  line-height: 1.25;
+  color: var(--el-text-color-secondary);
+}
+
+.pos-search-footer {
   margin-top: 8px;
-  border: 1px solid var(--kv-border);
-  border-radius: 0;
-  background: #f8fafc;
+  width: 100%;
+  justify-content: center;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+.pos-tab-col {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pos-tab-col :deep(.el-tabs__header) {
+  margin: 0;
+}
+
+.pos-header-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.pos-main {
+  padding: 10px;
   overflow: hidden;
 }
 
-.kv-summary > div {
+.pos-row {
+  height: calc(100vh - 102px);
+}
+
+.pos-left-col {
   display: flex;
-  justify-content: space-between;
-  padding: 8px 10px;
-  border-bottom: 1px dashed #dbe2ea;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
 }
 
-.kv-summary > div:last-child {
-  border-bottom: none;
+.pos-right-col {
+  height: 100%;
+  min-height: 0;
 }
 
-.kv-summary span {
-  color: #475569;
+.pos-card {
+  border-radius: 0;
 }
 
-.kv-summary strong {
-  color: #0f172a;
+.pos-order-card {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
-.kv-total {
-  background: #dbeafe;
+.pos-order-card :deep(.el-card__body) {
+  height: 100%;
 }
 
-.kv-total span,
-.kv-total strong {
-  color: var(--kv-primary);
-  font-size: 15px;
+.pos-order-card :deep(.el-table) {
+  height: 100%;
 }
 
-.kv-action-row {
-  margin-top: 12px;
+.pos-qty-input {
+  width: 100%;
+}
+
+.pos-note-card {
+  flex: 0 0 auto;
+}
+
+.pos-sidebar-card {
+  height: 100%;
+  overflow: auto;
+}
+
+.pos-customer-form-item :deep(.el-form-item__content) {
+  display: block;
+}
+
+.pos-customer-search {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr 38px;
+  gap: 6px;
+  width: 100%;
+}
+
+.pos-customer-input {
+  width: 100%;
+}
+
+.pos-customer-input :deep(.el-input__wrapper),
+.pos-customer-input :deep(.el-input-group__append) {
+  background: #f3f4f6;
+}
+
+.pos-customer-add-btn {
+  width: 38px;
+  padding: 0;
+}
+
+.pos-customer-suggestion-list {
+  margin-top: 6px;
+  border: 1px solid var(--el-border-color-light);
+  max-height: 180px;
+  overflow: auto;
+  background: var(--el-bg-color);
+}
+
+.pos-customer-suggestion-item {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  padding: 8px 10px;
+  cursor: pointer;
+  color: var(--el-text-color-primary);
+}
+
+.pos-customer-suggestion-item:last-child {
+  border-bottom: 0;
+}
+
+.pos-customer-suggestion-item:hover {
+  background: var(--el-fill-color-light);
+}
+
+.pos-customer-result {
+  margin-top: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.pos-checkout-btn {
+  width: 100%;
+  height: 42px;
+  margin-top: 8px;
+}
+
+.pos-ship-drawer :deep(.el-drawer) {
+  border-radius: 0;
+  top: 62px;
+  right: 0;
+  height: calc(100vh - 62px);
+}
+
+.pos-search-list {
+  width: 100%;
+}
+
+.pos-pagination {
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+
+.pos-qr-card {
+  margin-bottom: 10px;
+}
+
+.pos-qr-card :deep(.el-card__body) {
+  display: grid;
   gap: 8px;
-  position: sticky;
-  bottom: 0;
-  background: #ffffff;
-  padding-top: 8px;
-  border-top: 1px solid #e2e8f0;
+  justify-items: start;
 }
 
-@media (max-width: 1440px) {
-  .kv-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 900px) {
-  .kv-header {
-    flex-direction: column;
-    align-items: flex-start;
+@media (max-width: 1200px) {
+  .pos-header-actions {
+    justify-content: flex-start;
   }
 
-  .kv-form-grid,
-  .kv-payment-row {
-    grid-template-columns: 1fr;
+  .pos-main {
+    height: auto;
+    overflow: auto;
   }
 
-  .kv-ship-grid {
-    grid-template-columns: 1fr;
+  .pos-row {
+    height: auto;
   }
 
-  .kv-variant-card,
-  .kv-action-row {
-    grid-template-columns: 1fr;
+  .pos-ship-drawer :deep(.el-drawer) {
+    top: 0;
+    right: 0;
+    height: 100vh;
   }
+
 }
 </style>

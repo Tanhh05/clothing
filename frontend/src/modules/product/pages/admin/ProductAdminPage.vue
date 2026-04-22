@@ -1,6 +1,6 @@
 <template>
   <section class="product-admin-page admin-page-shell" v-loading="loading">
-    <div class="inventory-panel">
+    <div v-if="!isCreateOnly" class="inventory-panel">
       <div class="panel-header">
         <div class="panel-actions">
           <el-input
@@ -102,8 +102,14 @@
       v-model="drawerVisible"
       :title="drawerMode === 'create' ? 'Thêm sản phẩm' : 'Cập nhật sản phẩm'"
       direction="rtl"
-      size="42%"
+      :size="isCreateOnly ? 'clamp(520px, 50vw, 760px)' : '42%'"
+      :append-to-body="true"
+      :with-header="true"
+      :modal="true"
+      :show-close="true"
+      :close-on-click-modal="true"
       class="product-form-drawer"
+      @closed="handleDrawerClosed"
     >
       <el-form :model="productForm" label-position="top">
         <el-form-item label="Tên sản phẩm">
@@ -280,7 +286,7 @@
       </transition>
 
       <template #footer>
-        <el-button @click="drawerVisible = false">Hủy</el-button>
+        <el-button @click="handleCancelCreate">Hủy</el-button>
         <el-button type="primary" :loading="submitting" @click="submitProduct">
           {{ drawerMode === "create" ? "Tạo sản phẩm" : "Lưu thay đổi" }}
         </el-button>
@@ -288,6 +294,7 @@
     </el-drawer>
 
     <el-drawer
+      v-if="!isCreateOnly"
       v-model="deletedDrawerVisible"
       title="Sản phẩm đã xóa"
       direction="rtl"
@@ -327,6 +334,7 @@
     </el-drawer>
 
     <el-drawer
+      v-if="!isCreateOnly"
       v-model="inventoryDrawerVisible"
       title="Cảnh báo tồn kho"
       direction="rtl"
@@ -378,6 +386,7 @@
     </el-drawer>
 
     <el-dialog
+      v-if="!isCreateOnly"
       v-model="importDialogVisible"
       title="Import sản phẩm từ XLSX"
       width="760px"
@@ -438,7 +447,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "@/utils/dialogMessage";
 import { Plus, Search, Upload } from "@element-plus/icons-vue";
 import { useProductStore } from "@/modules/product/store/productStore";
 import { productApi } from "@/modules/product/api/productApi";
@@ -447,6 +456,14 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 const store = useProductStore();
 const { confirm } = useConfirmDialog();
+const props = defineProps({
+  createOnly: {
+    type: Boolean,
+    default: false
+  }
+});
+const emit = defineEmits(["close-request", "created"]);
+const isCreateOnly = computed(() => Boolean(props.createOnly));
 
 const loading = computed(() => store.loading);
 const products = computed(() => store.products || []);
@@ -952,6 +969,7 @@ const submitProduct = async () => {
         await productApi.createProduct(payload);
       }
       ElMessage.success("Tạo sản phẩm thành công");
+      emit("created");
     } else if (editingId.value) {
       if (selectedFiles.length) {
         await productApi.updateProduct(editingId.value, buildMultipartPayload(payload, selectedFiles));
@@ -1117,14 +1135,26 @@ const restoreDeletedProduct = async (item) => {
 onMounted(() => {
   loadCategories();
   loadVariantOptions();
+  if (isCreateOnly.value) {
+    openCreate();
+    return;
+  }
   fetchPage(0);
 });
 
 watch(keyword, () => {
+  if (isCreateOnly.value) return;
   if (productFilterTimer) clearTimeout(productFilterTimer);
   productFilterTimer = setTimeout(() => {
     fetchPage(0);
   }, 300);
+});
+
+watch(drawerVisible, (value) => {
+  if (!isCreateOnly.value) return;
+  if (!value) {
+    emit("close-request");
+  }
 });
 
 watch(
@@ -1583,3 +1613,15 @@ watch(
   }
 }
 </style>
+const handleCancelCreate = () => {
+  drawerVisible.value = false;
+  if (isCreateOnly.value) {
+    emit("close-request");
+  }
+};
+
+const handleDrawerClosed = () => {
+  if (isCreateOnly.value) {
+    emit("close-request");
+  }
+};
