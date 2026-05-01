@@ -3,11 +3,13 @@ package com.clothing.messaging.publisher;
 import com.clothing.messaging.event.OrderCreatedEvent;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
 @Component
+@ConditionalOnProperty(prefix = "app.integrations.rabbit", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class RabbitOrderEventPublisher implements OrderEventPublisher {
 
     private final RabbitTemplate rabbitTemplate;

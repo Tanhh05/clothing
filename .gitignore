@@ -5,13 +5,13 @@
 # Environment files
 backend/.env
 backend/.env.local
-frontend/.env
-frontend/.env.local
+vue-element-client/.env
+vue-element-client/.env.local
 
 # Backend build
 backend/target/
 backend/.git.backup-single-repo/
 
 # Frontend dependencies/build
-frontend/node_modules/
-frontend/dist/
+vue-element-client/node_modules/
+vue-element-client/dist/

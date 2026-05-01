@@ -1,0 +1,177 @@
+.admin-page {
+  padding: 16px;
+}
+
+.admin-card {
+  background: #fff;
+  border: 1px solid #dce1e7;
+  border-radius: 0;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.admin-page .panel-header {
+  margin-bottom: 10px;
+}
+
+.admin-page .panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-page .table-wrap {
+  width: 100%;
+}
+
+.admin-toolbar .search-input {
+  min-width: 260px;
+  max-width: 420px;
+}
+
+.admin-toolbar .status-select {
+  width: 180px;
+}
+
+.admin-primary-btn {
+  border-radius: 0;
+}
+
+.admin-ghost-btn {
+  border-radius: 0;
+}
+
+.admin-table .title-cell {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+
+.admin-page .admin-table {
+  width: 100%;
+}
+
+.admin-page .admin-table .el-table__cell {
+  padding: 8px 0;
+  vertical-align: middle;
+}
+
+.admin-page .admin-table .cell {
+  line-height: 1.35;
+}
+
+.admin-table .el-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
+}
+
+.admin-table .el-table__body td .cell {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+}
+
+.admin-action-cell {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-action-cell .el-button + .el-button {
+  margin-left: 0;
+}
+
+.admin-action-btn.el-button {
+  border-radius: 0;
+  font-weight: 600;
+  padding: 7px 12px;
+  transition: all 0.18s ease;
+}
+
+.admin-action-edit.el-button {
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.admin-action-edit.el-button:hover,
+.admin-action-edit.el-button:focus {
+  color: #1e40af;
+  border-color: #93c5fd;
+  background: #dbeafe;
+}
+
+.admin-action-delete.el-button {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.admin-action-delete.el-button:hover,
+.admin-action-delete.el-button:focus {
+  color: #991b1b;
+  border-color: #fca5a5;
+  background: #ffe4e6;
+}
+
+.admin-pagination {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.admin-page .el-card,
+.admin-page .el-card__body,
+.admin-page .el-table,
+.admin-page .el-table::before,
+.admin-page .el-button,
+.admin-page .el-input__inner,
+.admin-page .el-textarea__inner,
+.admin-page .el-dialog,
+.admin-page .el-dialog__header,
+.admin-page .el-dialog__body,
+.admin-page .el-dialog__footer,
+.admin-page .el-drawer,
+.admin-page .el-tag {
+  border-radius: 0 !important;
+}
+
+@media (max-width: 767px) {
+  .admin-page {
+    padding: 10px;
+  }
+
+  .admin-card {
+    padding: 10px;
+    border-radius: 0;
+  }
+
+  .admin-toolbar .search-input,
+  .admin-toolbar .status-select {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .admin-action-cell .el-button {
+    flex: 1;
+    justify-content: center;
+  }
+}

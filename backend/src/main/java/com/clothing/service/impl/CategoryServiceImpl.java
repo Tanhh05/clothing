@@ -85,7 +85,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
-    public PageResponse<CategoryResponse> getAll(int page, int size, String sortBy, String direction) {
+    public PageResponse<CategoryResponse> getAll(int page, int size, String sortBy, String direction, String q) {
         if (page < 0) {
             throw new BusinessException("page must be >= 0", HttpStatus.BAD_REQUEST);
         }
@@ -97,7 +97,15 @@ public class CategoryServiceImpl implements CategoryService {
         Sort.Direction sortDirection = "asc".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, safeSortBy));
 
-        Page<CategoryEntity> categoryPage = categoryRepository.findAll(pageable);
+        String keyword = q == null ? "" : q.trim();
+        Page<CategoryEntity> categoryPage;
+        if (keyword.isEmpty()) {
+            categoryPage = categoryRepository.findAll(pageable);
+        } else {
+            categoryPage = categoryRepository.findByNameContainingIgnoreCaseOrSlugContainingIgnoreCaseOrShortContentContainingIgnoreCase(
+                    keyword, keyword, keyword, pageable
+            );
+        }
         return PageResponse.<CategoryResponse>builder()
                 .content(categoryPage.getContent().stream().map(this::toResponse).toList())
                 .page(categoryPage.getNumber())

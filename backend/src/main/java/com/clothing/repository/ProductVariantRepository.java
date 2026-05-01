@@ -14,6 +14,8 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariantEn
 
     List<ProductVariantEntity> findByProductIdOrderByIdAsc(Long productId);
 
+    List<ProductVariantEntity> findByProductIdInOrderByProductIdAscIdAsc(List<Long> productIds);
+
     void deleteByProductId(Long productId);
 
     boolean existsBySkuIgnoreCase(String sku);

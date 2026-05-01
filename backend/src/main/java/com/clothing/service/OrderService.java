@@ -52,4 +52,8 @@ public interface OrderService {
     void handleMomoPaymentIpn(Map<String, Object> payload);
 
     void handleVnpayPaymentIpn(Map<String, String> payload);
+
+    int cancelExpiredMomoWaitingPaymentOrders();
+
+    int cancelExpiredCodReservedOrders();
 }

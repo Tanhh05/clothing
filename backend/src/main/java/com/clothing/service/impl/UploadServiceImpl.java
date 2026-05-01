@@ -5,12 +5,16 @@ import com.clothing.dto.request.UploadPresignRequest;
 import com.clothing.dto.response.UploadPresignResponse;
 import com.clothing.exception.BusinessException;
 import com.clothing.service.UploadService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
@@ -28,6 +32,7 @@ import java.util.UUID;
 @Service
 public class UploadServiceImpl implements UploadService {
 
+    private static final Logger log = LoggerFactory.getLogger(UploadServiceImpl.class);
     private static final DateTimeFormatter PATH_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
 
     private final S3Presigner s3Presigner;
@@ -119,7 +124,25 @@ public class UploadServiceImpl implements UploadService {
                 s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
             } catch (IOException ex) {
                 throw new BusinessException("Failed to read uploaded file", HttpStatus.BAD_REQUEST);
+            } catch (S3Exception ex) {
+                String errorCode = ex.awsErrorDetails() != null ? ex.awsErrorDetails().errorCode() : "S3_ERROR";
+                String errorMessage = ex.awsErrorDetails() != null ? ex.awsErrorDetails().errorMessage() : ex.getMessage();
+                log.error("R2 upload failed: bucket={}, key={}, status={}, code={}, message={}",
+                        r2Properties.getBucket(), objectKey, ex.statusCode(), errorCode, errorMessage, ex);
+                throw new BusinessException(
+                        "Failed to upload file to cloud storage: " + errorCode + " - " + errorMessage,
+                        HttpStatus.BAD_GATEWAY
+                );
+            } catch (SdkClientException ex) {
+                log.error("R2 upload client error: bucket={}, key={}, message={}",
+                        r2Properties.getBucket(), objectKey, ex.getMessage(), ex);
+                throw new BusinessException(
+                        "Failed to upload file to cloud storage: CLIENT_ERROR - " + ex.getMessage(),
+                        HttpStatus.BAD_GATEWAY
+                );
             } catch (Exception ex) {
+                log.error("R2 upload unexpected error: bucket={}, key={}, message={}",
+                        r2Properties.getBucket(), objectKey, ex.getMessage(), ex);
                 throw new BusinessException("Failed to upload file to cloud storage", HttpStatus.BAD_GATEWAY);
             }
 

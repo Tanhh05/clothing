@@ -4,10 +4,12 @@ import com.clothing.messaging.event.OrderCreatedEvent;
 import com.clothing.service.OrderAsyncProcessingService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "app.integrations.rabbit", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class OrderEventListener {
 
     private final OrderAsyncProcessingService orderAsyncProcessingService;

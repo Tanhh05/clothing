@@ -5,6 +5,7 @@ import com.clothing.dto.request.LogoutRequest;
 import com.clothing.dto.request.RefreshTokenRequest;
 import com.clothing.dto.request.RegisterRequest;
 import com.clothing.dto.request.UpdateProfileRequest;
+import com.clothing.dto.request.ChangePasswordRequest;
 import com.clothing.dto.response.AuthResponse;
 import com.clothing.entity.RefreshTokenEntity;
 import com.clothing.dto.response.UserResponse;
@@ -34,6 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -179,6 +181,20 @@ public class AuthServiceImpl implements AuthService {
         UserEntity user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND));
 
+        if (request.getUsername() != null) {
+            String nextUsername = request.getUsername().trim();
+            if (!nextUsername.equalsIgnoreCase(user.getUsername()) && userRepository.existsByUsername(nextUsername)) {
+                throw new BusinessException("Username already exists", HttpStatus.CONFLICT);
+            }
+            user.setUsername(nextUsername);
+        }
+        if (request.getEmail() != null) {
+            String nextEmail = request.getEmail().trim();
+            if (!nextEmail.equalsIgnoreCase(user.getEmail()) && userRepository.existsByEmail(nextEmail)) {
+                throw new BusinessException("Email already exists", HttpStatus.CONFLICT);
+            }
+            user.setEmail(nextEmail);
+        }
         if (request.getFullName() != null) {
             user.setFullName(request.getFullName().trim());
         }
@@ -190,8 +206,40 @@ public class AuthServiceImpl implements AuthService {
         return userMapper.toResponse(saved);
     }
 
+    @Override
+    @Transactional
+    public void changeCurrentUserPassword(String username, ChangePasswordRequest request) {
+        UserEntity user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND));
+
+        String currentPassword = request.getCurrentPassword() == null ? "" : request.getCurrentPassword().trim();
+        String newPassword = request.getNewPassword() == null ? "" : request.getNewPassword().trim();
+
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new BusinessException("Current password is incorrect", HttpStatus.BAD_REQUEST);
+        }
+        if (newPassword.length() < 6) {
+            throw new BusinessException("New password must be at least 6 characters", HttpStatus.BAD_REQUEST);
+        }
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new BusinessException("New password must be different from current password", HttpStatus.BAD_REQUEST);
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+
     private AuthResponse toAuthResponse(UserEntity user) {
-        Set<String> roles = user.getRoles().stream().map(RoleEntity::getName).collect(Collectors.toSet());
+        Set<String> roles = user.getRoles().stream()
+                .map(role -> role == null ? null : role.getName())
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(name -> !name.isBlank())
+                .collect(Collectors.toSet());
+        if (roles.isEmpty()) {
+            roles = Set.of(USER_ROLE);
+        }
+
         String accessToken = jwtService.generateToken(
                 user.getUsername(),
                 Map.of("roles", roles, "userId", user.getId())

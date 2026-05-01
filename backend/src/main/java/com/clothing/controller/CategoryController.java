@@ -33,9 +33,10 @@ public class CategoryController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
-            @RequestParam(defaultValue = "asc") String direction
+            @RequestParam(defaultValue = "asc") String direction,
+            @RequestParam(required = false) String q
     ) {
-        return ResponseEntity.ok(categoryService.getAll(page, size, sortBy, direction));
+        return ResponseEntity.ok(categoryService.getAll(page, size, sortBy, direction, q));
     }
 
     @GetMapping("/{id}")

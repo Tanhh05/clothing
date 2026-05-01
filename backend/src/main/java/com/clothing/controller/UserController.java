@@ -2,6 +2,7 @@ package com.clothing.controller;
 
 import com.clothing.dto.request.UpdateUserStatusRequest;
 import com.clothing.dto.request.UpdateProfileRequest;
+import com.clothing.dto.request.ChangePasswordRequest;
 import com.clothing.dto.response.PageResponse;
 import com.clothing.dto.response.UserResponse;
 import com.clothing.entity.UserEntity;
@@ -57,6 +58,15 @@ public class UserController {
             @Valid @RequestBody UpdateProfileRequest request
     ) {
         return ResponseEntity.ok(authService.updateCurrentUser(authentication.getName(), request));
+    }
+
+    @PatchMapping("/api/user/me/password")
+    public ResponseEntity<Void> changeMyPassword(
+            Authentication authentication,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
+        authService.changeCurrentUserPassword(authentication.getName(), request);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/api/admin/ping")

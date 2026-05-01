@@ -7,17 +7,19 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
+import org.springframework.data.elasticsearch.annotations.Setting;
 
 @Getter
 @Setter
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Document(indexName = "products")
+@Setting(settingPath = "/elasticsearch/products-settings.json")
 public class ProductDocument {
 
     @Id
     private Long id;
 
-    @Field(type = FieldType.Text)
+    @Field(type = FieldType.Text, analyzer = "autocomplete_index", searchAnalyzer = "autocomplete_search")
     private String name;
 
     @Field(type = FieldType.Keyword)
@@ -26,13 +28,13 @@ public class ProductDocument {
     @Field(type = FieldType.Text)
     private String description;
 
-    @Field(type = FieldType.Text)
+    @Field(type = FieldType.Text, analyzer = "autocomplete_index", searchAnalyzer = "autocomplete_search")
     private String brand;
 
     @Field(type = FieldType.Keyword)
     private Long categoryId;
 
-    @Field(type = FieldType.Text)
+    @Field(type = FieldType.Text, analyzer = "autocomplete_index", searchAnalyzer = "autocomplete_search")
     private String categoryName;
 
     @Field(type = FieldType.Keyword)

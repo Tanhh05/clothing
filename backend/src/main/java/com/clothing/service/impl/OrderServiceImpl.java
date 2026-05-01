@@ -21,6 +21,7 @@ import com.clothing.entity.OrderStatusHistoryEntity;
 import com.clothing.entity.PaymentEntity;
 import com.clothing.entity.ProductEntity;
 import com.clothing.entity.ProductVariantEntity;
+import com.clothing.entity.StockReservationEntity;
 import com.clothing.entity.UserAddressEntity;
 import com.clothing.entity.UserEntity;
 import com.clothing.entity.VnpayCheckoutSessionEntity;
@@ -38,6 +39,7 @@ import com.clothing.repository.OrderStatusHistoryRepository;
 import com.clothing.repository.PaymentRepository;
 import com.clothing.repository.ProductRepository;
 import com.clothing.repository.ProductVariantRepository;
+import com.clothing.repository.StockReservationRepository;
 import com.clothing.repository.StatusCountProjection;
 import com.clothing.repository.TopProductSalesProjection;
 import com.clothing.repository.UserAddressRepository;
@@ -90,20 +92,34 @@ public class OrderServiceImpl implements OrderService {
 
     private static final String STATUS_PENDING = "PENDING";
     private static final String STATUS_WAITING_PAYMENT = "WAITING_PAYMENT";
+    private static final String STATUS_CANCELLED = "CANCELLED";
+    private static final String STATUS_FAILED = "FAILED";
     private static final String SHIPPING_PROVIDER_GHN = "GHN";
     private static final String SHIPPING_PROVIDER_POS_COUNTER = "POS_COUNTER";
     private static final String SHIPPING_PROVIDER_POS_SHIP = "POS_SHIP";
     private static final String STATUS_DELIVERED = "DELIVERED";
     private static final String INVENTORY_TYPE_POS = "POS_DEDUCT";
+    private static final String INVENTORY_TYPE_POS_REVERT = "POS_REVERT";
+    private static final String INVENTORY_TYPE_POS_CAPTURE = "POS_CAPTURE";
+    private static final String INVENTORY_TYPE_CLIENT_CAPTURE = "CLIENT_CAPTURE";
+    private static final String INVENTORY_TYPE_COD_CAPTURE = "COD_CAPTURE";
+    private static final String PAYMENT_COD = "COD";
     private static final String PAYMENT_MOMO = "MOMO";
     private static final String PAYMENT_VNPAY = "VNPAY";
+    private static final String PAYMENT_STATUS_PAID = "PAID";
+    private static final String PAYMENT_STATUS_FAILED = "FAILED";
     private static final String MOMO_SESSION_STATUS_PENDING = "PENDING";
     private static final String MOMO_SESSION_STATUS_COMPLETED = "COMPLETED";
+    private static final String MOMO_SESSION_STATUS_EXPIRED = "EXPIRED";
     private static final String VNPAY_SESSION_STATUS_PENDING = "PENDING";
     private static final String VNPAY_SESSION_STATUS_COMPLETED = "COMPLETED";
     private static final String VNPAY_SESSION_STATUS_EXPIRED = "EXPIRED";
     private static final long MOMO_SESSION_TTL_MINUTES = 30L;
     private static final long VNPAY_SESSION_TTL_MINUTES = 30L;
+    private static final long COD_RESERVATION_TTL_MINUTES = 120L;
+    private static final String RESERVATION_STATUS_ACTIVE = "ACTIVE";
+    private static final String RESERVATION_STATUS_CONVERTED = "CONVERTED";
+    private static final String RESERVATION_STATUS_RELEASED = "RELEASED";
     private static final long FAR_DISTANCE_SURCHARGE = 20_000L;
     private static final Set<String> NEAR_PROVINCES = Set.of(
             "ho chi minh",
@@ -122,6 +138,7 @@ public class OrderServiceImpl implements OrderService {
     private final MomoCheckoutSessionRepository momoCheckoutSessionRepository;
     private final VnpayCheckoutSessionRepository vnpayCheckoutSessionRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final StockReservationRepository stockReservationRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
@@ -145,6 +162,7 @@ public class OrderServiceImpl implements OrderService {
             MomoCheckoutSessionRepository momoCheckoutSessionRepository,
             VnpayCheckoutSessionRepository vnpayCheckoutSessionRepository,
             ProductVariantRepository productVariantRepository,
+            StockReservationRepository stockReservationRepository,
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
             OrderStatusHistoryRepository orderStatusHistoryRepository,
@@ -167,6 +185,7 @@ public class OrderServiceImpl implements OrderService {
         this.momoCheckoutSessionRepository = momoCheckoutSessionRepository;
         this.vnpayCheckoutSessionRepository = vnpayCheckoutSessionRepository;
         this.productVariantRepository = productVariantRepository;
+        this.stockReservationRepository = stockReservationRepository;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.orderStatusHistoryRepository = orderStatusHistoryRepository;
@@ -201,7 +220,9 @@ public class OrderServiceImpl implements OrderService {
         long subTotal = 0L;
         for (CartItemEntity item : cartItems) {
             ProductVariantEntity variant = getVariant(item.getVariantId());
-            if (item.getQuantity() > variant.getStock()) {
+            int stock = variant.getStock() == null ? 0 : variant.getStock();
+            int availableForNewOrder = stock - getActiveReservedQuantity(variant.getId());
+            if (item.getQuantity() > availableForNewOrder) {
                 throw new BusinessException("Not enough stock for variant: " + variant.getSku(), HttpStatus.BAD_REQUEST);
             }
             subTotal += variant.getPrice() * item.getQuantity();
@@ -218,6 +239,32 @@ public class OrderServiceImpl implements OrderService {
         }
         if (PAYMENT_VNPAY.equalsIgnoreCase(paymentMethod)) {
             return createVnpayCheckoutSession(user, request, cartItems, subTotal, shippingFee, discountAmount, total, resolvedCoupon);
+        }
+        boolean reserveCodStock = PAYMENT_COD.equalsIgnoreCase(paymentMethod);
+        Map<Long, ProductVariantEntity> lockedVariants = new HashMap<>();
+        if (reserveCodStock) {
+            Map<Long, Integer> requestedQtyByVariantId = new HashMap<>();
+            for (CartItemEntity item : cartItems) {
+                if (item.getVariantId() == null) {
+                    throw new BusinessException("variantId is required", HttpStatus.BAD_REQUEST);
+                }
+                int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+                if (quantity <= 0) {
+                    throw new BusinessException("quantity must be >= 1", HttpStatus.BAD_REQUEST);
+                }
+                requestedQtyByVariantId.merge(item.getVariantId(), quantity, Integer::sum);
+            }
+            for (Long variantId : requestedQtyByVariantId.keySet().stream().sorted().toList()) {
+                ProductVariantEntity lockedVariant = productVariantRepository.findByIdForUpdate(variantId)
+                        .orElseThrow(() -> new BusinessException("Variant not found", HttpStatus.BAD_REQUEST));
+                int stock = lockedVariant.getStock() == null ? 0 : lockedVariant.getStock();
+                int requested = requestedQtyByVariantId.getOrDefault(variantId, 0);
+                int availableForNewOrder = stock - getActiveReservedQuantity(variantId);
+                if (availableForNewOrder < requested) {
+                    throw new BusinessException("Not enough stock for variant: " + lockedVariant.getSku(), HttpStatus.BAD_REQUEST);
+                }
+                lockedVariants.put(variantId, lockedVariant);
+            }
         }
 
         OrderEntity order = new OrderEntity();
@@ -236,7 +283,15 @@ public class OrderServiceImpl implements OrderService {
         OrderEntity savedOrder = orderRepository.save(order);
 
         for (CartItemEntity item : cartItems) {
-            ProductVariantEntity variant = getVariant(item.getVariantId());
+            ProductVariantEntity variant = reserveCodStock
+                    ? lockedVariants.get(item.getVariantId())
+                    : getVariant(item.getVariantId());
+            if (variant == null) {
+                throw new BusinessException("Variant not found", HttpStatus.BAD_REQUEST);
+            }
+            if (reserveCodStock) {
+                reserveStockForCodOrder(savedOrder, variant.getId(), item.getQuantity());
+            }
             OrderItemEntity orderItem = new OrderItemEntity();
             orderItem.setOrderId(savedOrder.getId());
             orderItem.setVariantId(variant.getId());
@@ -281,17 +336,38 @@ public class OrderServiceImpl implements OrderService {
         Long couponEligibilityUserId = customer == null ? null : customer.getId();
 
         List<PosCheckoutItemRequest> items = request.getItems();
-        long subTotal = 0L;
+        Map<Long, Integer> requestedQtyByVariantId = new HashMap<>();
         for (PosCheckoutItemRequest item : items) {
-            ProductVariantEntity variant = getVariant(item.getVariantId());
+            if (item.getVariantId() == null) {
+                throw new BusinessException("variantId is required", HttpStatus.BAD_REQUEST);
+            }
             int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
             if (quantity <= 0) {
                 throw new BusinessException("quantity must be >= 1", HttpStatus.BAD_REQUEST);
             }
-            int available = variant.getStock() == null ? 0 : variant.getStock();
-            if (available < quantity) {
-                throw new BusinessException("Not enough stock for variant: " + variant.getSku(), HttpStatus.BAD_REQUEST);
+            requestedQtyByVariantId.merge(item.getVariantId(), quantity, Integer::sum);
+        }
+
+        Map<Long, ProductVariantEntity> lockedVariants = new HashMap<>();
+        for (Long variantId : requestedQtyByVariantId.keySet().stream().sorted().toList()) {
+            ProductVariantEntity lockedVariant = productVariantRepository.findByIdForUpdate(variantId)
+                    .orElseThrow(() -> new BusinessException("Variant not found", HttpStatus.BAD_REQUEST));
+            int stock = lockedVariant.getStock() == null ? 0 : lockedVariant.getStock();
+            int requested = requestedQtyByVariantId.getOrDefault(variantId, 0);
+            int availableForNewOrder = stock - getActiveReservedQuantity(variantId);
+            if (availableForNewOrder < requested) {
+                throw new BusinessException("Not enough stock for variant: " + lockedVariant.getSku(), HttpStatus.BAD_REQUEST);
             }
+            lockedVariants.put(variantId, lockedVariant);
+        }
+
+        long subTotal = 0L;
+        for (PosCheckoutItemRequest item : items) {
+            ProductVariantEntity variant = lockedVariants.get(item.getVariantId());
+            if (variant == null) {
+                throw new BusinessException("Variant not found", HttpStatus.BAD_REQUEST);
+            }
+            int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
             subTotal += (variant.getPrice() == null ? 0L : variant.getPrice()) * quantity;
         }
 
@@ -339,14 +415,20 @@ public class OrderServiceImpl implements OrderService {
         OrderEntity savedOrder = orderRepository.save(order);
 
         for (PosCheckoutItemRequest item : items) {
-            ProductVariantEntity variant = getVariant(item.getVariantId());
-            inventoryMovementService.deductStockByVariantId(
-                    variant.getId(),
-                    item.getQuantity(),
-                    INVENTORY_TYPE_POS,
-                    "POS checkout order #" + savedOrder.getId()
-            );
-
+            ProductVariantEntity variant = lockedVariants.get(item.getVariantId());
+            if (variant == null) {
+                throw new BusinessException("Variant not found", HttpStatus.BAD_REQUEST);
+            }
+            if (useMomoPosPayment) {
+                reserveStockForMomoPosOrder(savedOrder, variant.getId(), item.getQuantity());
+            } else {
+                inventoryMovementService.deductStockByVariantId(
+                        variant.getId(),
+                        item.getQuantity(),
+                        INVENTORY_TYPE_POS,
+                        "POS checkout order #" + savedOrder.getId()
+                );
+            }
             OrderItemEntity orderItem = new OrderItemEntity();
             orderItem.setOrderId(savedOrder.getId());
             orderItem.setVariantId(variant.getId());
@@ -698,11 +780,64 @@ public class OrderServiceImpl implements OrderService {
             return;
         }
         if (session.getCreatedOrderId() != null) {
-            if (!MOMO_SESSION_STATUS_COMPLETED.equalsIgnoreCase(session.getStatus())) {
-                session.setStatus(MOMO_SESSION_STATUS_COMPLETED);
-                session.setConsumedAt(LocalDateTime.now());
-                momoCheckoutSessionRepository.save(session);
+            OrderEntity order = orderRepository.findById(session.getCreatedOrderId()).orElse(null);
+            if (order != null && STATUS_WAITING_PAYMENT.equalsIgnoreCase(safeTrim(order.getStatus()))) {
+                if (session.getExpiresAt() != null && session.getExpiresAt().isBefore(LocalDateTime.now())) {
+                    applyOrderStatus(order, STATUS_CANCELLED, false);
+                    session.setStatus(MOMO_SESSION_STATUS_EXPIRED);
+                    session.setConsumedAt(LocalDateTime.now());
+                    momoCheckoutSessionRepository.save(session);
+                    return;
+                }
+
+                List<MomoCartItemSnapshot> snapshots = parseCartSnapshot(session.getCartItemsPayload());
+                if (snapshots.isEmpty()) {
+                    throw new BusinessException("MoMo session cart is empty", HttpStatus.BAD_REQUEST);
+                }
+                CreateOrderRequest request = parseCreateOrderRequestSnapshot(session.getRequestPayload());
+                UserEntity user = userRepository.findById(session.getUserId())
+                        .orElseThrow(() -> new BusinessException("User not found for MoMo session", HttpStatus.NOT_FOUND));
+
+                List<CartItemEntity> pseudoCartItems = toPseudoCartItems(snapshots);
+                try {
+                    tryCreateGhnShippingOrder(order, user, request, pseudoCartItems);
+                } catch (Exception ex) {
+                    log.error("Cannot create GHN shipping order after MoMo paid. orderId={}", order.getId(), ex);
+                    order.setShippingStatus("CREATE_FAILED");
+                    order.setShippingUpdatedAt(LocalDateTime.now());
+                    orderRepository.save(order);
+                }
+
+                applyOrderStatus(order, STATUS_PENDING, false);
+
+                if (session.getCouponId() != null) {
+                    CouponEntity coupon = couponRepository.findById(session.getCouponId()).orElse(null);
+                    if (coupon != null) {
+                        coupon.setUsedCount((coupon.getUsedCount() == null ? 0 : coupon.getUsedCount()) + 1);
+                        couponRepository.save(coupon);
+
+                        CouponUsageEntity usage = new CouponUsageEntity();
+                        usage.setCouponId(coupon.getId());
+                        usage.setUserId(order.getUserId());
+                        usage.setOrderId(order.getId());
+                        usage.setUsedAt(LocalDateTime.now());
+                        couponUsageRepository.save(usage);
+                    }
+                }
+
+                CartEntity cart = cartRepository.findByUserId(order.getUserId()).orElse(null);
+                if (cart != null) {
+                    cartItemRepository.deleteByCartId(cart.getId());
+                }
+                publishOrderCreatedAfterCommit(order.getId());
+                auditLogService.log("ORDER_CREATED", "ORDER", order.getId(), "Created order after MoMo payment");
             }
+
+            session.setStatus(MOMO_SESSION_STATUS_COMPLETED);
+            session.setConsumedAt(LocalDateTime.now());
+            session.setPaidAt(LocalDateTime.now());
+            session.setPaymentTransactionCode(toText(payload.get("orderId")));
+            momoCheckoutSessionRepository.save(session);
             return;
         }
 
@@ -815,6 +950,76 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    public int cancelExpiredMomoWaitingPaymentOrders() {
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(MOMO_SESSION_TTL_MINUTES);
+        List<OrderEntity> expiredOrders = orderRepository.findByStatusIgnoreCaseAndPaymentMethodIgnoreCaseAndCreatedAtBefore(
+                STATUS_WAITING_PAYMENT,
+                PAYMENT_MOMO,
+                cutoff
+        );
+        if (expiredOrders.isEmpty()) {
+            return 0;
+        }
+
+        int cancelled = 0;
+        for (OrderEntity order : expiredOrders) {
+            if (!STATUS_WAITING_PAYMENT.equalsIgnoreCase(safeTrim(order.getStatus()))) {
+                continue;
+            }
+            applyOrderStatus(order, STATUS_CANCELLED, false);
+            paymentRepository.findByOrderId(order.getId()).ifPresent(payment -> {
+                if (PAYMENT_STATUS_PAID.equalsIgnoreCase(safeTrim(payment.getStatus()))) {
+                    return;
+                }
+                payment.setStatus(PAYMENT_STATUS_FAILED);
+                paymentRepository.save(payment);
+            });
+            auditLogService.log(
+                    "MOMO_ORDER_TIMEOUT_CANCELLED",
+                    "ORDER",
+                    order.getId(),
+                    "Auto-cancel MoMo waiting-payment order due to timeout"
+            );
+            cancelled += 1;
+        }
+        return cancelled;
+    }
+
+    @Override
+    @Transactional
+    public int cancelExpiredCodReservedOrders() {
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(COD_RESERVATION_TTL_MINUTES);
+        List<OrderEntity> expiredOrders = orderRepository.findByStatusIgnoreCaseAndPaymentMethodIgnoreCaseAndCreatedAtBefore(
+                "CONFIRMED",
+                PAYMENT_COD,
+                cutoff
+        );
+        if (expiredOrders.isEmpty()) {
+            return 0;
+        }
+
+        int cancelled = 0;
+        for (OrderEntity order : expiredOrders) {
+            if (!"CONFIRMED".equalsIgnoreCase(safeTrim(order.getStatus()))) {
+                continue;
+            }
+            if (!stockReservationRepository.existsByOrderIdAndStatusIgnoreCase(order.getId(), RESERVATION_STATUS_ACTIVE)) {
+                continue;
+            }
+            applyOrderStatus(order, STATUS_CANCELLED, false);
+            auditLogService.log(
+                    "COD_ORDER_TIMEOUT_CANCELLED",
+                    "ORDER",
+                    order.getId(),
+                    "Auto-cancel COD reserved order due to timeout before shipped"
+            );
+            cancelled += 1;
+        }
+        return cancelled;
+    }
+
+    @Override
+    @Transactional
     public int bulkUpdateStatus(List<Long> ids, String status) {
         if (ids == null || ids.isEmpty()) {
             throw new BusinessException("ids must not be empty", HttpStatus.BAD_REQUEST);
@@ -882,6 +1087,60 @@ public class OrderServiceImpl implements OrderService {
 
         MomoCheckoutSessionEntity session = new MomoCheckoutSessionEntity();
         String token = UUID.randomUUID().toString().replace("-", "");
+        Map<Long, Integer> requestedQtyByVariantId = new HashMap<>();
+        for (CartItemEntity item : cartItems) {
+            if (item.getVariantId() == null) {
+                throw new BusinessException("variantId is required", HttpStatus.BAD_REQUEST);
+            }
+            int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+            if (quantity <= 0) {
+                throw new BusinessException("quantity must be >= 1", HttpStatus.BAD_REQUEST);
+            }
+            requestedQtyByVariantId.merge(item.getVariantId(), quantity, Integer::sum);
+        }
+        Map<Long, ProductVariantEntity> lockedVariants = new HashMap<>();
+        for (Long variantId : requestedQtyByVariantId.keySet().stream().sorted().toList()) {
+            ProductVariantEntity lockedVariant = productVariantRepository.findByIdForUpdate(variantId)
+                    .orElseThrow(() -> new BusinessException("Variant not found", HttpStatus.BAD_REQUEST));
+            int stock = lockedVariant.getStock() == null ? 0 : lockedVariant.getStock();
+            int requested = requestedQtyByVariantId.getOrDefault(variantId, 0);
+            int availableForNewOrder = stock - getActiveReservedQuantity(variantId);
+            if (availableForNewOrder < requested) {
+                throw new BusinessException("Not enough stock for variant: " + lockedVariant.getSku(), HttpStatus.BAD_REQUEST);
+            }
+            lockedVariants.put(variantId, lockedVariant);
+        }
+
+        OrderEntity order = new OrderEntity();
+        order.setUserId(user.getId());
+        order.setSubTotal(subTotal);
+        order.setShippingFee(shippingFee);
+        order.setDiscountAmount(discountAmount);
+        order.setCouponId(resolvedCoupon == null ? null : resolvedCoupon.coupon.getId());
+        order.setCouponCode(resolvedCoupon == null ? null : resolvedCoupon.coupon.getCode());
+        order.setTotalPrice(total);
+        order.setStatus(STATUS_WAITING_PAYMENT);
+        order.setPaymentMethod(PAYMENT_MOMO);
+        order.setShippingProvider(SHIPPING_PROVIDER_GHN);
+        order.setAddress(safeTrim(request.getAddress()));
+        order.setCreatedAt(LocalDateTime.now());
+        OrderEntity savedOrder = orderRepository.save(order);
+
+        for (CartItemEntity item : cartItems) {
+            ProductVariantEntity variant = lockedVariants.get(item.getVariantId());
+            if (variant == null) {
+                throw new BusinessException("Variant not found", HttpStatus.BAD_REQUEST);
+            }
+            reserveStockForMomoOrder(savedOrder, variant.getId(), item.getQuantity(), "Reserve for MoMo client waiting payment order #");
+
+            OrderItemEntity orderItem = new OrderItemEntity();
+            orderItem.setOrderId(savedOrder.getId());
+            orderItem.setVariantId(variant.getId());
+            orderItem.setQuantity(item.getQuantity());
+            orderItem.setPrice(variant.getPrice());
+            orderItemRepository.save(orderItem);
+        }
+
         session.setToken(token);
         session.setUserId(user.getId());
         session.setRequestPayload(writeJson(request));
@@ -893,6 +1152,7 @@ public class OrderServiceImpl implements OrderService {
         session.setCouponId(resolvedCoupon == null ? null : resolvedCoupon.coupon.getId());
         session.setCouponCode(resolvedCoupon == null ? null : resolvedCoupon.coupon.getCode());
         session.setStatus(MOMO_SESSION_STATUS_PENDING);
+        session.setCreatedOrderId(savedOrder.getId());
         session.setCreatedAt(LocalDateTime.now());
         session.setExpiresAt(LocalDateTime.now().plusMinutes(MOMO_SESSION_TTL_MINUTES));
         momoCheckoutSessionRepository.save(session);
@@ -910,25 +1170,12 @@ public class OrderServiceImpl implements OrderService {
             );
         } catch (RuntimeException ex) {
             momoCheckoutSessionRepository.delete(session);
+            orderRepository.delete(savedOrder);
             throw ex;
         }
 
-        return OrderResponse.builder()
-                .id(null)
-                .userId(user.getId())
-                .totalPrice(total)
-                .subTotal(subTotal)
-                .shippingFee(shippingFee)
-                .discountAmount(discountAmount)
-                .appliedVoucherCode(session.getCouponCode())
-                .status("WAITING_PAYMENT")
-                .paymentMethod(PAYMENT_MOMO)
-                .paymentUrl(payUrl)
-                .address(safeTrim(request.getAddress()))
-                .createdAt(session.getCreatedAt())
-                .items(List.of())
-                .statusHistory(List.of())
-                .build();
+        addHistory(savedOrder.getId(), STATUS_WAITING_PAYMENT);
+        return toResponseWithPaymentUrl(savedOrder, payUrl);
     }
 
     private OrderResponse createVnpayCheckoutSession(
@@ -1265,6 +1512,82 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
+    private int getActiveReservedQuantity(Long variantId) {
+        if (variantId == null) {
+            return 0;
+        }
+        long reserved = stockReservationRepository.sumActiveQuantityByVariantId(
+                variantId,
+                RESERVATION_STATUS_ACTIVE,
+                LocalDateTime.now()
+        );
+        if (reserved <= 0) {
+            return 0;
+        }
+        return (int) Math.min(Integer.MAX_VALUE, reserved);
+    }
+
+    private void reserveStockForMomoPosOrder(OrderEntity order, Long variantId, Integer quantityValue) {
+        reserveStockForMomoOrder(order, variantId, quantityValue, "Reserve for MoMo POS waiting payment order #");
+    }
+
+    private void reserveStockForCodOrder(OrderEntity order, Long variantId, Integer quantityValue) {
+        reserveStockForOrder(order, variantId, quantityValue, "Reserve for COD order #", COD_RESERVATION_TTL_MINUTES);
+    }
+
+    private void reserveStockForMomoOrder(
+            OrderEntity order,
+            Long variantId,
+            Integer quantityValue,
+            String notePrefix
+    ) {
+        reserveStockForOrder(order, variantId, quantityValue, notePrefix, MOMO_SESSION_TTL_MINUTES);
+    }
+
+    private void reserveStockForOrder(
+            OrderEntity order,
+            Long variantId,
+            Integer quantityValue,
+            String notePrefix,
+            long ttlMinutes
+    ) {
+        if (order == null || order.getId() == null || variantId == null) {
+            return;
+        }
+        int quantity = quantityValue == null ? 0 : quantityValue;
+        if (quantity <= 0) {
+            return;
+        }
+        StockReservationEntity reservation = new StockReservationEntity();
+        reservation.setOrderId(order.getId());
+        reservation.setVariantId(variantId);
+        reservation.setQuantity(quantity);
+        reservation.setStatus(RESERVATION_STATUS_ACTIVE);
+        reservation.setExpiresAt(LocalDateTime.now().plusMinutes(Math.max(1L, ttlMinutes)));
+        reservation.setNote(safeTrim(notePrefix) + order.getId());
+        reservation.setCreatedAt(LocalDateTime.now());
+        stockReservationRepository.save(reservation);
+    }
+
+    private List<CartItemEntity> toPseudoCartItems(List<MomoCartItemSnapshot> snapshots) {
+        List<CartItemEntity> pseudoCartItems = new ArrayList<>();
+        for (MomoCartItemSnapshot snapshot : snapshots) {
+            Long variantId = snapshot.variantId == null ? null : snapshot.variantId;
+            Integer quantity = snapshot.quantity == null ? null : snapshot.quantity;
+            if (variantId == null || quantity == null || quantity <= 0) {
+                continue;
+            }
+            CartItemEntity pseudoCartItem = new CartItemEntity();
+            pseudoCartItem.setVariantId(variantId);
+            pseudoCartItem.setQuantity(quantity);
+            pseudoCartItems.add(pseudoCartItem);
+        }
+        if (pseudoCartItems.isEmpty()) {
+            throw new BusinessException("MoMo session has no valid items", HttpStatus.BAD_REQUEST);
+        }
+        return pseudoCartItems;
+    }
+
     private String writeJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -1397,12 +1720,131 @@ public class OrderServiceImpl implements OrderService {
         if (normalized.equals(current)) {
             return;
         }
+        if (shouldCaptureReservedStockOnStatusTransition(order, current, normalized)) {
+            captureReservedStockForMomoPosOrder(order);
+        } else if (shouldReleaseReservedStockOnStatusTransition(order, current, normalized)) {
+            releaseReservedStockForMomoPosOrder(order);
+        }
         order.setStatus(normalized);
         if (externalSync) {
             order.setShippingUpdatedAt(LocalDateTime.now());
         }
         orderRepository.save(order);
         addHistory(order.getId(), normalized);
+    }
+
+    private boolean shouldCaptureReservedStockOnStatusTransition(OrderEntity order, String currentStatus, String targetStatus) {
+        if (order == null) {
+            return false;
+        }
+        String provider = safeTrim(order.getShippingProvider()).toUpperCase(Locale.ROOT);
+        String paymentMethod = safeTrim(order.getPaymentMethod()).toUpperCase(Locale.ROOT);
+
+        if (PAYMENT_MOMO.equals(paymentMethod) && STATUS_WAITING_PAYMENT.equals(currentStatus)) {
+            boolean posCaptureTarget = Set.of("CONFIRMED", STATUS_DELIVERED).contains(targetStatus);
+            boolean clientCaptureTarget = SHIPPING_PROVIDER_GHN.equals(provider) && STATUS_PENDING.equals(targetStatus);
+            if (posCaptureTarget || clientCaptureTarget) {
+                return stockReservationRepository.existsByOrderIdAndStatusIgnoreCase(order.getId(), RESERVATION_STATUS_ACTIVE);
+            }
+            return false;
+        }
+
+        if (PAYMENT_COD.equals(paymentMethod)
+                && SHIPPING_PROVIDER_GHN.equals(provider)
+                && Set.of(STATUS_PENDING, "PROCESSING", "CONFIRMED").contains(currentStatus)
+                && Set.of("SHIPPED", STATUS_DELIVERED).contains(targetStatus)) {
+            return stockReservationRepository.existsByOrderIdAndStatusIgnoreCase(order.getId(), RESERVATION_STATUS_ACTIVE);
+        }
+        return false;
+    }
+
+    private boolean shouldReleaseReservedStockOnStatusTransition(OrderEntity order, String currentStatus, String targetStatus) {
+        if (order == null) {
+            return false;
+        }
+        if (!Set.of(STATUS_CANCELLED, STATUS_FAILED, "FAILED_DELIVERY").contains(targetStatus)) {
+            return false;
+        }
+        String provider = safeTrim(order.getShippingProvider()).toUpperCase(Locale.ROOT);
+        String paymentMethod = safeTrim(order.getPaymentMethod()).toUpperCase(Locale.ROOT);
+        if (PAYMENT_MOMO.equals(paymentMethod) && STATUS_WAITING_PAYMENT.equals(currentStatus)) {
+            return stockReservationRepository.existsByOrderIdAndStatusIgnoreCase(order.getId(), RESERVATION_STATUS_ACTIVE);
+        }
+        if (PAYMENT_COD.equals(paymentMethod)
+                && SHIPPING_PROVIDER_GHN.equals(provider)
+                && Set.of(STATUS_PENDING, "PROCESSING", "CONFIRMED").contains(currentStatus)) {
+            return stockReservationRepository.existsByOrderIdAndStatusIgnoreCase(order.getId(), RESERVATION_STATUS_ACTIVE);
+        }
+        if (!PAYMENT_MOMO.equals(paymentMethod)) {
+            return false;
+        }
+        return stockReservationRepository.existsByOrderIdAndStatusIgnoreCase(order.getId(), RESERVATION_STATUS_ACTIVE);
+    }
+
+    private void captureReservedStockForMomoPosOrder(OrderEntity order) {
+        List<StockReservationEntity> reservations = stockReservationRepository
+                .findByOrderIdAndStatusIgnoreCaseOrderByIdAsc(order.getId(), RESERVATION_STATUS_ACTIVE);
+        if (reservations.isEmpty()) {
+            return;
+        }
+        for (StockReservationEntity reservation : reservations) {
+            int quantity = reservation.getQuantity() == null ? 0 : reservation.getQuantity();
+            if (quantity <= 0) {
+                reservation.setStatus(RESERVATION_STATUS_CONVERTED);
+                reservation.setUpdatedAt(LocalDateTime.now());
+                continue;
+            }
+            inventoryMovementService.deductStockByVariantId(
+                    reservation.getVariantId(),
+                    quantity,
+                    resolveCaptureInventoryType(order),
+                    "Capture reserved stock for MoMo waiting payment order #" + order.getId()
+            );
+            reservation.setStatus(RESERVATION_STATUS_CONVERTED);
+            reservation.setUpdatedAt(LocalDateTime.now());
+        }
+        stockReservationRepository.saveAll(reservations);
+    }
+
+    private void releaseReservedStockForMomoPosOrder(OrderEntity order) {
+        List<StockReservationEntity> reservations = stockReservationRepository
+                .findByOrderIdAndStatusIgnoreCaseOrderByIdAsc(order.getId(), RESERVATION_STATUS_ACTIVE);
+        if (!reservations.isEmpty()) {
+            for (StockReservationEntity reservation : reservations) {
+                reservation.setStatus(RESERVATION_STATUS_RELEASED);
+                reservation.setUpdatedAt(LocalDateTime.now());
+            }
+            stockReservationRepository.saveAll(reservations);
+            return;
+        }
+
+        // Legacy fallback: old WAITING_PAYMENT MoMo POS orders may have been deducted immediately.
+        String provider = safeTrim(order.getShippingProvider()).toUpperCase(Locale.ROOT);
+        if (provider.startsWith("POS_")) {
+            List<OrderItemEntity> orderItems = orderItemRepository.findByOrderIdOrderByIdAsc(order.getId());
+            for (OrderItemEntity item : orderItems) {
+                int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+                if (quantity <= 0) {
+                    continue;
+                }
+                ProductVariantEntity variant = getVariant(item.getVariantId());
+                inventoryMovementService.increaseStockBySku(
+                        variant.getSku(),
+                        quantity,
+                        INVENTORY_TYPE_POS_REVERT,
+                        "Restore stock for legacy cancelled/failed MoMo POS order #" + order.getId()
+                );
+            }
+        }
+    }
+
+    private String resolveCaptureInventoryType(OrderEntity order) {
+        String provider = safeTrim(order == null ? null : order.getShippingProvider()).toUpperCase(Locale.ROOT);
+        String paymentMethod = safeTrim(order == null ? null : order.getPaymentMethod()).toUpperCase(Locale.ROOT);
+        if (PAYMENT_COD.equals(paymentMethod) && SHIPPING_PROVIDER_GHN.equals(provider)) {
+            return INVENTORY_TYPE_COD_CAPTURE;
+        }
+        return provider.startsWith("POS_") ? INVENTORY_TYPE_POS_CAPTURE : INVENTORY_TYPE_CLIENT_CAPTURE;
     }
 
     private OrderResponse toResponse(OrderEntity order) {

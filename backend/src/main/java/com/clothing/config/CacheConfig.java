@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.cache.CacheManager;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -18,6 +19,7 @@ import java.time.Duration;
 import java.util.Map;
 
 @Configuration
+@ConditionalOnProperty(prefix = "app.integrations.redis", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class CacheConfig {
 
     public static final String PRODUCT_LIST_CACHE = "products:list";

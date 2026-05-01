@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
 import java.util.Set;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -30,9 +31,17 @@ public class CustomUserDetailsService implements UserDetailsService {
 
         Set<GrantedAuthority> authorities = user.getRoles()
                 .stream()
-                .map(role -> role.getName().startsWith("ROLE_") ? role.getName() : "ROLE_" + role.getName())
+                .map(role -> role == null ? null : role.getName())
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(name -> !name.isBlank())
+                .map(name -> name.startsWith("ROLE_") ? name : "ROLE_" + name)
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toSet());
+
+        if (authorities.isEmpty()) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+        }
 
         return User.builder()
                 .username(user.getUsername())

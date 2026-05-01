@@ -2,6 +2,16 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: clothing-postgres
+    command:
+      - postgres
+      - -c
+      - shared_buffers=64MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=32MB
+      - -c
+      - max_connections=50
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -10,8 +20,8 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    mem_limit: 512m
-    cpus: 0.5
+    mem_limit: ${POSTGRES_MEM_LIMIT:-320m}
+    cpus: ${POSTGRES_CPUS:-0.35}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
@@ -24,8 +34,8 @@ services:
     command: redis-server --appendonly no --save ""
     ports:
       - "${REDIS_PORT}:6379"
-    mem_limit: 128m
-    cpus: 0.2
+    mem_limit: ${REDIS_MEM_LIMIT:-96m}
+    cpus: ${REDIS_CPUS:-0.15}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -37,8 +47,8 @@ services:
     container_name: clothing-rabbitmq
     ports:
       - "${RABBITMQ_PORT}:5672"
-    mem_limit: 256m
-    cpus: 0.3
+    mem_limit: ${RABBITMQ_MEM_LIMIT:-192m}
+    cpus: ${RABBITMQ_CPUS:-0.2}
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 15s
@@ -51,13 +61,15 @@ services:
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"
+      xpack.ml.enabled: "false"
+      xpack.watcher.enabled: "false"
       ES_JAVA_OPTS: "${ELASTICSEARCH_ES_JAVA_OPTS}"
     ports:
       - "9200:9200"
     volumes:
       - es_data:/usr/share/elasticsearch/data
-    mem_limit: 768m
-    cpus: 0.5
+    mem_limit: ${ELASTICSEARCH_MEM_LIMIT:-512m}
+    cpus: ${ELASTICSEARCH_CPUS:-0.3}
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9200 >/dev/null || exit 1"]
       interval: 20s
@@ -135,8 +147,8 @@ services:
       JAVA_OPTS: ${JAVA_OPTS}
     ports:
       - "${APP_PORT}:8080"
-    mem_limit: 384m
-    cpus: 0.5
+    mem_limit: ${BE_MEM_LIMIT:-320m}
+    cpus: ${BE_CPUS:-0.35}
 
 volumes:
   postgres_data:

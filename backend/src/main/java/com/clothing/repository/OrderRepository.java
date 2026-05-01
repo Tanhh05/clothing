@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 public interface OrderRepository extends JpaRepository<OrderEntity, Long>, JpaSpecificationExecutor<OrderEntity> {
 
@@ -15,6 +16,12 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long>, JpaSp
     List<OrderEntity> findAllByOrderByIdDesc();
 
     Optional<OrderEntity> findByShippingCode(String shippingCode);
+
+    List<OrderEntity> findByStatusIgnoreCaseAndPaymentMethodIgnoreCaseAndCreatedAtBefore(
+            String status,
+            String paymentMethod,
+            LocalDateTime createdAt
+    );
 
     @Query("select distinct o.userId from OrderEntity o where o.userId is not null")
     List<Long> findDistinctUserIds();
