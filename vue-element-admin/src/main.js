@@ -21,12 +21,6 @@ import './utils/error-log' // error log
 
 import * as filters from './filters' // global filters
 
-if (process.env.NODE_ENV === 'development') {
-  // Enable vue-element-admin mock APIs used by demo pages (table/charts/example...)
-  // without affecting real backend routes like /api/*
-  require('../mock')
-}
-
 Vue.use(Element, {
   size: Cookies.get('size') || 'medium', // set element-ui default size
   locale: viLang

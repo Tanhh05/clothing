@@ -322,24 +322,52 @@
         <div v-if="!deletedLoading && !deletedProducts.length" class="deleted-empty">
           Không có sản phẩm đã xóa.
         </div>
-        <div v-else class="deleted-list">
-          <article v-for="item in deletedProducts" :key="item.id" class="deleted-card">
-            <div class="deleted-main">
-              <p class="deleted-name">{{ item.name || "Không có" }}</p>
-              <p class="deleted-meta">
-                #{{ item.id }} • {{ item.brand || "Không thương hiệu" }} • {{ item.categoryName || "Không có" }}
-              </p>
-            </div>
-            <el-button
-              type="success"
-              plain
-              :size="elementSize"
-              :loading="restoringId === item.id"
-              @click="restoreDeletedProduct(item)"
-            >
-              Khôi phục
-            </el-button>
-          </article>
+        <div v-else class="table-wrap">
+          <el-table
+            :data="deletedProducts"
+            border
+            stripe
+            :size="elementSize"
+            class="inventory-table admin-table"
+            table-layout="fixed"
+            empty-text="Không có sản phẩm đã xóa"
+          >
+            <el-table-column label="Ảnh" width="78" align="center">
+              <template slot-scope="{ row }">
+                <img
+                  :src="(row.images && row.images[0] && row.images[0].url) || fallbackImage"
+                  alt="thumb"
+                  class="deleted-thumb"
+                  @error="onThumbError"
+                >
+              </template>
+            </el-table-column>
+            <el-table-column label="Thông tin sản phẩm" min-width="220">
+              <template slot-scope="{ row }">
+                <div>
+                  <p class="deleted-name">{{ row.name || "Không có" }}</p>
+                  <p class="deleted-meta">#{{ row.id }} • {{ row.brand || "Không thương hiệu" }}</p>
+                  <p class="deleted-meta">{{ row.categoryName || "Không có danh mục" }} • {{ formatStatusLabel(row.status) }}</p>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="Thao tác" width="92" align="center">
+              <template slot-scope="{ row }">
+                <div class="admin-action-cell">
+                  <el-tooltip content="Khôi phục" placement="top">
+                    <el-button
+                      :size="elementSize"
+                      icon="el-icon-refresh-left"
+                      class="admin-action-btn admin-action-edit"
+                      circle
+                      :loading="restoringId === row.id"
+                      @click="restoreDeletedProduct(row)"
+                    />
+                  </el-tooltip>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
         </div>
       </div>
     </el-drawer>
@@ -407,7 +435,8 @@
         <el-button type="text" @click="downloadImportTemplate">Tải file mẫu</el-button>
       </div>
       <div class="import-guide">
-        <p>File cần có sheet đầu tiên, hàng đầu là tiêu đề. Thứ tự cột:</p>
+        <p class="guide-title">Định dạng file bắt buộc</p>
+        <p class="guide-sub">File cần có sheet đầu tiên, hàng đầu là tiêu đề. Thứ tự cột:</p>
         <code>name | brand | description | category(id/slug/name) | status | imageUrl | sku | price | stock | weight | size | color | slug</code>
       </div>
 
@@ -424,7 +453,8 @@
         :on-remove="handleImportFileRemove"
       >
         <i class="el-icon-upload" />
-        <div class="el-upload__text">Kéo thả file .xlsx vào đây hoặc <em>chọn file</em></div>
+        <div class="el-upload__text"><strong>Kéo thả file .xlsx vào đây</strong> hoặc <em>chọn file</em></div>
+        <div class="el-upload__tip">Chỉ nhận 1 file .xlsx mỗi lần import</div>
       </el-upload>
 
       <div v-if="importResult" class="import-result">
@@ -1428,6 +1458,14 @@ export default {
   word-break: break-word;
 }
 
+.deleted-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
 .product-image-uploader {
   width: 100%;
 }
@@ -1623,22 +1661,31 @@ export default {
 
 .import-guide {
   margin-bottom: 12px;
-  color: #374151;
+  color: #334155;
   font-size: 13px;
   line-height: 1.5;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 10px 12px;
 
-  p {
-    margin: 0 0 6px;
+  .guide-title {
+    margin: 0 0 4px;
     font-weight: 600;
+    color: #0f172a;
+  }
+
+  .guide-sub {
+    margin: 0 0 6px;
   }
 
   code {
     display: block;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    padding: 8px;
+    background: #ffffff;
+    border: 1px dashed #cbd5e1;
+    padding: 8px 10px;
     white-space: normal;
     word-break: break-word;
+    color: #0f172a;
   }
 }
 
@@ -1652,6 +1699,27 @@ export default {
 
 .import-upload {
   margin-bottom: 12px;
+
+  ::v-deep .el-upload {
+    width: 100%;
+  }
+
+  ::v-deep .el-upload-dragger {
+    width: 100%;
+    border-color: #cbd5e1;
+    background: #ffffff;
+  }
+
+  ::v-deep .el-upload__text strong {
+    color: #0f172a;
+    font-weight: 600;
+  }
+
+  ::v-deep .el-upload__tip {
+    color: #64748b;
+    margin-top: 6px;
+    font-size: 12px;
+  }
 }
 
 .import-result {

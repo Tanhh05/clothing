@@ -14,6 +14,27 @@ body {
   font-family: Helvetica Neue, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
 }
 
+body.ui-font-default {
+  --admin-font-size: 14px;
+}
+
+body.ui-font-medium {
+  --admin-font-size: 13px;
+}
+
+body.ui-font-small {
+  --admin-font-size: 12px;
+}
+
+body.ui-font-mini {
+  --admin-font-size: 11px;
+}
+
+body [class^="el-"],
+body [class*=" el-"] {
+  font-size: var(--admin-font-size, 13px);
+}
+
 label {
   font-weight: 700;
 }

@@ -57,6 +57,23 @@ export function bulkUpdateAdminOrderStatus(ids, status) {
   })
 }
 
+export function fetchAdminInvoicesForPrint(ids) {
+  return request({
+    url: '/orders/admin/invoices/print',
+    method: 'post',
+    data: { ids }
+  })
+}
+
+export function exportAdminInvoicesExcel(ids) {
+  return request({
+    url: '/orders/admin/invoices/export-excel',
+    method: 'post',
+    data: { ids },
+    responseType: 'blob'
+  })
+}
+
 export function fetchCategoriesAdmin(params) {
   const safeParams = params || {}
   return request({
@@ -116,5 +133,14 @@ export function updateAdminCustomerStatus(id, status) {
     url: `/admin/users/${id}/status`,
     method: 'patch',
     data: { status }
+  })
+}
+
+export function exportAdminCustomersExcel(ids) {
+  return request({
+    url: '/admin/users/export-excel',
+    method: 'post',
+    data: { ids },
+    responseType: 'blob'
   })
 }

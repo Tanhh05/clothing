@@ -55,7 +55,7 @@ app:
     elasticsearch:
       enabled: ${ELASTICSEARCH_ENABLED:false}
   cors:
-    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174}
   jwt:
     # >= 32 bytes for HS256
     secret: ${JWT_SECRET:clothing-super-secret-key-need-32-bytes-min}

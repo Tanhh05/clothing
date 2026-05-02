@@ -1,26 +1,32 @@
 <template>
-  <section v-loading="loading" class="admin-page">
+  <section v-loading="loading" class="shopop-page admin-page-shell admin-page">
     <div class="admin-card inventory-panel">
-      <div class="admin-toolbar">
-        <h3 class="title">Nhập kho</h3>
-        <el-button type="primary" @click="openCreate">+ Tạo phiếu nhập</el-button>
-        <el-button class="admin-ghost-btn" @click="loadData">Làm mới</el-button>
+      <div class="panel-header">
+        <div class="panel-actions admin-toolbar">
+          <h3 class="title">Nhập kho</h3>
+          <div class="action-buttons">
+            <el-button type="primary" class="admin-primary-btn" :size="elementSize" @click="openCreate">+ Tạo phiếu nhập</el-button>
+            <el-button class="admin-ghost-btn" :size="elementSize" @click="loadData">Làm mới</el-button>
+          </div>
+        </div>
       </div>
-      <el-table :data="rows" border stripe class="admin-table" empty-text="Không có phiếu nhập">
-        <el-table-column label="ID" width="90" prop="id" />
-        <el-table-column label="Mã phiếu" min-width="160" prop="code" />
-        <el-table-column label="Nhà cung cấp" min-width="180" prop="supplier" />
-        <el-table-column label="Tổng SL" width="120" prop="totalQuantity" />
-        <el-table-column label="Tổng chi phí" width="140" prop="totalCost" />
-        <el-table-column label="Ngày tạo" width="180">
-          <template slot-scope="{ row }">{{ formatDate(row.createdAt) }}</template>
-        </el-table-column>
-        <el-table-column label="Thao tác" width="130" align="center">
-          <template slot-scope="{ row }">
-            <el-button size="mini" plain @click="openDetail(row)">Chi tiết</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <div class="table-wrap">
+        <el-table :data="rows" border stripe :size="elementSize" class="inventory-table admin-table" empty-text="Không có phiếu nhập" table-layout="fixed">
+          <el-table-column label="ID" width="90" prop="id" />
+          <el-table-column label="Mã phiếu" min-width="160" prop="code" />
+          <el-table-column label="Nhà cung cấp" min-width="180" prop="supplier" />
+          <el-table-column label="Tổng SL" width="120" prop="totalQuantity" />
+          <el-table-column label="Tổng chi phí" width="140" prop="totalCost" />
+          <el-table-column label="Ngày tạo" width="180">
+            <template slot-scope="{ row }">{{ formatDate(row.createdAt) }}</template>
+          </el-table-column>
+          <el-table-column label="Thao tác" width="130" align="center">
+            <template slot-scope="{ row }">
+              <el-button :size="elementSize" plain @click="openDetail(row)">Chi tiết</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </div>
 
     <el-dialog :visible.sync="createVisible" title="Tạo phiếu nhập kho" width="860px">
@@ -106,6 +112,12 @@ export default {
   created() {
     this.loadData()
   },
+  computed: {
+    elementSize() {
+      const size = this.$store.getters.size
+      return size === 'default' ? undefined : size
+    }
+  },
   methods: {
     defaultForm() {
       return {
@@ -188,3 +200,40 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.shopop-page {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.panel-header {
+  margin-bottom: 10px;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.table-wrap {
+  width: 100%;
+}
+
+.inventory-table {
+  width: 100%;
+}
+</style>

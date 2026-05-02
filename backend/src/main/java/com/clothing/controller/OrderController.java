@@ -1,6 +1,7 @@
 package com.clothing.controller;
 
 import com.clothing.dto.request.CreateOrderRequest;
+import com.clothing.dto.request.OrderIdsRequest;
 import com.clothing.dto.request.OrderBulkStatusRequest;
 import com.clothing.dto.request.PosDraftUpsertRequest;
 import com.clothing.dto.request.PosCheckoutRequest;
@@ -14,6 +15,8 @@ import com.clothing.service.PosDraftService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +31,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -151,6 +156,23 @@ public class OrderController {
     public ResponseEntity<Map<String, Integer>> bulkUpdateStatus(@Valid @RequestBody OrderBulkStatusRequest request) {
         int affected = orderService.bulkUpdateStatus(request.getIds(), request.getStatus());
         return ResponseEntity.ok(Map.of("affected", affected));
+    }
+
+    @PostMapping("/admin/invoices/print")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<OrderResponse>> getAdminInvoicesForPrint(@Valid @RequestBody OrderIdsRequest request) {
+        return ResponseEntity.ok(orderService.getAdminInvoices(request.getIds()));
+    }
+
+    @PostMapping("/admin/invoices/export-excel")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<byte[]> exportAdminInvoicesExcel(@Valid @RequestBody OrderIdsRequest request) {
+        byte[] content = orderService.exportAdminInvoicesExcel(request.getIds());
+        String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=hoa-don-" + ts + ".xlsx")
+                .body(content);
     }
 
     @PostMapping("/{orderId}/status/sync-ghn")

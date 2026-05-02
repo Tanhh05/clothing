@@ -14,9 +14,9 @@
         <ul class="list-unstyled">
           <li>Hoặc bạn có thể:</li>
           <li class="link-type">
-            <router-link to="/dashboard">
-              Về trang chủ
-            </router-link>
+            <a href="#" @click.prevent="logoutAndGoLogin">
+              Về trang chủ (đăng xuất)
+            </a>
           </li>
           <li class="link-type">
             <a href="https://www.taobao.com/">Xem trang khác</a>
@@ -47,6 +47,14 @@ export default {
     }
   },
   methods: {
+    async logoutAndGoLogin() {
+      try {
+        await this.$store.dispatch('user/logout')
+      } catch (error) {
+        await this.$store.dispatch('user/resetToken')
+      }
+      this.$router.replace('/login')
+    },
     back() {
       if (this.$route.query.noGoBack) {
         this.$router.push({ path: '/dashboard' })

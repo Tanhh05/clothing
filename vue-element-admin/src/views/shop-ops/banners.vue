@@ -1,28 +1,34 @@
 <template>
-  <section v-loading="loading" class="admin-page">
+  <section v-loading="loading" class="shopop-page admin-page-shell admin-page">
     <div class="admin-card inventory-panel">
-      <div class="admin-toolbar">
-        <h3 class="title">Biểu ngữ</h3>
-        <el-button type="primary" @click="openCreate">+ Thêm banner</el-button>
-        <el-button class="admin-ghost-btn" @click="loadData">Làm mới</el-button>
+      <div class="panel-header">
+        <div class="panel-actions admin-toolbar">
+          <h3 class="title">Biểu ngữ</h3>
+          <div class="action-buttons">
+            <el-button type="primary" class="admin-primary-btn" :size="elementSize" @click="openCreate">+ Thêm banner</el-button>
+            <el-button class="admin-ghost-btn" :size="elementSize" @click="loadData">Làm mới</el-button>
+          </div>
+        </div>
       </div>
-      <el-table :data="rows" border stripe class="admin-table" empty-text="Không có banner">
-        <el-table-column label="ID" width="90" prop="id" />
-        <el-table-column label="Tiêu đề" min-width="180" prop="title" />
-        <el-table-column label="Ảnh" min-width="220" prop="imageUrl" show-overflow-tooltip />
-        <el-table-column label="Link" min-width="220" prop="linkUrl" show-overflow-tooltip />
-        <el-table-column label="Trạng thái" width="120">
-          <template slot-scope="{ row }">
-            {{ formatStatus(row.status) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="Thao tác" width="170" align="center">
-          <template slot-scope="{ row }">
-            <el-button size="mini" plain @click="openEdit(row)">Sửa</el-button>
-            <el-button size="mini" type="danger" plain @click="remove(row)">Xóa</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <div class="table-wrap">
+        <el-table :data="rows" border stripe :size="elementSize" class="inventory-table admin-table" empty-text="Không có banner" table-layout="fixed">
+          <el-table-column label="ID" width="90" prop="id" />
+          <el-table-column label="Tiêu đề" min-width="180" prop="title" />
+          <el-table-column label="Ảnh" min-width="220" prop="imageUrl" show-overflow-tooltip />
+          <el-table-column label="Link" min-width="220" prop="linkUrl" show-overflow-tooltip />
+          <el-table-column label="Trạng thái" width="120">
+            <template slot-scope="{ row }">
+              {{ formatStatus(row.status) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="Thao tác" width="170" align="center">
+            <template slot-scope="{ row }">
+              <el-button :size="elementSize" plain @click="openEdit(row)">Sửa</el-button>
+              <el-button :size="elementSize" type="danger" plain @click="remove(row)">Xóa</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </div>
 
     <el-dialog :visible.sync="dialogVisible" :title="editingId ? 'Sửa banner' : 'Thêm banner'" width="640px">
@@ -66,6 +72,12 @@ export default {
   },
   created() {
     this.loadData()
+  },
+  computed: {
+    elementSize() {
+      const size = this.$store.getters.size
+      return size === 'default' ? undefined : size
+    }
   },
   methods: {
     formatStatus(status) {
@@ -144,3 +156,40 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.shopop-page {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.panel-header {
+  margin-bottom: 10px;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.table-wrap {
+  width: 100%;
+}
+
+.inventory-table {
+  width: 100%;
+}
+</style>

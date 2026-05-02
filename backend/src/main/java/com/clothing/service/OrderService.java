@@ -43,6 +43,10 @@ public interface OrderService {
 
     int bulkUpdateStatus(List<Long> ids, String status);
 
+    List<OrderResponse> getAdminInvoices(List<Long> ids);
+
+    byte[] exportAdminInvoicesExcel(List<Long> ids);
+
     OrderResponse syncOrderStatusWithGhn(Long orderId);
 
     Map<String, List<String>> getAdminStatusOptions();

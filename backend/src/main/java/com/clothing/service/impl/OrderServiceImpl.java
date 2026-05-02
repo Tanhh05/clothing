@@ -66,7 +66,13 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -84,6 +90,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -1055,6 +1062,61 @@ public class OrderServiceImpl implements OrderService {
         return affected;
     }
 
+    @Override
+    public List<OrderResponse> getAdminInvoices(List<Long> ids) {
+        return fetchInvoicesByIds(ids);
+    }
+
+    @Override
+    public byte[] exportAdminInvoicesExcel(List<Long> ids) {
+        List<OrderResponse> invoices = fetchInvoicesByIds(ids);
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Invoices");
+            String[] headers = {
+                    "Ma don",
+                    "Khach hang",
+                    "Trang thai",
+                    "Thanh toan",
+                    "Van chuyen",
+                    "Tong tien",
+                    "Tam tinh",
+                    "Phi ship",
+                    "Giam gia",
+                    "Dia chi",
+                    "Tao luc"
+            };
+
+            Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                headerRow.createCell(i).setCellValue(headers[i]);
+            }
+
+            int rowIndex = 1;
+            for (OrderResponse invoice : invoices) {
+                Row row = sheet.createRow(rowIndex++);
+                row.createCell(0).setCellValue(invoice.getId() == null ? "" : String.valueOf(invoice.getId()));
+                row.createCell(1).setCellValue(nonNullText(invoice.getCustomerName(), "Khach le"));
+                row.createCell(2).setCellValue(nonNullText(normalizeStatus(invoice.getStatus()), ""));
+                row.createCell(3).setCellValue(nonNullText(invoice.getPaymentMethod(), ""));
+                row.createCell(4).setCellValue(nonNullText(invoice.getShippingStatus(), ""));
+                row.createCell(5).setCellValue(safeLong(invoice.getTotalPrice()));
+                row.createCell(6).setCellValue(safeLong(invoice.getSubTotal()));
+                row.createCell(7).setCellValue(safeLong(invoice.getShippingFee()));
+                row.createCell(8).setCellValue(safeLong(invoice.getDiscountAmount()));
+                row.createCell(9).setCellValue(nonNullText(invoice.getAddress(), ""));
+                row.createCell(10).setCellValue(invoice.getCreatedAt() == null ? "" : invoice.getCreatedAt().toString());
+            }
+
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (IOException ex) {
+            throw new BusinessException("Cannot export invoices excel", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     private OrderResponse createMomoCheckoutSession(
             UserEntity user,
             CreateOrderRequest request,
@@ -1618,6 +1680,46 @@ public class OrderServiceImpl implements OrderService {
 
     private String normalizeStatus(String status) {
         return String.valueOf(status == null ? "" : status).trim().toUpperCase(Locale.ROOT);
+    }
+
+    private List<OrderResponse> fetchInvoicesByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw new BusinessException("ids must not be empty", HttpStatus.BAD_REQUEST);
+        }
+        List<Long> normalizedIds = ids.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (normalizedIds.isEmpty()) {
+            throw new BusinessException("ids must not be empty", HttpStatus.BAD_REQUEST);
+        }
+
+        List<OrderEntity> foundOrders = orderRepository.findAllById(normalizedIds);
+        if (foundOrders.isEmpty()) {
+            throw new BusinessException("Orders not found", HttpStatus.NOT_FOUND);
+        }
+
+        Set<Long> foundIds = foundOrders.stream()
+                .map(OrderEntity::getId)
+                .collect(Collectors.toSet());
+        List<Long> missingIds = normalizedIds.stream()
+                .filter(id -> !foundIds.contains(id))
+                .toList();
+        if (!missingIds.isEmpty()) {
+            throw new BusinessException("Orders not found: " + missingIds, HttpStatus.NOT_FOUND);
+        }
+
+        Map<Long, Integer> orderIndex = new HashMap<>();
+        for (int i = 0; i < normalizedIds.size(); i++) {
+            orderIndex.put(normalizedIds.get(i), i);
+        }
+        foundOrders.sort(Comparator.comparingInt(order -> orderIndex.getOrDefault(order.getId(), Integer.MAX_VALUE)));
+        return toResponses(foundOrders);
+    }
+
+    private String nonNullText(String value, String fallback) {
+        String trimmed = safeTrim(value);
+        return trimmed.isBlank() ? fallback : trimmed;
     }
 
     private String normalizeShippingCode(String shippingCode) {

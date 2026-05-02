@@ -1,34 +1,40 @@
 <template>
-  <section v-loading="loading" class="admin-page">
+  <section v-loading="loading" class="shopop-page admin-page-shell admin-page">
     <div class="admin-card inventory-panel">
-      <div class="admin-toolbar">
-        <h3 class="title">Mã giảm giá</h3>
-        <el-button type="primary" @click="openCreate">+ Thêm voucher</el-button>
-        <el-button class="admin-ghost-btn" @click="loadData">Làm mới</el-button>
+      <div class="panel-header">
+        <div class="panel-actions admin-toolbar">
+          <h3 class="title">Mã giảm giá</h3>
+          <div class="action-buttons">
+            <el-button type="primary" class="admin-primary-btn" :size="elementSize" @click="openCreate">+ Thêm voucher</el-button>
+            <el-button class="admin-ghost-btn" :size="elementSize" @click="loadData">Làm mới</el-button>
+          </div>
+        </div>
       </div>
-      <el-table :data="rows" border stripe class="admin-table" empty-text="Không có voucher">
-        <el-table-column label="ID" width="90" prop="id" />
-        <el-table-column label="Mã" min-width="160" prop="code" />
-        <el-table-column label="Loại" width="140">
-          <template slot-scope="{ row }">
-            {{ formatDiscountType(row.discountType) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="Giá trị" width="130" prop="discountValue" />
-        <el-table-column label="Đơn tối thiểu" width="140" prop="minOrderValue" />
-        <el-table-column label="Số lượt" width="100" prop="maxUsage" />
-        <el-table-column label="Trạng thái" width="120">
-          <template slot-scope="{ row }">
-            {{ formatStatus(row.status) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="Thao tác" width="170" align="center">
-          <template slot-scope="{ row }">
-            <el-button size="mini" plain @click="openEdit(row)">Sửa</el-button>
-            <el-button size="mini" type="danger" plain @click="remove(row)">Xóa</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <div class="table-wrap">
+        <el-table :data="rows" border stripe :size="elementSize" class="inventory-table admin-table" empty-text="Không có voucher" table-layout="fixed">
+          <el-table-column label="ID" width="90" prop="id" />
+          <el-table-column label="Mã" min-width="160" prop="code" />
+          <el-table-column label="Loại" width="140">
+            <template slot-scope="{ row }">
+              {{ formatDiscountType(row.discountType) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="Giá trị" width="130" prop="discountValue" />
+          <el-table-column label="Đơn tối thiểu" width="140" prop="minOrderValue" />
+          <el-table-column label="Số lượt" width="100" prop="maxUsage" />
+          <el-table-column label="Trạng thái" width="120">
+            <template slot-scope="{ row }">
+              {{ formatStatus(row.status) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="Thao tác" width="170" align="center">
+            <template slot-scope="{ row }">
+              <el-button :size="elementSize" plain @click="openEdit(row)">Sửa</el-button>
+              <el-button :size="elementSize" type="danger" plain @click="remove(row)">Xóa</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </div>
 
     <el-dialog :visible.sync="dialogVisible" :title="editingId ? 'Sửa voucher' : 'Thêm voucher'" width="640px">
@@ -86,6 +92,12 @@ export default {
   },
   created() {
     this.loadData()
+  },
+  computed: {
+    elementSize() {
+      const size = this.$store.getters.size
+      return size === 'default' ? undefined : size
+    }
   },
   methods: {
     formatDiscountType(type) {
@@ -176,3 +188,40 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.shopop-page {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.panel-header {
+  margin-bottom: 10px;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.table-wrap {
+  width: 100%;
+}
+
+.inventory-table {
+  width: 100%;
+}
+</style>

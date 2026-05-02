@@ -22,8 +22,17 @@
         </div>
       </div>
 
+      <div v-if="selectedIds.length" class="bulk-toolbar">
+        <p>Đã chọn {{ selectedIds.length }} khách hàng</p>
+        <div class="bulk-actions">
+          <el-button :size="elementSize" type="primary" class="admin-primary-btn" @click="exportSelectedCustomers">Xuất Excel</el-button>
+          <el-button :size="elementSize" @click="clearSelection">Bỏ chọn</el-button>
+        </div>
+      </div>
+
       <div class="table-wrap">
         <el-table
+          ref="customerTableRef"
           :data="customers"
           border
           stripe
@@ -31,10 +40,22 @@
           class="inventory-table admin-table"
           empty-text="Chưa có khách hàng"
           table-layout="fixed"
+          @selection-change="handleSelectionChange"
         >
-          <el-table-column label="ID" width="90" prop="id" />
-          <el-table-column label="Tài khoản" min-width="170" prop="username" />
-          <el-table-column label="Họ tên" min-width="170" prop="fullName" />
+          <el-table-column type="selection" width="48" align="center" />
+          <el-table-column label="STT" width="70" align="center">
+            <template slot-scope="{ $index }">
+              {{ (currentPage - 1) * pageSize + $index + 1 }}
+            </template>
+          </el-table-column>
+          <el-table-column label="Khách hàng" min-width="220">
+            <template slot-scope="{ row }">
+              <div class="customer-summary">
+                <strong>{{ row.fullName || 'Không có họ tên' }}</strong>
+                <span>@{{ row.username || 'unknown' }}</span>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column label="Email" min-width="220" prop="email" />
           <el-table-column label="Số điện thoại" min-width="140" prop="phone" />
           <el-table-column label="Trạng thái" width="130" align="center">
@@ -79,7 +100,7 @@
 </template>
 
 <script>
-import { fetchAdminCustomers, updateAdminCustomerStatus } from '@/api/admin-management'
+import { fetchAdminCustomers, updateAdminCustomerStatus, exportAdminCustomersExcel } from '@/api/admin-management'
 import Pagination from '@/components/Pagination'
 
 export default {
@@ -94,7 +115,9 @@ export default {
       status: '',
       pageSize: 20,
       totalElements: 0,
-      currentPage: 1
+      currentPage: 1,
+      selectedIds: [],
+      selectedRows: []
     }
   },
   computed: {
@@ -125,6 +148,7 @@ export default {
         this.totalElements = Number((data && data.totalElements) || 0)
         const responsePage = this.toSafePage(data && data.page, safePage)
         this.currentPage = responsePage + 1
+        this.clearSelection()
       } catch (error) {
         this.$message.error((error && error.response && error.response.data && error.response.data.message) || 'Không tải được khách hàng')
       } finally {
@@ -140,6 +164,36 @@ export default {
       if (normalized === 'ACTIVE') return 'Đang hoạt động'
       if (normalized === 'INACTIVE') return 'Ngưng hoạt động'
       return 'Không có'
+    },
+    handleSelectionChange(rows) {
+      const selected = Array.isArray(rows) ? rows : []
+      this.selectedRows = selected
+      this.selectedIds = selected.map(row => row.id).filter(Boolean)
+    },
+    clearSelection() {
+      this.selectedRows = []
+      this.selectedIds = []
+      if (this.$refs.customerTableRef && this.$refs.customerTableRef.clearSelection) {
+        this.$refs.customerTableRef.clearSelection()
+      }
+    },
+    async exportSelectedCustomers() {
+      if (!this.selectedRows.length) return
+      try {
+        const blob = await exportAdminCustomersExcel(this.selectedIds)
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        const now = new Date()
+        const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
+        link.href = url
+        link.download = `khach-hang-${stamp}.xlsx`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      } catch (error) {
+        this.$message.error((error && error.response && error.response.data && error.response.data.message) || 'Không xuất Excel được')
+      }
     },
     async toggleStatus(row) {
       if (!row || !row.id) return
@@ -172,6 +226,28 @@ export default {
   margin-bottom: 10px;
 }
 
+.bulk-toolbar {
+  margin-bottom: 8px;
+  border: 1px dashed #cfd8e3;
+  padding: 8px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.bulk-toolbar p {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .panel-actions {
   display: flex;
   align-items: center;
@@ -192,6 +268,25 @@ export default {
 }
 
 .inventory-table {
+  width: 100%;
+}
+
+.customer-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.35;
+}
+
+.customer-summary span {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.admin-action-cell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   width: 100%;
 }
 </style>

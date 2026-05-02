@@ -5,11 +5,6 @@ import router from "@/router";
 let requestInterceptorId = null;
 let responseInterceptorId = null;
 
-function isAdminContext() {
-  if (typeof window === "undefined") return false;
-  return window.location.pathname.startsWith("/admin");
-}
-
 function setupInterceptors(pinia) {
   if (requestInterceptorId !== null) {
     api.interceptors.request.eject(requestInterceptorId);
@@ -20,9 +15,7 @@ function setupInterceptors(pinia) {
 
   requestInterceptorId = api.interceptors.request.use((config) => {
     const authStore = useAuthStore(pinia);
-    const token = isAdminContext()
-      ? (authStore.adminToken || authStore.token)
-      : (authStore.token || authStore.adminToken);
+    const token = authStore.token;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -35,11 +28,7 @@ function setupInterceptors(pinia) {
       const status = error?.response?.status;
       if (status === 401) {
         const authStore = useAuthStore(pinia);
-        if (isAdminContext()) {
-          authStore.clearAdminAuth();
-        } else {
-          authStore.clearClientAuth();
-        }
+        authStore.clearClientAuth();
       } else if (status === 403 || status === 404) {
         const targetPath = status === 403 ? "/system/forbidden" : "/system/not-found";
         if (router.currentRoute.value.path !== targetPath) {
