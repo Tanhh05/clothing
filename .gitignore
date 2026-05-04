@@ -3,15 +3,16 @@
 .idea/
 
 # Environment files
-backend/.env
-backend/.env.local
-e-commerce/.env
-e-commerce/.env.local
+api-server/.env
+api-server/.env.local
+storefront/.env
+storefront/.env.local
 
 # Backend build
-backend/target/
-backend/.git.backup-single-repo/
+api-server/target/
+api-server/.git.backup-single-repo/
 
 # Frontend dependencies/build
-e-commerce/node_modules/
-e-commerce/dist/
+storefront/node_modules/
+storefront/dist/
+storefront/.next/

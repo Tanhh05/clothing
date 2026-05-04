@@ -2,7 +2,7 @@ name: Deploy Staging
 
 on:
   workflow_run:
-    workflows: ["Backend CI"]
+    workflows: ["CI"]
     types: [completed]
     branches: ["main"]
   workflow_dispatch:
@@ -17,7 +17,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  deploy_backend:
+    name: Deploy Backend to Staging
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
@@ -37,7 +38,7 @@ jobs:
             echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Deploy backend to staging via SSH
+      - name: Deploy backend via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.STAGING_SSH_HOST }}
@@ -50,19 +51,20 @@ jobs:
             cd "${{ secrets.STAGING_APP_DIR }}"
             git fetch --all --prune
             git checkout -f "${{ steps.meta.outputs.sha }}"
-            cd backend
+            cd api-server
             docker compose build be
             docker compose up -d --force-recreate be
 
-  smoke_test:
+  smoke_test_backend:
+    name: Smoke Test Staging API
     runs-on: ubuntu-latest
-    needs: deploy
+    needs: deploy_backend
     environment: staging
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run staging smoke test
+      - name: Run smoke test
         env:
           BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
           TIMEOUT_SECONDS: "180"
