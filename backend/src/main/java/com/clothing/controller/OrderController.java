@@ -128,8 +128,12 @@ public class OrderController {
     }
 
     @GetMapping("/my")
-    public ResponseEntity<List<OrderResponse>> getMyOrders(Authentication authentication) {
-        return ResponseEntity.ok(orderService.getMyOrders(authentication.getName()));
+    public ResponseEntity<PageResponse<OrderResponse>> getMyOrders(
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return ResponseEntity.ok(orderService.getMyOrders(authentication.getName(), page, size));
     }
 
     @GetMapping("/my/{orderId}")
@@ -140,6 +144,15 @@ public class OrderController {
     @PostMapping("/my/{orderId}/reorder")
     public ResponseEntity<OrderResponse> reorder(Authentication authentication, @PathVariable Long orderId) {
         return ResponseEntity.ok(orderService.reorder(authentication.getName(), orderId));
+    }
+
+    @PostMapping("/my/{orderId}/send-confirmation-email")
+    public ResponseEntity<Map<String, Object>> sendMyOrderConfirmationEmail(
+            Authentication authentication,
+            @PathVariable Long orderId
+    ) {
+        orderService.sendMyOrderConfirmationEmail(authentication.getName(), orderId);
+        return ResponseEntity.ok(Map.of("sent", true));
     }
 
     @PatchMapping("/{orderId}/status")

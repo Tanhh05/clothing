@@ -49,6 +49,7 @@ import com.clothing.service.GhnShippingService;
 import com.clothing.service.InventoryMovementService;
 import com.clothing.service.OrderService;
 import com.clothing.service.PaymentService;
+import com.clothing.service.EmailService;
 import com.clothing.service.AuditLogService;
 import com.clothing.service.StoreSettingService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -158,6 +159,7 @@ public class OrderServiceImpl implements OrderService {
     private final StoreSettingService storeSettingService;
     private final GhnShippingService ghnShippingService;
     private final InventoryMovementService inventoryMovementService;
+    private final EmailService emailService;
     private final ObjectMapper objectMapper;
 
     public OrderServiceImpl(
@@ -182,6 +184,7 @@ public class OrderServiceImpl implements OrderService {
             StoreSettingService storeSettingService,
             GhnShippingService ghnShippingService,
             InventoryMovementService inventoryMovementService,
+            EmailService emailService,
             ObjectMapper objectMapper
     ) {
         this.userRepository = userRepository;
@@ -205,6 +208,7 @@ public class OrderServiceImpl implements OrderService {
         this.storeSettingService = storeSettingService;
         this.ghnShippingService = ghnShippingService;
         this.inventoryMovementService = inventoryMovementService;
+        this.emailService = emailService;
         this.objectMapper = objectMapper;
     }
 
@@ -236,7 +240,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         String province = extractProvince(request);
-        long shippingFee = calculateShippingFee(subTotal, province);
+        long shippingFee = resolveShippingFee(request, subTotal, province);
         ResolvedCoupon resolvedCoupon = resolveBestCoupon(user.getId(), subTotal, request.getVoucherCode());
         long discountAmount = resolvedCoupon == null ? 0L : resolvedCoupon.discountAmount;
         long total = Math.max(0L, subTotal + shippingFee - discountAmount);
@@ -617,6 +621,29 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public PageResponse<OrderResponse> getMyOrders(String username, int page, int size) {
+        if (page < 0) {
+            throw new BusinessException("page must be >= 0", HttpStatus.BAD_REQUEST);
+        }
+        if (size < 1 || size > 100) {
+            throw new BusinessException("size must be between 1 and 100", HttpStatus.BAD_REQUEST);
+        }
+        UserEntity user = getUser(username);
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+        Page<OrderEntity> orderPage = orderRepository.findByUserId(user.getId(), pageable);
+        List<OrderResponse> responses = toResponses(orderPage.getContent());
+        return PageResponse.<OrderResponse>builder()
+                .content(responses)
+                .page(orderPage.getNumber())
+                .size(orderPage.getSize())
+                .totalElements(orderPage.getTotalElements())
+                .totalPages(orderPage.getTotalPages())
+                .first(orderPage.isFirst())
+                .last(orderPage.isLast())
+                .build();
+    }
+
+    @Override
     public OrderResponse getMyOrderById(String username, Long orderId) {
         UserEntity user = getUser(username);
         OrderEntity order = orderRepository.findById(orderId)
@@ -625,6 +652,20 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessException("Order does not belong to current user", HttpStatus.FORBIDDEN);
         }
         return toResponses(List.of(order)).get(0);
+    }
+
+    @Override
+    public void sendMyOrderConfirmationEmail(String username, Long orderId) {
+        UserEntity user = getUser(username);
+        OrderEntity order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException("Order not found", HttpStatus.NOT_FOUND));
+        if (!order.getUserId().equals(user.getId())) {
+            throw new BusinessException("Order does not belong to current user", HttpStatus.FORBIDDEN);
+        }
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
+            throw new BusinessException("Email not found", HttpStatus.BAD_REQUEST);
+        }
+        emailService.sendOrderConfirmationEmail(user.getEmail().trim(), order.getId());
     }
 
     @Override
@@ -2161,26 +2202,47 @@ public class OrderServiceImpl implements OrderService {
                 : 0L;
 
         String clientOrderCode = "ORD-" + order.getId();
-        String shippingCode = ghnShippingService.createShippingOrder(new GhnShippingService.CreateShippingOrderRequest(
-                clientOrderCode,
-                receiver.recipientName,
-                receiver.phone,
-                receiver.address,
-                receiver.province,
-                receiver.district,
-                receiver.ward,
-                codAmount,
-                totalWeightGrams
-        ));
+        try {
+            String shippingCode = ghnShippingService.createShippingOrder(new GhnShippingService.CreateShippingOrderRequest(
+                    clientOrderCode,
+                    receiver.recipientName,
+                    receiver.phone,
+                    receiver.address,
+                    receiver.province,
+                    receiver.district,
+                    receiver.ward,
+                    codAmount,
+                    totalWeightGrams
+            ));
 
-        if (shippingCode == null || shippingCode.isBlank()) {
-            throw new BusinessException("GHN không trả về mã vận đơn", HttpStatus.BAD_GATEWAY);
+            if (shippingCode == null || shippingCode.isBlank()) {
+                log.warn("GHN returned empty shipping code for order {}", order.getId());
+                order.setShippingStatus("pending_create");
+                order.setShippingUpdatedAt(LocalDateTime.now());
+                orderRepository.save(order);
+                return;
+            }
+
+            order.setShippingCode(shippingCode);
+            order.setShippingStatus("ready_to_pick");
+            order.setShippingUpdatedAt(LocalDateTime.now());
+            orderRepository.save(order);
+        } catch (BusinessException ex) {
+            // GHN temporary/system errors should not block checkout.
+            if (ex.getStatus() == HttpStatus.BAD_GATEWAY || ex.getStatus() == HttpStatus.INTERNAL_SERVER_ERROR) {
+                log.warn("Skip GHN create for order {} due to upstream error: {}", order.getId(), ex.getMessage());
+                order.setShippingStatus("pending_create");
+                order.setShippingUpdatedAt(LocalDateTime.now());
+                orderRepository.save(order);
+                return;
+            }
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Unexpected GHN create error for order {}: {}", order.getId(), ex.getMessage(), ex);
+            order.setShippingStatus("pending_create");
+            order.setShippingUpdatedAt(LocalDateTime.now());
+            orderRepository.save(order);
         }
-
-        order.setShippingCode(shippingCode);
-        order.setShippingStatus("ready_to_pick");
-        order.setShippingUpdatedAt(LocalDateTime.now());
-        orderRepository.save(order);
     }
 
     private long estimateTotalWeightGrams(List<CartItemEntity> cartItems) {
@@ -2332,6 +2394,14 @@ public class OrderServiceImpl implements OrderService {
             return defaultFee;
         }
         return defaultFee + FAR_DISTANCE_SURCHARGE;
+    }
+
+    private long resolveShippingFee(CreateOrderRequest request, long subTotal, String province) {
+        Long requestShippingFee = request.getShippingFee();
+        if (requestShippingFee != null && requestShippingFee >= 0) {
+            return requestShippingFee;
+        }
+        return calculateShippingFee(subTotal, province);
     }
 
     private ResolvedCoupon resolveBestCoupon(Long userId, long subTotal, String preferredCode) {

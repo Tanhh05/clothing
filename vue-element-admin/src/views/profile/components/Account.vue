@@ -140,4 +140,12 @@ export default {
 .account-settings {
   max-width: 900px;
 }
+
+.account-settings ::v-deep .el-input__inner,
+.account-settings ::v-deep .el-textarea__inner,
+.account-settings ::v-deep .el-button,
+.account-settings ::v-deep .el-card,
+.account-settings ::v-deep .el-card__body {
+  border-radius: 0 !important;
+}
 </style>

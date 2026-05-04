@@ -34,6 +34,7 @@ public interface OrderService {
     );
 
     List<OrderResponse> getMyOrders(String username);
+    PageResponse<OrderResponse> getMyOrders(String username, int page, int size);
 
     OrderResponse getMyOrderById(String username, Long orderId);
 
@@ -60,4 +61,6 @@ public interface OrderService {
     int cancelExpiredMomoWaitingPaymentOrders();
 
     int cancelExpiredCodReservedOrders();
+
+    void sendMyOrderConfirmationEmail(String username, Long orderId);
 }

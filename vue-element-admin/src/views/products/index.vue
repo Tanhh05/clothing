@@ -834,8 +834,11 @@ export default {
         this.applyProductPageData(data, page)
         this.cacheProductPage(cacheKey, data)
       } catch (error) {
-        if (!cached) {
-          this.$message.error((error && error.response && error.response.data && error.response.data.message) || 'Không tải được sản phẩm')
+        const apiMessage = (error && error.response && error.response.data && error.response.data.message) || ''
+        if (cached) {
+          this.$message.warning(apiMessage || 'Không kết nối được hệ thống dữ liệu. Đang hiển thị dữ liệu đã lưu gần nhất.')
+        } else {
+          this.$message.error(apiMessage || 'Không tải được sản phẩm')
         }
       } finally {
         this.loading = false

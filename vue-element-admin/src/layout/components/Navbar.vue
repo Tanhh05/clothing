@@ -12,7 +12,7 @@
 
         <screenfull id="screenfull" class="right-menu-item hover-effect" />
 
-        <el-tooltip content="Global Size" effect="dark" placement="bottom">
+        <el-tooltip content="Kích thước giao diện" effect="dark" placement="bottom">
           <size-select id="size-select" class="right-menu-item hover-effect" />
         </el-tooltip>
 
@@ -25,19 +25,13 @@
         </div>
         <el-dropdown-menu slot="dropdown">
           <router-link to="/profile/index">
-            <el-dropdown-item>Profile</el-dropdown-item>
+            <el-dropdown-item>Hồ sơ</el-dropdown-item>
           </router-link>
           <router-link to="/">
-            <el-dropdown-item>Dashboard</el-dropdown-item>
+            <el-dropdown-item>Tổng quan</el-dropdown-item>
           </router-link>
-          <a target="_blank" href="https://github.com/PanJiaChen/vue-element-admin/">
-            <el-dropdown-item>Github</el-dropdown-item>
-          </a>
-          <a target="_blank" href="https://panjiachen.github.io/vue-element-admin-site/#/">
-            <el-dropdown-item>Docs</el-dropdown-item>
-          </a>
           <el-dropdown-item divided @click.native="logout">
-            <span style="display:block;">Log Out</span>
+            <span style="display:block;">Đăng xuất</span>
           </el-dropdown-item>
         </el-dropdown-menu>
       </el-dropdown>
@@ -150,7 +144,7 @@ export default {
           cursor: pointer;
           width: 40px;
           height: 40px;
-          border-radius: 10px;
+          border-radius: 0;
         }
 
         .el-icon-caret-bottom {

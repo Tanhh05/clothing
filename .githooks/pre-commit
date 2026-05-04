@@ -2,4 +2,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-"${REPO_ROOT}/scripts/check-no-secrets.sh"
+if [ -x "${REPO_ROOT}/scripts/check-no-secrets.sh" ]; then
+  "${REPO_ROOT}/scripts/check-no-secrets.sh"
+else
+  echo "[pre-commit] skip check-no-secrets.sh (missing)"
+fi

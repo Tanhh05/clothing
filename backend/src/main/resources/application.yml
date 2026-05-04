@@ -19,7 +19,7 @@ spring:
     enabled: true
     baseline-on-migrate: true
     baseline-version: 0
-    ignore-migration-patterns: "*:missing"
+    ignore-migration-patterns: ["*:missing"]
     locations: classpath:db/migration
   data:
     redis:

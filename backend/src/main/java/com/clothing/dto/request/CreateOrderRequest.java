@@ -31,6 +31,8 @@ public class CreateOrderRequest {
     @Size(max = 120, message = "ward max length is 120")
     private String ward;
 
+    private Long shippingFee;
+
     @Size(max = 50, message = "voucherCode max length is 50")
     private String voucherCode;
 
