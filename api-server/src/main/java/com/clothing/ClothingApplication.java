@@ -20,7 +20,11 @@ import java.util.concurrent.TimeUnit;
 public class ClothingApplication {
 
     public static void main(String[] args) {
-        ensurePostgresIsRunningForLocalSqlMode();
+        boolean runningInsideContainer = isRunningInsideContainer();
+        if (!runningInsideContainer) {
+            normalizeLocalDbHost();
+            ensurePostgresIsRunningForLocalSqlMode();
+        }
         SpringApplication application = new SpringApplication(ClothingApplication.class);
         if (!hasExplicitActiveProfile()) {
             application.setAdditionalProfiles("sql-only");
@@ -35,6 +39,24 @@ public class ClothingApplication {
         }
         String envProfile = System.getenv("SPRING_PROFILES_ACTIVE");
         return envProfile != null && !envProfile.isBlank();
+    }
+
+    private static boolean isRunningInsideContainer() {
+        return System.getenv("RUNNING_IN_DOCKER") != null
+                || System.getenv("KUBERNETES_SERVICE_HOST") != null
+                || new java.io.File("/.dockerenv").exists();
+    }
+
+    private static void normalizeLocalDbHost() {
+        if (System.getProperty("spring.datasource.url") != null) {
+            return;
+        }
+        String dbHostFromSystem = System.getProperty("DB_HOST");
+        String dbHostFromEnv = System.getenv("DB_HOST");
+        String dbHost = firstNonBlank(dbHostFromSystem, dbHostFromEnv, "localhost").trim();
+        if ("postgres".equalsIgnoreCase(dbHost)) {
+            System.setProperty("DB_HOST", "localhost");
+        }
     }
 
     private static void ensurePostgresIsRunningForLocalSqlMode() {

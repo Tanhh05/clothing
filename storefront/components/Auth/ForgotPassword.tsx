@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Dialog } from "@headlessui/react";
 import { useTranslations } from "next-intl";
 
 import { useAuth } from "../../context/AuthContext";
+import { useNotify } from "../../context/NotificationContext";
 import Button from "../Buttons/Button";
 import Input from "../Input/Input";
 
@@ -13,6 +14,8 @@ type Props = {
   setSuccessMsg: React.Dispatch<React.SetStateAction<string>>;
 };
 
+type Step = "request" | "verify" | "reset";
+
 const ForgotPassword: React.FC<Props> = ({
   onLogin,
   errorMsg,
@@ -20,18 +23,70 @@ const ForgotPassword: React.FC<Props> = ({
   setSuccessMsg,
 }) => {
   const auth = useAuth();
+  const { notify } = useNotify();
   const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [step, setStep] = useState<Step>("request");
+  const [resetToken, setResetToken] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const t = useTranslations("LoginRegister");
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const forgotPasswordResponse = await auth.forgotPassword!(email);
-    console.log(forgotPasswordResponse);
-    if (forgotPasswordResponse.success) {
-      setSuccessMsg("login_successful");
-    } else {
-      setErrorMsg("incorrect_email_password");
+    setIsSubmitting(true);
+    setErrorMsg("");
+    if (step === "request") {
+      const response = await auth.forgotPassword!(email);
+      if (!mountedRef.current) return;
+      if (response.success) {
+        notify(t("reset_email_sent"), "success");
+        setStep("verify");
+      } else {
+        setErrorMsg(response.message || "error_occurs");
+      }
+      setIsSubmitting(false);
+      return;
     }
+
+    if (step === "verify") {
+      const response = await auth.verifyForgotPasswordOtp!(email, otp);
+      if (!mountedRef.current) return;
+      if (response.success && response.resetToken) {
+        setResetToken(response.resetToken);
+        setStep("reset");
+        notify(t("otp_verified"), "success");
+      } else {
+        setErrorMsg(response.message || "error_occurs");
+      }
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (newPassword.trim() !== confirmPassword.trim()) {
+      setErrorMsg("password_confirm_not_match");
+      setIsSubmitting(false);
+      return;
+    }
+    const response = await auth.resetPasswordWithOtp!(email, resetToken, newPassword);
+    if (!mountedRef.current) return;
+    if (response.success) {
+      setSuccessMsg("password_reset_success");
+      notify(t("password_reset_success"), "success");
+      setIsSubmitting(false);
+      onLogin();
+      return;
+    }
+    setErrorMsg(response.message || "error_occurs");
+    setIsSubmitting(false);
   };
 
   return (
@@ -40,7 +95,9 @@ const ForgotPassword: React.FC<Props> = ({
         as="h3"
         className="text-3xl text-center my-8 font-medium leading-10 text-gray-900"
       >
-        {t("forgot_password")}
+        {step === "request" && t("forgot_password")}
+        {step === "verify" && t("verify_otp")}
+        {step === "reset" && t("reset_password")}
       </Dialog.Title>
       <form onSubmit={handleSubmit} className="mt-2">
         <Input
@@ -52,15 +109,52 @@ const ForgotPassword: React.FC<Props> = ({
           border="border-2 border-gray300 mb-4"
           onChange={(e) => setEmail((e.target as HTMLInputElement).value)}
           value={email}
+          disabled={step !== "request"}
         />
+        {step === "verify" && (
+          <Input
+            type="text"
+            placeholder={`${t("otp_code")} *`}
+            name="otp"
+            required
+            extraClass="w-full focus:border-gray500"
+            border="border-2 border-gray300 mb-4"
+            onChange={(e) => setOtp((e.target as HTMLInputElement).value)}
+            value={otp}
+          />
+        )}
+        {step === "reset" && (
+          <>
+            <Input
+              type="password"
+              placeholder={`${t("new_password")} *`}
+              name="newPassword"
+              required
+              extraClass="w-full focus:border-gray500"
+              border="border-2 border-gray300 mb-4"
+              onChange={(e) => setNewPassword((e.target as HTMLInputElement).value)}
+              value={newPassword}
+            />
+            <Input
+              type="password"
+              placeholder={`${t("confirm_password")} *`}
+              name="confirmPassword"
+              required
+              extraClass="w-full focus:border-gray500"
+              border="border-2 border-gray300 mb-4"
+              onChange={(e) => setConfirmPassword((e.target as HTMLInputElement).value)}
+              value={confirmPassword}
+            />
+          </>
+        )}
         {errorMsg !== "" && (
           <div className="text-red text-sm mb-4 whitespace-nowrap">
-            {t(errorMsg)}
+            {errorMsg.includes(" ") ? errorMsg : t(errorMsg)}
           </div>
         )}
         <Button
           type="submit"
-          value={t("submit")}
+          value={isSubmitting ? "..." : step === "reset" ? t("reset_password") : t("submit")}
           extraClass="w-full text-center text-xl mb-4"
           size="lg"
         />

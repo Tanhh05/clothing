@@ -8,6 +8,7 @@ import com.clothing.dto.request.UpdateProfileRequest;
 import com.clothing.dto.request.ChangePasswordRequest;
 import com.clothing.dto.response.AuthResponse;
 import com.clothing.dto.response.UserResponse;
+import com.clothing.dto.response.VerifyResetOtpResponse;
 
 public interface AuthService {
 
@@ -20,6 +21,12 @@ public interface AuthService {
     AuthResponse refresh(RefreshTokenRequest request);
 
     void logout(LogoutRequest request);
+
+    void forgotPassword(String email);
+
+    VerifyResetOtpResponse verifyForgotPasswordOtp(String email, String otp);
+
+    void resetPasswordWithOtp(String email, String resetToken, String newPassword);
 
     UserResponse getCurrentUser(String username);
 

@@ -26,6 +26,8 @@ const Login: React.FC<Props> = ({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const googleBtnHostRef = useRef<HTMLDivElement | null>(null);
+  const googleInitializedRef = useRef(false);
+  const googleScriptInjectedRef = useRef(false);
   const t = useTranslations("LoginRegister");
   const { notify } = useNotify();
 
@@ -36,41 +38,57 @@ const Login: React.FC<Props> = ({
       const google = (window as any).google;
       if (!clientId || !google?.accounts?.id || !googleBtnHostRef.current) return;
 
-      google.accounts.id.initialize({
-        client_id: clientId,
-        callback: async (response: { credential?: string }) => {
-          try {
-            if (!response?.credential) {
-              setErrorMsg("Google không trả về credential.");
-              return;
+      if (!googleInitializedRef.current) {
+        google.accounts.id.initialize({
+          client_id: clientId,
+          callback: async (response: { credential?: string }) => {
+            try {
+              if (!response?.credential) {
+                setErrorMsg("Google không trả về credential.");
+                return;
+              }
+              const loginResponse = await auth.loginWithGoogle!(response.credential);
+              if (loginResponse.success) {
+                setSuccessMsg("login_successful");
+                notify(t("login_successful"), "success");
+              } else {
+                setErrorMsg(loginResponse.message);
+              }
+            } catch (error) {
+              console.error("Google login callback failed:", error);
+              setErrorMsg("Không thể xử lý đăng nhập Google.");
             }
-            const loginResponse = await auth.loginWithGoogle!(response.credential);
-            if (loginResponse.success) {
-              setSuccessMsg("login_successful");
-              notify(t("login_successful"), "success");
-            } else {
-              setErrorMsg(loginResponse.message);
-            }
-          } catch (error) {
-            console.error("Google login callback failed:", error);
-            setErrorMsg("Không thể xử lý đăng nhập Google.");
-          }
-        },
-      });
+          },
+        });
+        googleInitializedRef.current = true;
+      }
 
-      googleBtnHostRef.current.innerHTML = "";
-      google.accounts.id.renderButton(googleBtnHostRef.current, {
-        theme: "outline",
-        size: "large",
-        text: "signin_with",
-        width: 250,
-      });
+      if (googleBtnHostRef.current.childElementCount === 0) {
+        google.accounts.id.renderButton(googleBtnHostRef.current, {
+          theme: "outline",
+          size: "large",
+          text: "signin_with",
+          width: 250,
+        });
+      }
     };
 
-    if (document.getElementById(scriptId)) {
+    if ((window as any).google?.accounts?.id) {
       setupGoogle();
       return;
     }
+
+    if (googleScriptInjectedRef.current) {
+      return;
+    }
+
+    const existingScript = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (existingScript) {
+      googleScriptInjectedRef.current = true;
+      existingScript.addEventListener("load", setupGoogle, { once: true });
+      return;
+    }
+
     const script = document.createElement("script");
     script.id = scriptId;
     script.src = "https://accounts.google.com/gsi/client";
@@ -78,6 +96,7 @@ const Login: React.FC<Props> = ({
     script.defer = true;
     script.onload = setupGoogle;
     document.body.appendChild(script);
+    googleScriptInjectedRef.current = true;
   }, [auth, notify, setErrorMsg, setSuccessMsg, t]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

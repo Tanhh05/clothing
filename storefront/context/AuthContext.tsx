@@ -31,6 +31,19 @@ type authType = {
     success: boolean;
     message: string;
   }>;
+  verifyForgotPasswordOtp?: (email: string, otp: string) => Promise<{
+    success: boolean;
+    message: string;
+    resetToken?: string;
+  }>;
+  resetPasswordWithOtp?: (
+    email: string,
+    resetToken: string,
+    newPassword: string
+  ) => Promise<{
+    success: boolean;
+    message: string;
+  }>;
   updateProfile?: (payload: {
     username?: string;
     email?: string;
@@ -234,23 +247,86 @@ function useProvideAuth() {
 
   const forgotPassword = async (email: string) => {
     try {
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/auth/forgot-password`,
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/forgot-password`,
         {
           email,
         }
       );
-      const forgotPasswordResponse = response.data;
-      setUser(user);
       return {
-        success: forgotPasswordResponse.success,
+        success: true,
         message: "reset_email_sent",
       };
     } catch (err) {
-      console.log(err);
+      console.error("Forgot password failed:", err);
+      const axiosErr = err as any;
+      const backendMsg =
+        axiosErr?.response?.data?.message ||
+        axiosErr?.response?.data?.error ||
+        "";
       return {
         success: false,
-        message: "something_went_wrong",
+        message: backendMsg || "error_occurs",
+      };
+    }
+  };
+
+  const verifyForgotPasswordOtp = async (email: string, otp: string) => {
+    try {
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/forgot-password/verify-otp`,
+        {
+          email,
+          otp,
+        }
+      );
+      return {
+        success: true,
+        message: "otp_verified",
+        resetToken: response.data?.resetToken || "",
+      };
+    } catch (err) {
+      console.error("Verify OTP failed:", err);
+      const axiosErr = err as any;
+      const backendMsg =
+        axiosErr?.response?.data?.message ||
+        axiosErr?.response?.data?.error ||
+        "";
+      return {
+        success: false,
+        message: backendMsg || "error_occurs",
+      };
+    }
+  };
+
+  const resetPasswordWithOtp = async (
+    email: string,
+    resetToken: string,
+    newPassword: string
+  ) => {
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/forgot-password/reset`,
+        {
+          email,
+          resetToken,
+          newPassword,
+        }
+      );
+      return {
+        success: true,
+        message: "password_reset_success",
+      };
+    } catch (err) {
+      console.error("Reset password failed:", err);
+      const axiosErr = err as any;
+      const backendMsg =
+        axiosErr?.response?.data?.message ||
+        axiosErr?.response?.data?.error ||
+        "";
+      return {
+        success: false,
+        message: backendMsg || "error_occurs",
       };
     }
   };
@@ -302,6 +378,8 @@ function useProvideAuth() {
     login,
     loginWithGoogle,
     forgotPassword,
+    verifyForgotPasswordOtp,
+    resetPasswordWithOtp,
     updateProfile,
     logout,
   };

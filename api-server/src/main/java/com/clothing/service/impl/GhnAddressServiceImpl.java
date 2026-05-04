@@ -14,6 +14,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,6 +26,7 @@ import java.util.Set;
 
 @Service
 public class GhnAddressServiceImpl implements AddressService {
+    private static final Logger log = LoggerFactory.getLogger(GhnAddressServiceImpl.class);
 
     private final RestTemplate restTemplate;
     private final GhnProperties ghnProperties;
@@ -35,12 +38,20 @@ public class GhnAddressServiceImpl implements AddressService {
 
     @Override
     public List<AddressUnitResponse> getProvinces() {
+        if (ghnProperties.getToken() == null || ghnProperties.getToken().isBlank()) {
+            log.warn("GHN token is missing, return empty provinces list");
+            return List.of();
+        }
         JsonNode data = callGhn(HttpMethod.GET, "/province", null);
         return mapAddressUnits(data, "ProvinceID", "ProvinceName");
     }
 
     @Override
     public List<AddressUnitResponse> getDistricts(Long provinceId) {
+        if (ghnProperties.getToken() == null || ghnProperties.getToken().isBlank()) {
+            log.warn("GHN token is missing, return empty districts list");
+            return List.of();
+        }
         if (provinceId == null) {
             throw new BusinessException("provinceId is required", HttpStatus.BAD_REQUEST);
         }
@@ -52,6 +63,10 @@ public class GhnAddressServiceImpl implements AddressService {
 
     @Override
     public List<AddressUnitResponse> getWards(Long districtId) {
+        if (ghnProperties.getToken() == null || ghnProperties.getToken().isBlank()) {
+            log.warn("GHN token is missing, return empty wards list");
+            return List.of();
+        }
         if (districtId == null) {
             throw new BusinessException("districtId is required", HttpStatus.BAD_REQUEST);
         }
