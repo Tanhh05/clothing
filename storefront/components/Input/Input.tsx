@@ -12,6 +12,7 @@ type Props = {
   onChange?: (e: FormEvent<HTMLInputElement>) => void;
   value?: string;
   readOnly?: boolean;
+  disabled?: boolean;
 };
 
 const Input: FC<Props> = ({
@@ -25,10 +26,12 @@ const Input: FC<Props> = ({
   onChange,
   value,
   readOnly = false,
+  disabled = false,
 }) => (
   <input
     type={type}
     readOnly={readOnly}
+    disabled={disabled}
     className={`${
       border !== "" ? border : "border-2 border-gray500"
     } py-2 px-4 outline-none ${extraClass}`}

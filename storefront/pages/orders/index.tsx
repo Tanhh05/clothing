@@ -59,7 +59,8 @@ const OrdersPage = () => {
   }, [auth.isAuthReady, auth.user, router]);
 
   useEffect(() => {
-    if (!auth.user?.token) return;
+    const token = auth.user?.token;
+    if (!token) return;
     let active = true;
     const loadOrders = async () => {
       setIsLoading(true);
@@ -73,7 +74,7 @@ const OrdersPage = () => {
               size: pageSize,
             },
             headers: {
-              Authorization: `Bearer ${auth.user.token}`,
+              Authorization: `Bearer ${token}`,
             },
           }
         );

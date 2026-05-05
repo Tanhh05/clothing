@@ -5,6 +5,7 @@ export const CLEAR_WISHLIST = "CLEAR_WISHLIST";
 
 export type itemType = {
   id: number;
+  slug?: string;
   img1?: string;
   img2?: string;
   name: string;

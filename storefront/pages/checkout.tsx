@@ -15,7 +15,7 @@ import { useAuth } from "../context/AuthContext";
 import { useCurrency } from "../context/CurrencyContext";
 
 // let w = window.innerWidth;
-type PaymentType = "CASH_ON_DELIVERY" | "MOMO" | "VNPAY";
+type PaymentType = "CASH_ON_DELIVERY" | "MOMO" | "VNPAY" | "BANK_TRANSFER";
 
 type Order = {
   id?: number;
@@ -29,6 +29,7 @@ type Order = {
   orderDate: string;
   paymentType?: PaymentType;
   paymentMethod?: string;
+  deliveryType?: string;
   totalPrice: number;
   deliveryDate: string;
   paymentUrl?: string | null;
