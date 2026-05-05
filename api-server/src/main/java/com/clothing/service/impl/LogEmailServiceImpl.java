@@ -2,12 +2,14 @@ package com.clothing.service.impl;
 
 import com.clothing.service.EmailService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
-@ConditionalOnMissingBean(EmailService.class)
+@ConditionalOnExpression(
+        "'${spring.mail.username:}' == '' and '${spring.mail.password:}' == '' and '${app.mail.brevo.api-key:}' == '' and '${app.mail.brevo.sender-email:}' == ''"
+)
 public class LogEmailServiceImpl implements EmailService {
 
     @Override
