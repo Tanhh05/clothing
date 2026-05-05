@@ -2,12 +2,12 @@ package com.clothing.service.impl;
 
 import com.clothing.service.EmailService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
-@Profile("sql-only")
+@ConditionalOnMissingBean(EmailService.class)
 public class LogEmailServiceImpl implements EmailService {
 
     @Override
