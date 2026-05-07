@@ -93,12 +93,13 @@ const Wishlist = () => {
                 ) : (
                   wishlist.map((item) => {
                     subtotal += item.price * item.qty!;
+                    const productLink = item.slug
+                      ? `/products/${encodeURIComponent(item.slug)}`
+                      : "/";
                     return (
                       <tr className="border-b-2 border-gray200" key={item.id}>
                         <td className="my-3 flex justify-center flex-col items-start sm:items-center">
-                          <Link
-                            href={`/products/${encodeURIComponent(item.id)}`}
-                          >
+                          <Link href={productLink}>
                             <a>
                               <Image
                                 src={item.img1 as string}

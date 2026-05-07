@@ -39,7 +39,6 @@ const ProfilePage = () => {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [isSendingReset, setIsSendingReset] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -260,23 +259,6 @@ const ProfilePage = () => {
     auth.logout?.();
     notify(t("logout_successful"), "success");
     router.push("/");
-  };
-
-  const handleForgotPassword = async () => {
-    const targetEmail = (email || auth.user?.email || "").trim();
-    if (!targetEmail) {
-      notify("Không tìm thấy email để đặt lại mật khẩu.", "error");
-      return;
-    }
-
-    setIsSendingReset(true);
-    const response = await auth.forgotPassword?.(targetEmail);
-    if (response?.success) {
-      notify("Đã gửi yêu cầu đặt lại mật khẩu. Vui lòng kiểm tra email.", "success");
-    } else {
-      notify("Không thể gửi yêu cầu quên mật khẩu.", "error");
-    }
-    setIsSendingReset(false);
   };
 
   const handleSaveAddress = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -511,14 +493,6 @@ const ProfilePage = () => {
               value={isSaving ? indexT("loading") : "Lưu thay đổi"}
               extraClass="text-center"
             />
-            <button
-              type="button"
-              onClick={handleForgotPassword}
-              className="text-xl sm:text-base py-2 sm:py-1 px-5 border border-gray400 bg-white text-gray500 hover:bg-gray100"
-              disabled={isSendingReset}
-            >
-              {isSendingReset ? indexT("loading") : t("forgot_password")}
-            </button>
             <button
               type="button"
               onClick={handleLogout}

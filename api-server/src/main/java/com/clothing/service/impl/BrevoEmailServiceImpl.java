@@ -44,12 +44,22 @@ public class BrevoEmailServiceImpl implements EmailService {
 
     @Override
     public void sendOrderConfirmationEmail(String toEmail, Long orderId) {
-        sendEmail(toEmail, "Xac nhan don hang #" + orderId, "Don hang cua ban da duoc xac nhan. Ma don: " + orderId);
+        sendEmail(
+                toEmail,
+                "Xac nhan don hang #" + orderId,
+                "Don hang cua ban da duoc xac nhan. Ma don: " + orderId,
+                false
+        );
     }
 
     @Override
     public void sendOrderFailedEmail(String toEmail, Long orderId, String reason) {
-        sendEmail(toEmail, "Don hang #" + orderId + " that bai", "Don hang cua ban khong thanh cong. Ly do: " + reason);
+        sendEmail(
+                toEmail,
+                "Don hang #" + orderId + " that bai",
+                "Don hang cua ban khong thanh cong. Ly do: " + reason,
+                false
+        );
     }
 
     @Override
@@ -59,15 +69,15 @@ public class BrevoEmailServiceImpl implements EmailService {
                 + "Ma OTP dat lai mat khau cua ban la: " + otpCode + "\n"
                 + "Ma co hieu luc trong 5 phut.\n\n"
                 + "Neu ban khong yeu cau dat lai mat khau, vui long bo qua email nay.\n";
-        sendEmail(toEmail, "Ma OTP dat lai mat khau", text);
+        sendEmail(toEmail, "Ma OTP dat lai mat khau", text, false);
     }
 
     @Override
     public void sendTestEmail(String toEmail, String subject, String content) {
-        sendEmail(toEmail, subject, content);
+        sendEmail(toEmail, subject, content, true);
     }
 
-    private void sendEmail(String toEmail, String subject, String textBody) {
+    private void sendEmail(String toEmail, String subject, String textBody, boolean failOnError) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("api-key", brevoApiKey);
@@ -89,18 +99,28 @@ public class BrevoEmailServiceImpl implements EmailService {
                     JsonNode.class
             );
             if (!response.getStatusCode().is2xxSuccessful()) {
-                throw new BusinessException("Brevo send email failed", HttpStatus.BAD_GATEWAY);
+                String message = "Brevo send email failed";
+                if (failOnError) {
+                    throw new BusinessException(message, HttpStatus.BAD_GATEWAY);
+                }
+                log.warn("{} (non-blocking). toEmail={}, subject={}", message, toEmail, subject);
             }
         } catch (HttpStatusCodeException ex) {
             String body = ex.getResponseBodyAsString();
-            log.error("Brevo API error status={} body={}", ex.getStatusCode(), body);
-            throw new BusinessException(
-                    "Brevo API error (" + ex.getStatusCode() + "): " + (body == null ? ex.getMessage() : body),
-                    HttpStatus.BAD_GATEWAY
-            );
+            String message = "Brevo API error (" + ex.getStatusCode() + "): " + (body == null ? ex.getMessage() : body);
+            if (failOnError) {
+                log.error("Brevo API error status={} body={}", ex.getStatusCode(), body);
+                throw new BusinessException(message, HttpStatus.BAD_GATEWAY);
+            }
+            log.warn("Brevo non-blocking error. status={} toEmail={} subject={} body={}",
+                    ex.getStatusCode(), toEmail, subject, body);
         } catch (Exception ex) {
-            log.error("Failed to send email via Brevo API", ex);
-            throw new BusinessException("Failed to send email via Brevo API", HttpStatus.BAD_GATEWAY);
+            if (failOnError) {
+                log.error("Failed to send email via Brevo API", ex);
+                throw new BusinessException("Failed to send email via Brevo API", HttpStatus.BAD_GATEWAY);
+            }
+            log.warn("Failed to send email via Brevo API (non-blocking). toEmail={}, subject={}, message={}",
+                    toEmail, subject, ex.getMessage());
         }
     }
 }

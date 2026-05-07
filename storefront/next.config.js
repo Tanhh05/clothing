@@ -4,7 +4,7 @@ module.exports = withPWA({
   // module.exports = {
   i18n: {
     locales: ["en", "my", "vi"],
-    defaultLocale: "en",
+    defaultLocale: "vi",
   },
   reactStrictMode: true,
   // swcMinify: true,

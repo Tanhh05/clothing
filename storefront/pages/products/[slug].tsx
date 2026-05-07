@@ -321,9 +321,9 @@ export const getServerSideProps: GetServerSideProps = async ({
   params,
   locale,
 }) => {
-  const paramId = params!.id as string;
+  const productKey = params!.slug as string;
   const res = await axios.get(
-    `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products/${paramId}`
+    `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products/${productKey}`
   );
   const product: itemType = mapApiProductToItem(res.data);
 

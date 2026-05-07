@@ -11,6 +11,7 @@ type ProductImage = {
 
 type ApiProduct = {
   id: number;
+  slug?: string;
   name: string;
   description?: string;
   categoryName?: string;
@@ -55,6 +56,7 @@ export const mapApiProductToItem = (product: ApiProduct): itemType => {
 
   return {
     id: product.id,
+    slug: product.slug,
     name: product.name,
     description: product.description || "",
     detail: product.description || "",

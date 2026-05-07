@@ -7,6 +7,7 @@ export const CLEAR_CART = "CLEAR_CART";
 
 export type commonType = {
   id: number;
+  slug?: string;
   name: string;
   price: number;
   qty?: number | undefined;
