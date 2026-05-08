@@ -13,6 +13,15 @@ public class CategoryUpsertRequest {
     @Size(max = 100, message = "name max length is 100")
     private String name;
 
+    @Size(max = 100, message = "nameVi max length is 100")
+    private String nameVi;
+
+    @Size(max = 100, message = "nameEn max length is 100")
+    private String nameEn;
+
+    @Size(max = 100, message = "nameMy max length is 100")
+    private String nameMy;
+
     @Size(max = 255, message = "slug max length is 255")
     private String slug;
 

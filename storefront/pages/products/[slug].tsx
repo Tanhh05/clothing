@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { GetServerSideProps } from "next";
 import Link from "next/link";
 import Image from "next/image";
@@ -28,6 +28,9 @@ import HeartSolid from "../../public/icons/HeartSolid";
 import { mapApiProductToItem } from "../../context/Util/productMapper";
 import { useCurrency } from "../../context/CurrencyContext";
 import { useNotify } from "../../context/NotificationContext";
+import enMessages from "../../messages/common/en.json";
+import viMessages from "../../messages/common/vi.json";
+import myMessages from "../../messages/common/my.json";
 
 // install Swiper modules
 SwiperCore.use([Pagination]);
@@ -35,9 +38,27 @@ SwiperCore.use([Pagination]);
 type Props = {
   product: itemType;
   products: itemType[];
+  sizeOptions: string[];
 };
 
-const Product: React.FC<Props> = ({ product, products }) => {
+const unwrapApiData = <T,>(payload: any): T => {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    Object.prototype.hasOwnProperty.call(payload, "data")
+  ) {
+    return payload.data as T;
+  }
+  return payload as T;
+};
+
+const getMessagesByLocale = (locale?: string) => {
+  if (locale === "en") return enMessages;
+  if (locale === "my") return myMessages;
+  return viMessages;
+};
+
+const Product: React.FC<Props> = ({ product, products, sizeOptions = [] }) => {
   const img1 = product.img1;
   const img2 = product.img2;
 
@@ -45,12 +66,17 @@ const Product: React.FC<Props> = ({ product, products }) => {
   const { notify } = useNotify();
   const { formatPrice } = useCurrency();
   const { wishlist, addToWishlist, deleteWishlistItem } = useWishlist();
-  const [size, setSize] = useState("M");
+  const safeSizeOptions = useMemo(
+    () => (Array.isArray(sizeOptions) && sizeOptions.length ? sizeOptions : ["M"]),
+    [sizeOptions]
+  );
+  const [size, setSize] = useState(safeSizeOptions[0]);
   const [mainImg, setMainImg] = useState(img1);
   const [currentQty, setCurrentQty] = useState(1);
   const t = useTranslations("Category");
   const authT = useTranslations("LoginRegister");
-  const categoryLabel = (product.categoryName || "").replace(/-/g, " ");
+  const categoryLabel = product.categoryName || "";
+  const categoryPath = product.categorySlug || "";
 
   const alreadyWishlisted =
     wishlist.filter((wItem) => wItem.id === product.id).length > 0;
@@ -58,6 +84,10 @@ const Product: React.FC<Props> = ({ product, products }) => {
   useEffect(() => {
     setMainImg(product.img1);
   }, [product]);
+
+  useEffect(() => {
+    setSize(safeSizeOptions[0]);
+  }, [safeSizeOptions]);
 
   const handleSize = (value: string) => {
     setSize(value);
@@ -93,7 +123,7 @@ const Product: React.FC<Props> = ({ product, products }) => {
                 <a className="text-gray400">{t("home")}</a>
               </Link>{" "}
               /{" "}
-              <Link href={`/product-category/${product.categoryName}`}>
+              <Link href={`/product-category/${categoryPath}`}>
                 <a className="text-gray400 capitalize">
                   {categoryLabel}
                 </a>
@@ -183,37 +213,20 @@ const Product: React.FC<Props> = ({ product, products }) => {
             <span className="mb-2">
               {t("size")}: {size}
             </span>
-            <div className="sizeContainer flex space-x-4 text-sm mb-4">
-              <div
-                onClick={() => handleSize("S")}
-                className={`w-8 h-8 flex items-center justify-center border ${
-                  size === "S"
-                    ? "border-gray500"
-                    : "border-gray300 text-gray400"
-                } cursor-pointer hover:bg-gray500 hover:text-gray100`}
-              >
-                S
-              </div>
-              <div
-                onClick={() => handleSize("M")}
-                className={`w-8 h-8 flex items-center justify-center border ${
-                  size === "M"
-                    ? "border-gray500"
-                    : "border-gray300 text-gray400"
-                } cursor-pointer hover:bg-gray500 hover:text-gray100`}
-              >
-                M
-              </div>
-              <div
-                onClick={() => handleSize("L")}
-                className={`w-8 h-8 flex items-center justify-center border ${
-                  size === "L"
-                    ? "border-gray500"
-                    : "border-gray300 text-gray400"
-                } cursor-pointer hover:bg-gray500 hover:text-gray100`}
-              >
-                L
-              </div>
+            <div className="sizeContainer flex flex-wrap gap-3 text-sm mb-4">
+              {safeSizeOptions.map((option) => (
+                <div
+                  key={option}
+                  onClick={() => handleSize(option)}
+                  className={`min-w-[2rem] h-8 px-2 flex items-center justify-center border ${
+                    size === option
+                      ? "border-gray500"
+                      : "border-gray300 text-gray400"
+                  } cursor-pointer hover:bg-gray500 hover:text-gray100`}
+                >
+                  {option}
+                </div>
+              ))}
             </div>
             <div className="addToCart flex flex-col sm:flex-row md:flex-col lg:flex-row space-y-4 sm:space-y-0 mb-4">
               <div className="plusOrMinus h-12 flex border justify-center border-gray300 divide-x-2 divide-gray300 mb-4 mr-0 sm:mr-4 md:mr-0 lg:mr-4">
@@ -321,27 +334,65 @@ export const getServerSideProps: GetServerSideProps = async ({
   params,
   locale,
 }) => {
-  const productKey = params!.slug as string;
-  const res = await axios.get(
-    `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products/${productKey}`
-  );
-  const product: itemType = mapApiProductToItem(res.data);
+  try {
+    const productKey = params!.slug as string;
+    const headers = {
+      "Accept-Language": locale || "vi",
+      "X-Currency": "VND",
+    };
+    const res = await axios.get(
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products/${productKey}`,
+      { headers }
+    );
+    const productData = unwrapApiData<any>(res.data);
+    const product: itemType = mapApiProductToItem(productData);
+    const sizeOptions = Array.from(
+      new Set(
+        (Array.isArray(productData?.variants) ? productData.variants : [])
+          .map((variant: any) =>
+            typeof variant?.size === "string" ? variant.size.trim() : ""
+          )
+          .filter((value: string) => Boolean(value))
+      )
+    );
 
-  const recommendationRes = await axios.get(
-    `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products/recommendations?productIds=${product.id}&limit=5`
-  );
-  const products: itemType[] = (recommendationRes.data || []).map(
-    mapApiProductToItem
-  );
+    const recommendationRes = await axios.get(
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products/recommendations?productIds=${product.id}&limit=5`,
+      { headers }
+    );
+    const recommendationData = unwrapApiData<any[]>(recommendationRes.data) || [];
+    const products: itemType[] = recommendationData.map(mapApiProductToItem);
 
-  // Pass data to the page via props
-  return {
-    props: {
-      product,
-      products,
-      messages: (await import(`../../messages/common/${locale}.json`)).default,
-    },
-  };
+    return {
+      props: {
+        product,
+        products,
+        sizeOptions,
+        messages: getMessagesByLocale(locale),
+      },
+    };
+  } catch (error: any) {
+    const status = error?.response?.status;
+    if (status === 404) {
+      return { notFound: true };
+    }
+    return {
+      props: {
+        product: {
+          id: 0,
+          name: "N/A",
+          price: 0,
+          img1: "/bg-img/ourshop.png",
+          img2: "/bg-img/ourshop.png",
+          description: "",
+          detail: "",
+        },
+        products: [],
+        sizeOptions: ["M"],
+        messages: getMessagesByLocale(locale),
+      },
+    };
+  }
 };
 
 export default Product;

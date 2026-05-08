@@ -23,6 +23,17 @@ type Props = {
   bestSellingProducts: itemType[];
 };
 
+const unwrapApiData = <T,>(payload: any): T => {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    Object.prototype.hasOwnProperty.call(payload, "data")
+  ) {
+    return payload.data as T;
+  }
+  return payload as T;
+};
+
 const Home: React.FC<Props> = ({ featuredProducts, bestSellingProducts }) => {
   const t = useTranslations("Index");
   const [currentItems, setCurrentItems] = useState(featuredProducts);
@@ -37,7 +48,8 @@ const Home: React.FC<Props> = ({ featuredProducts, bestSellingProducts }) => {
             Math.floor(currentItems.length / 10)
           }&size=10&sortBy=createdAt&direction=desc`
         );
-        const fetchedProducts = (res.data.content || []).map(mapApiProductToItem);
+        const productPage = unwrapApiData<any>(res.data);
+        const fetchedProducts = (productPage?.content || []).map(mapApiProductToItem);
         setCurrentItems((products) => [...products, ...fetchedProducts]);
       } catch (error) {
         console.error("Failed to fetch more products:", error);
@@ -175,16 +187,30 @@ export const getStaticProps: GetStaticProps = async ({ locale }) => {
   try {
     const [featuredRes, bestSellingRes] = await Promise.all([
       axios.get(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products?page=0&size=10&sortBy=createdAt&direction=desc`
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products?page=0&size=10&sortBy=createdAt&direction=desc`,
+        {
+          headers: {
+            "Accept-Language": locale || "vi",
+            "X-Currency": "VND",
+          },
+        }
       ),
       axios.get(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products?page=0&size=4&sortBy=createdAt&direction=desc`
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products?page=0&size=4&sortBy=createdAt&direction=desc`,
+        {
+          headers: {
+            "Accept-Language": locale || "vi",
+            "X-Currency": "VND",
+          },
+        }
       ),
     ]);
 
-    featuredProducts = (featuredRes.data.content || []).map(mapApiProductToItem);
+    const featuredPage = unwrapApiData<any>(featuredRes.data);
+    const bestSellingPage = unwrapApiData<any>(bestSellingRes.data);
 
-    bestSellingProducts = (bestSellingRes.data.content || []).map(
+    featuredProducts = (featuredPage?.content || []).map(mapApiProductToItem);
+    bestSellingProducts = (bestSellingPage?.content || []).map(
       mapApiProductToItem
     );
   } catch (error) {

@@ -25,7 +25,8 @@ function isAdminErrorReportRequest(error) {
 
 function mapUserFriendlyError(error) {
   const status = error?.response?.status
-  const apiMessage = error?.response?.data?.message
+  const body = error?.response?.data
+  const apiMessage = body?.message || body?.data?.message
   const timeout = error?.code === 'ECONNABORTED'
   const networkDown = !status
 
@@ -75,7 +76,11 @@ service.interceptors.request.use(
 // response interceptor
 service.interceptors.response.use(
   response => {
-    return response.data
+    const payload = response?.data
+    if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {
+      return payload.data
+    }
+    return payload
   },
   error => {
     const status = error?.response?.status

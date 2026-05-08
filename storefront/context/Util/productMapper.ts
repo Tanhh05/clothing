@@ -15,6 +15,7 @@ type ApiProduct = {
   name: string;
   description?: string;
   categoryName?: string;
+  categorySlug?: string;
   variants?: ProductVariant[];
   images?: ProductImage[];
   price?: number | string;
@@ -29,12 +30,6 @@ const toNumber = (value: unknown) => {
   }
   return null;
 };
-
-const slugify = (value: string) =>
-  value
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "-");
 
 export const mapApiProductToItem = (product: ApiProduct): itemType => {
   const images = Array.isArray(product.images) ? product.images : [];
@@ -63,6 +58,7 @@ export const mapApiProductToItem = (product: ApiProduct): itemType => {
     price: basePrice,
     img1,
     img2,
-    categoryName: product.categoryName ? slugify(product.categoryName) : undefined,
+    categoryName: product.categoryName || undefined,
+    categorySlug: product.categorySlug || undefined,
   };
 };

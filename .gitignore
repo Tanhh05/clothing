@@ -1,7 +1,7 @@
 # macOS / IDE
 .DS_Store
 .idea/
-
+pm ru
 # Environment files
 api-server/.env
 api-server/.env.local

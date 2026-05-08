@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/router";
 import { useTranslations } from "next-intl";
 import axios from "axios";
 
@@ -43,6 +44,7 @@ const API_BASE_URL =
   "";
 
 const Header: React.FC<Props> = ({ title }) => {
+  const router = useRouter();
   const t = useTranslations("Navigation");
   const { wishlist } = useWishlist();
   const [animate, setAnimate] = useState("");
@@ -93,10 +95,21 @@ const Header: React.FC<Props> = ({ title }) => {
       }
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/categories?page=0&size=50&sortBy=displayOrder&direction=asc`
+          `${API_BASE_URL}/api/categories?page=0&size=50&sortBy=displayOrder&direction=asc`,
+          {
+            headers: {
+              "Accept-Language": router.locale || "vi",
+            },
+          }
         );
-        const categories: MenuCategory[] = Array.isArray(res.data?.content)
-          ? res.data.content
+        const payload =
+          res.data &&
+          typeof res.data === "object" &&
+          Object.prototype.hasOwnProperty.call(res.data, "data")
+            ? res.data.data
+            : res.data;
+        const categories: MenuCategory[] = Array.isArray(payload?.content)
+          ? payload.content
           : [];
         const visibleCategories = categories.filter(
           (category) =>
@@ -110,7 +123,7 @@ const Header: React.FC<Props> = ({ title }) => {
     };
 
     fetchMenuCategories();
-  }, []);
+  }, [router.locale]);
 
   if (!didMount) {
     return null;
@@ -202,7 +215,7 @@ const Header: React.FC<Props> = ({ title }) => {
                     <Image
                       className="justify-center"
                       src="/logo.svg"
-                      alt="Picture of the author"
+                      alt="Twenty"
                       width={220}
                       height={50}
                       layout="responsive"
@@ -228,7 +241,7 @@ const Header: React.FC<Props> = ({ title }) => {
                   <button
                     type="button"
                     className="relative"
-                    aria-label="Wishlist"
+                    aria-label={t("wishlist")}
                   >
                     <WhistlistIcon />
                     {noOfWishlist > 0 && (
@@ -247,7 +260,7 @@ const Header: React.FC<Props> = ({ title }) => {
                   <button
                     type="button"
                     className="relative"
-                    aria-label="My Orders"
+                    aria-label={t("my_orders")}
                   >
                     <OrderIcon />
                   </button>

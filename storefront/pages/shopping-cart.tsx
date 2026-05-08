@@ -265,11 +265,11 @@ const ShoppingCart = () => {
                 <span>{formatPrice(roundDecimal(subtotal))}</span>
               </div>
               <div className="py-3 flex justify-between">
-                <span className="uppercase">Phí vận chuyển</span>
+                <span className="uppercase">{t("shipping_fee")}</span>
                 <span>{deliFee === null ? "_" : formatPrice(deliFee)}</span>
               </div>
               <div className="flex justify-between py-3">
-                <span>Tổng đơn hàng</span>
+                <span>{t("order_total")}</span>
                 <span>{formatPrice(roundDecimal(subtotal + (deliFee ?? 0)))}</span>
               </div>
               <Button

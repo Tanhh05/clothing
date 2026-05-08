@@ -1,5 +1,6 @@
 package com.clothing.security;
 
+import com.clothing.config.RequestMetaResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,11 +32,14 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
         Map<String, Object> body = new HashMap<>();
-        body.put("status", HttpStatus.UNAUTHORIZED.value());
-        body.put("error", "Unauthorized");
-        body.put("message", "Authentication is required");
-        body.put("path", request.getRequestURI());
-        body.put("timestamp", LocalDateTime.now());
+        Map<String, Object> data = new HashMap<>();
+        data.put("status", HttpStatus.UNAUTHORIZED.value());
+        data.put("error", "Unauthorized");
+        data.put("message", "Authentication is required");
+        data.put("path", request.getRequestURI());
+        data.put("timestamp", LocalDateTime.now());
+        body.put("meta", RequestMetaResolver.resolve(request));
+        body.put("data", data);
 
         objectMapper.writeValue(response.getOutputStream(), body);
     }

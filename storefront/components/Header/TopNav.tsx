@@ -1,7 +1,6 @@
 import { Menu } from "@headlessui/react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/router";
-import Link from "next/link";
 
 import InstagramLogo from "../../public/icons/InstagramLogo";
 import FacebookLogo from "../../public/icons/FacebookLogo";
@@ -10,35 +9,42 @@ import styles from "./Header.module.css";
 import { useCurrency } from "../../context/CurrencyContext";
 
 type LinkProps = {
-  href: string;
   locale: "en" | "my" | "vi";
   active: boolean;
 };
 
+const buildLocaleHref = (asPath: string, nextLocale: "en" | "my" | "vi") => {
+  const pathWithoutLocale = asPath.replace(/^\/(en|my|vi)(?=\/|$)/, "");
+  const normalizedPath = pathWithoutLocale.startsWith("/")
+    ? pathWithoutLocale
+    : `/${pathWithoutLocale}`;
+  return `/${nextLocale}${normalizedPath}`;
+};
+
 const MyLink: React.FC<LinkProps> = ({
-  href,
   locale,
   children,
   active,
-  ...rest
+  ...rest 
 }) => {
+  const router = useRouter();
+  const href = buildLocaleHref(router.asPath, locale);
   return (
-    <Link href={href} locale={locale}>
-      <a
-        className={`py-2 px-4 text-center ${
-          active ? "bg-gray200 text-gray500" : "bg-white text-gray500"
-        }`}
-        {...rest}
-      >
-        {children}
-      </a>
-    </Link>
+    <a
+      href={href}
+      className={`py-2 px-4 text-center ${
+        active ? "bg-gray200 text-gray500" : "bg-white text-gray500"
+      } w-full`}
+      {...rest}
+    >
+      {children}
+    </a>
   );
 };
 
 const TopNav = () => {
   const router = useRouter();
-  const { asPath, locale } = router;
+  const { locale } = router;
   const t = useTranslations("Navigation");
   const { currency, setCurrency } = useCurrency();
 
@@ -80,21 +86,21 @@ const TopNav = () => {
                 >
                 <Menu.Item>
                   {({ active }) => (
-                    <MyLink active={active} href={asPath} locale="en">
+                    <MyLink active={active} locale="en">
                       {t("eng")}
                     </MyLink>
                   )}
                 </Menu.Item>
                 <Menu.Item>
                   {({ active }) => (
-                    <MyLink active={active} href={asPath} locale="my">
+                    <MyLink active={active} locale="my">
                       {t("myn")}
                     </MyLink>
                   )}
                 </Menu.Item>
                 <Menu.Item>
                   {({ active }) => (
-                    <MyLink active={active} href={asPath} locale="vi">
+                    <MyLink active={active} locale="vi">
                       {t("vie")}
                     </MyLink>
                   )}
@@ -130,14 +136,14 @@ const TopNav = () => {
                   {({ active }) => (
                     <button
                       type="button"
-                      onClick={() => setCurrency("MMK")}
+                      onClick={() => setCurrency("MYN")}
                       className={`${
-                        active || currency === "MMK"
+                        active || currency === "MYN"
                           ? "bg-gray100 text-gray500"
                           : "bg-white text-gray500"
                       } py-2 px-4 text-center focus:outline-none`}
                     >
-                      {t("mmk")}
+                      MYN
                     </button>
                   )}
                 </Menu.Item>

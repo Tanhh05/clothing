@@ -3,6 +3,7 @@ import { GetStaticProps } from "next";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import axios from "axios";
+import { useTranslations } from "next-intl";
 
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
@@ -39,6 +40,7 @@ type PagedOrderResponse = {
 };
 
 const OrdersPage = () => {
+  const t = useTranslations("Orders");
   const auth = useAuth();
   const router = useRouter();
   const { formatPrice } = useCurrency();
@@ -84,7 +86,7 @@ const OrdersPage = () => {
       } catch (err) {
         console.error("Load orders failed:", err);
         if (!active) return;
-        setError("Không thể tải danh sách đơn hàng.");
+        setError(t("cannot_load_orders"));
       } finally {
         if (!active) return;
         setIsLoading(false);
@@ -100,20 +102,20 @@ const OrdersPage = () => {
 
   return (
     <div>
-      <Header title="Đơn hàng của tôi - Twenty" />
+      <Header title={`${t("my_orders")} - Twenty`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl">Đơn hàng của tôi</h1>
+          <h1 className="text-3xl">{t("my_orders")}</h1>
           <Link href="/profile">
-            <a className="px-4 py-2 border border-gray300 hover:bg-gray100">Hồ sơ</a>
+            <a className="px-4 py-2 border border-gray300 hover:bg-gray100">{t("profile")}</a>
           </Link>
         </div>
 
-        {isLoading && <p>Đang tải...</p>}
+        {isLoading && <p>{t("loading")}</p>}
         {error && <p className="text-red">{error}</p>}
 
         {!isLoading && !error && orders.length === 0 && (
-          <div className="border border-gray200 p-6 text-gray500">Chưa có đơn hàng nào.</div>
+          <div className="border border-gray200 p-6 text-gray500">{t("no_orders")}</div>
         )}
 
         {!isLoading && !error && orders.length > 0 && (
@@ -122,12 +124,12 @@ const OrdersPage = () => {
             <table className="w-full min-w-[760px]">
               <thead>
                 <tr className="border-b border-gray200 bg-gray100">
-                  <th className="text-left font-medium px-4 py-3">Mã đơn</th>
-                  <th className="text-left font-medium px-4 py-3">Ngày tạo</th>
-                  <th className="text-left font-medium px-4 py-3">Trạng thái</th>
-                  <th className="text-left font-medium px-4 py-3">Thanh toán</th>
-                  <th className="text-right font-medium px-4 py-3">Tổng tiền</th>
-                  <th className="text-right font-medium px-4 py-3">Chi tiết</th>
+                  <th className="text-left font-medium px-4 py-3">{t("order_code")}</th>
+                  <th className="text-left font-medium px-4 py-3">{t("created_at")}</th>
+                  <th className="text-left font-medium px-4 py-3">{t("status")}</th>
+                  <th className="text-left font-medium px-4 py-3">{t("payment")}</th>
+                  <th className="text-right font-medium px-4 py-3">{t("total")}</th>
+                  <th className="text-right font-medium px-4 py-3">{t("detail")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -136,7 +138,9 @@ const OrdersPage = () => {
                     <td className="px-4 py-3">#{order.id}</td>
                     <td className="px-4 py-3">
                       {order.createdAt
-                        ? new Date(order.createdAt).toLocaleString("vi-VN")
+                        ? new Date(order.createdAt).toLocaleString(
+                            router.locale === "en" ? "en-US" : "vi-VN"
+                          )
                         : "-"}
                     </td>
                     <td className="px-4 py-3">{order.status || "-"}</td>
@@ -146,7 +150,7 @@ const OrdersPage = () => {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Link href={`/orders/${order.id}`}>
-                        <a className="text-blue-600 hover:underline">Xem</a>
+                        <a className="text-blue-600 hover:underline">{t("view")}</a>
                       </Link>
                     </td>
                   </tr>
@@ -156,7 +160,7 @@ const OrdersPage = () => {
           </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray400">
-                Trang {currentPage}/{totalPages}
+                {t("page")} {currentPage}/{totalPages}
               </span>
               <div className="flex gap-2">
                 <button
@@ -165,7 +169,7 @@ const OrdersPage = () => {
                   disabled={currentPage <= 1}
                   className="px-3 py-1 border border-gray300 disabled:opacity-50"
                 >
-                  Trước
+                  {t("prev")}
                 </button>
                 <button
                   type="button"
@@ -175,7 +179,7 @@ const OrdersPage = () => {
                   disabled={currentPage >= totalPages}
                   className="px-3 py-1 border border-gray300 disabled:opacity-50"
                 >
-                  Sau
+                  {t("next")}
                 </button>
               </div>
             </div>

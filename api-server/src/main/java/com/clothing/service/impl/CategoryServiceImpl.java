@@ -15,6 +15,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import com.clothing.config.RequestMetaResolver;
 
 import java.text.Normalizer;
 import java.util.Locale;
@@ -37,7 +40,14 @@ public class CategoryServiceImpl implements CategoryService {
         String slug = resolveSlug(request.getSlug(), request.getName(), null);
 
         CategoryEntity entity = new CategoryEntity();
-        entity.setName(request.getName().trim());
+        String normalizedName = request.getName().trim();
+        String resolvedNameVi = normalizeOptionalText(request.getNameVi(), normalizedName);
+        String resolvedNameEn = normalizeOptionalText(request.getNameEn(), normalizedName);
+        String resolvedNameMy = normalizeOptionalText(request.getNameMy(), resolvedNameVi);
+        entity.setName(normalizedName);
+        entity.setNameVi(resolvedNameVi);
+        entity.setNameEn(resolvedNameEn);
+        entity.setNameMy(resolvedNameMy);
         entity.setSlug(slug);
         entity.setParent(parent);
         applyExtendedFields(entity, request);
@@ -54,7 +64,14 @@ public class CategoryServiceImpl implements CategoryService {
         CategoryEntity parent = resolveParent(request.getParentId(), id);
         String slug = resolveSlug(request.getSlug(), request.getName(), id);
 
-        category.setName(request.getName().trim());
+        String normalizedName = request.getName().trim();
+        String resolvedNameVi = normalizeOptionalText(request.getNameVi(), normalizedName);
+        String resolvedNameEn = normalizeOptionalText(request.getNameEn(), normalizedName);
+        String resolvedNameMy = normalizeOptionalText(request.getNameMy(), resolvedNameVi);
+        category.setName(normalizedName);
+        category.setNameVi(resolvedNameVi);
+        category.setNameEn(resolvedNameEn);
+        category.setNameMy(resolvedNameMy);
         category.setSlug(slug);
         category.setParent(parent);
         applyExtendedFields(category, request);
@@ -184,6 +201,13 @@ public class CategoryServiceImpl implements CategoryService {
         return normalized.isEmpty() ? null : normalized;
     }
 
+    private String normalizeOptionalText(String preferred, String fallback) {
+        if (preferred != null && !preferred.isBlank()) {
+            return preferred.trim();
+        }
+        return fallback;
+    }
+
     private String normalizePageType(String value) {
         String normalized = normalizeNullable(value);
         if (normalized == null) {
@@ -205,9 +229,18 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     private CategoryResponse toResponse(CategoryEntity entity) {
+        String language = resolveLanguage();
+        String localizedName;
+        if ("en".equalsIgnoreCase(language)) {
+            localizedName = pickFirst(entity.getNameEn(), entity.getName(), entity.getNameVi(), entity.getNameMy());
+        } else if ("my".equalsIgnoreCase(language)) {
+            localizedName = pickFirst(entity.getNameMy(), entity.getName(), entity.getNameVi(), entity.getNameEn());
+        } else {
+            localizedName = pickFirst(entity.getNameVi(), entity.getName(), entity.getNameEn(), entity.getNameMy());
+        }
         return CategoryResponse.builder()
                 .id(entity.getId())
-                .name(entity.getName())
+                .name(localizedName)
                 .slug(entity.getSlug())
                 .imageUrl(entity.getImageUrl())
                 .subtitle(entity.getSubtitle())
@@ -219,5 +252,25 @@ public class CategoryServiceImpl implements CategoryService {
                 .status(entity.getStatus())
                 .parentId(entity.getParent() == null ? null : entity.getParent().getId())
                 .build();
+    }
+
+    private String resolveLanguage() {
+        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes == null) {
+            return "vi";
+        }
+        return RequestMetaResolver.resolveLanguage(attributes.getRequest());
+    }
+
+    private String pickFirst(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty()) {
+                return value;
+            }
+        }
+        return null;
     }
 }

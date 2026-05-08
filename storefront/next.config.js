@@ -1,7 +1,4 @@
-const withPWA = require("next-pwa");
-
-module.exports = withPWA({
-  // module.exports = {
+module.exports = {
   i18n: {
     locales: ["en", "my", "vi"],
     defaultLocale: "vi",
@@ -19,10 +16,11 @@ module.exports = withPWA({
       "example.com",
     ],
   },
-  pwa: {
-    dest: "public",
-    skipWaiting: true,
-    disable: process.env.NODE_ENV === "development",
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      "next-intl": require("path").resolve(__dirname, "lib/next-intl.tsx"),
+    };
+    return config;
   },
-  // };
-});
+};
