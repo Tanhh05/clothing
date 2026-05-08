@@ -33,13 +33,20 @@ const cartReducer = (state: cartType, action: actionType) => {
         ...state,
         cart: removeItemFromCart(state.cart, action.payload as itemType),
       };
-    case DELETE_ITEM:
+    case DELETE_ITEM: {
+      const payload = action.payload as itemType;
+      const targetSize = (payload?.selectedSize || "").trim().toUpperCase();
       return {
         ...state,
         cart: state.cart.filter(
-          (cartItem) => cartItem.id !== (action.payload as itemType).id
+          (cartItem) =>
+            !(
+              cartItem.id === payload.id &&
+              ((cartItem.selectedSize || "").trim().toUpperCase() === targetSize)
+            )
         ),
       };
+    }
     case SET_CART:
       return {
         ...state,

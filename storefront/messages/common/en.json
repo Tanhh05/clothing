@@ -166,7 +166,11 @@
     "add_to_wishlist": "Add To Wishlist",
     "details": "Details",
     "share": "Share",
-    "you_may_also_like": "You may also like"
+    "you_may_also_like": "You may also like",
+    "customer_reviews": "Customer Reviews",
+    "reviews_count": "reviews",
+    "no_reviews": "No reviews yet.",
+    "color": "Color"
   },
   "LoginRegister": {
     "login": "Login",
@@ -240,6 +244,7 @@
     "payment": "Payment",
     "total": "Total",
     "detail": "Detail",
+    "action": "Action",
     "view": "View",
     "page": "Page",
     "prev": "Prev",
@@ -258,7 +263,11 @@
     "address": "Address",
     "subtotal": "Subtotal",
     "shipping_fee": "Shipping Fee",
-    "discount": "Discount"
+    "discount": "Discount",
+    "cancel_order": "Cancel Order",
+    "cancelling": "Cancelling...",
+    "cancel_confirm": "Are you sure you want to cancel this order?",
+    "cannot_cancel_order": "Cannot cancel this order."
   },
   "Search": {
     "home": "Home",

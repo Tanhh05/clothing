@@ -96,6 +96,7 @@ const Product: React.FC<Props> = ({ product, products, sizeOptions = [] }) => {
   const currentItem = {
     ...product,
     qty: currentQty,
+    selectedSize: size,
   };
 
   const handleWishlist = () => {

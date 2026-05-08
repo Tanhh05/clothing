@@ -39,6 +39,21 @@ type PagedOrderResponse = {
   last?: boolean;
 };
 
+type ApiEnvelope<T> = {
+  data?: T;
+};
+
+const extractPayload = <T,>(input: T | ApiEnvelope<T> | undefined): T | undefined => {
+  if (!input || typeof input !== "object") return input as T | undefined;
+  const wrapped = input as ApiEnvelope<T>;
+  return wrapped.data ?? (input as T);
+};
+
+const isCancelableOrder = (status?: string) =>
+  ["WAITING_PAYMENT", "PENDING", "PROCESSING", "CONFIRMED"].includes(
+    String(status || "").toUpperCase()
+  );
+
 const OrdersPage = () => {
   const t = useTranslations("Orders");
   const auth = useAuth();
@@ -50,6 +65,7 @@ const OrdersPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
   const [totalPages, setTotalPages] = useState(1);
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!auth.isAuthReady) return;
@@ -68,7 +84,7 @@ const OrdersPage = () => {
       setIsLoading(true);
       setError("");
       try {
-        const res = await axios.get<PagedOrderResponse>(
+        const res = await axios.get<PagedOrderResponse | ApiEnvelope<PagedOrderResponse>>(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/my`,
           {
             params: {
@@ -81,8 +97,9 @@ const OrdersPage = () => {
           }
         );
         if (!active) return;
-        setOrders(Array.isArray(res.data?.content) ? res.data.content : []);
-        setTotalPages(Math.max(1, Number(res.data?.totalPages || 1)));
+        const payload = extractPayload<PagedOrderResponse>(res.data) || {};
+        setOrders(Array.isArray(payload.content) ? payload.content : []);
+        setTotalPages(Math.max(1, Number(payload.totalPages || 1)));
       } catch (err) {
         console.error("Load orders failed:", err);
         if (!active) return;
@@ -97,6 +114,34 @@ const OrdersPage = () => {
       active = false;
     };
   }, [auth.user?.token, currentPage]);
+
+  const handleCancelOrder = async (orderId: number) => {
+    if (!auth.user?.token) return;
+    if (!window.confirm(t("cancel_confirm"))) return;
+    setActionLoadingId(orderId);
+    setError("");
+    try {
+      await axios.patch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/my/${orderId}/cancel`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${auth.user.token}`,
+          },
+        }
+      );
+      setOrders((prev) =>
+        prev.map((item) =>
+          item.id === orderId ? { ...item, status: "CANCELLED" } : item
+        )
+      );
+    } catch (err) {
+      console.error("Cancel order failed:", err);
+      setError(t("cannot_cancel_order"));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
 
   if (!auth.isAuthReady || !auth.user) return null;
 
@@ -129,7 +174,7 @@ const OrdersPage = () => {
                   <th className="text-left font-medium px-4 py-3">{t("status")}</th>
                   <th className="text-left font-medium px-4 py-3">{t("payment")}</th>
                   <th className="text-right font-medium px-4 py-3">{t("total")}</th>
-                  <th className="text-right font-medium px-4 py-3">{t("detail")}</th>
+                  <th className="text-right font-medium px-4 py-3">{t("action")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -149,9 +194,23 @@ const OrdersPage = () => {
                       {formatPrice(order.totalPrice || 0)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Link href={`/orders/${order.id}`}>
-                        <a className="text-blue-600 hover:underline">{t("view")}</a>
-                      </Link>
+                      <div className="inline-flex items-center gap-3">
+                        <Link href={`/orders/${order.id}`}>
+                          <a className="text-blue-600 hover:underline">{t("view")}</a>
+                        </Link>
+                        {isCancelableOrder(order.status) && (
+                          <button
+                            type="button"
+                            onClick={() => handleCancelOrder(order.id)}
+                            disabled={actionLoadingId === order.id}
+                            className="text-red hover:underline disabled:opacity-50"
+                          >
+                            {actionLoadingId === order.id
+                              ? t("cancelling")
+                              : t("cancel_order")}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

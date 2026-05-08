@@ -21,6 +21,13 @@ import ourShop from "../public/bg-img/ourshop.png";
 type Props = {
   featuredProducts: itemType[];
   bestSellingProducts: itemType[];
+  testimonials: TestimonialItem[];
+};
+
+type TestimonialItem = {
+  speech: string;
+  name: string;
+  occupation: string;
 };
 
 const unwrapApiData = <T,>(payload: any): T => {
@@ -34,7 +41,11 @@ const unwrapApiData = <T,>(payload: any): T => {
   return payload as T;
 };
 
-const Home: React.FC<Props> = ({ featuredProducts, bestSellingProducts }) => {
+const Home: React.FC<Props> = ({
+  featuredProducts,
+  bestSellingProducts,
+  testimonials,
+}) => {
   const t = useTranslations("Index");
   const [currentItems, setCurrentItems] = useState(featuredProducts);
   const [isFetching, setIsFetching] = useState(false);
@@ -140,7 +151,7 @@ const Home: React.FC<Props> = ({ featuredProducts, bestSellingProducts }) => {
         {/* ===== Testimonial Section ===== */}
         <section className="w-full hidden h-full py-16 md:flex flex-col items-center bg-lightgreen">
           <h2 className="text-3xl">{t("testimonial")}</h2>
-          <TestiSlider />
+          <TestiSlider items={testimonials} />
         </section>
 
         {/* ===== Featured Products Section ===== */}
@@ -184,26 +195,21 @@ const Home: React.FC<Props> = ({ featuredProducts, bestSellingProducts }) => {
 export const getStaticProps: GetStaticProps = async ({ locale }) => {
   let featuredProducts: itemType[] = [];
   let bestSellingProducts: itemType[] = [];
+  let testimonials: TestimonialItem[] = [];
+  const headers = {
+    "Accept-Language": locale || "vi",
+    "X-Currency": "VND",
+  };
   try {
     const [featuredRes, bestSellingRes] = await Promise.all([
       axios.get(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products?page=0&size=10&sortBy=createdAt&direction=desc`,
-        {
-          headers: {
-            "Accept-Language": locale || "vi",
-            "X-Currency": "VND",
-          },
-        }
+        { headers }
       ),
       axios.get(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products?page=0&size=4&sortBy=createdAt&direction=desc`,
-        {
-          headers: {
-            "Accept-Language": locale || "vi",
-            "X-Currency": "VND",
-          },
-        }
-      ),
+        { headers }
+      )
     ]);
 
     const featuredPage = unwrapApiData<any>(featuredRes.data);
@@ -217,6 +223,29 @@ export const getStaticProps: GetStaticProps = async ({ locale }) => {
     console.error("getStaticProps(products) failed:", error);
   }
 
+  try {
+    const reviewRes = await axios.get(
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/reviews/latest?limit=5`,
+      { headers }
+    );
+    const reviews = unwrapApiData<any[]>(reviewRes.data) || [];
+    testimonials = reviews
+      .filter((review) => review && typeof review === "object")
+      .map((review) => ({
+        speech:
+          typeof review.comment === "string" && review.comment.trim()
+            ? review.comment.trim()
+            : "Khách hàng hài lòng với sản phẩm.",
+        name:
+          typeof review.username === "string" && review.username.trim()
+            ? review.username.trim()
+            : "Customer",
+        occupation: `${Math.max(1, Math.min(5, Number(review.rating) || 5))}★`,
+      }));
+  } catch (error) {
+    console.error("getStaticProps(reviews) failed:", error);
+  }
+
   return {
     props: {
       messages: {
@@ -225,6 +254,7 @@ export const getStaticProps: GetStaticProps = async ({ locale }) => {
       },
       featuredProducts,
       bestSellingProducts,
+      testimonials,
     }, // will be passed to the page component as props
   };
 };

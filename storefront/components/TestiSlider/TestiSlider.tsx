@@ -2,42 +2,42 @@ import { FC, useCallback, useEffect, useState } from "react";
 import LeftArrow from "../../public/icons/LeftArrow";
 import RightArrow from "../../public/icons/RightArrow";
 
-const testi = [
+type TestimonialItem = {
+  speech: string;
+  name: string;
+  occupation: string;
+};
+
+type Props = {
+  items?: TestimonialItem[];
+};
+
+const fallbackTesti: TestimonialItem[] = [
   {
-    speech:
-      "Lorem ipsum dolor sit, amet consectetur rro fuga minima necessitatibus repellendus. Veniam suscipit excepturi rem aliquam officiis.",
-    name: "David",
-    occupation: "Social Influencer",
-  },
-  {
-    speech:
-      "Nesciunt natus ullam iusto, maiores facere consectetur minima necessitatib adipisicing elit. Autem porro",
-    name: "Neymar",
-    occupation: "Athlete",
-  },
-  {
-    speech:
-      "provident neque obcaecati, quo consequatur delectus s ullam iusto, maiores facere consecte",
-    name: "Ronaldo",
-    occupation: "Business Owner",
+    speech: "Chưa có đánh giá khách hàng.",
+    name: "Twenty",
+    occupation: "Customer Reviews",
   },
 ];
 // animate__fadeIn
 // animate__lightSpeedInRight
-const TestiSlider: FC = () => {
+const TestiSlider: FC<Props> = ({ items = [] }) => {
+  const testi = items.length ? items : fallbackTesti;
   const [arrIndex, setArrIndex] = useState(0);
   const [animate, setAnimate] = useState("animate__lightSpeedInRight");
 
   const handleNext = useCallback(() => {
+    if (!testi.length) return;
     if (arrIndex === testi.length - 1) {
       setArrIndex(0);
     } else {
       setArrIndex((prevState) => prevState + 1);
       setAnimate("animate__lightSpeedInRight");
     }
-  }, [arrIndex]);
+  }, [arrIndex, testi.length]);
 
   const handlePrev = () => {
+    if (!testi.length) return;
     if (arrIndex === 0) {
       setArrIndex(testi.length - 1);
     } else {
@@ -47,11 +47,18 @@ const TestiSlider: FC = () => {
   };
 
   useEffect(() => {
+    if (testi.length <= 1) return;
     const interval = setInterval(() => {
       handleNext();
     }, 4000);
     return () => clearInterval(interval);
-  }, [handleNext]);
+  }, [handleNext, testi.length]);
+
+  useEffect(() => {
+    if (arrIndex > testi.length - 1) {
+      setArrIndex(0);
+    }
+  }, [arrIndex, testi.length]);
   return (
     <div
       className="flex flex-1 overflow-hidden relative my-6"

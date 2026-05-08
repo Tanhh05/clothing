@@ -738,9 +738,17 @@ const ShoppingCart = () => {
 
                 <div className="pt-2">
                   {cart.map((item) => (
-                    <div className="flex justify-between mb-2" key={item.id}>
+                    <div
+                      className="flex justify-between mb-2"
+                      key={`${item.id}-${item.selectedSize || "na"}`}
+                    >
                       <span className="text-base font-medium">
-                        {item.name}{" "}
+                        {item.name}
+                        {item.selectedSize ? (
+                          <span className="text-gray400 ml-1">
+                            ({item.selectedSize})
+                          </span>
+                        ) : null}{" "}
                         <span className="text-gray400">x {item.qty}</span>
                       </span>
                       <span className="text-base">

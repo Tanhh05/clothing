@@ -33,6 +33,7 @@ export interface itemType extends commonType {
   img2?: string;
   categoryName?: string;
   categorySlug?: string;
+  selectedSize?: string;
 }
 
 export interface apiProductsType extends commonType {

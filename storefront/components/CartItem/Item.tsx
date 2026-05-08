@@ -8,6 +8,7 @@ type Props = {
   name: string;
   price: number;
   qty: number;
+  selectedSize?: string;
   onAdd?: () => void;
   onRemove?: () => void;
   onDelete?: () => void;
@@ -18,6 +19,7 @@ const Item: FC<Props> = ({
   name,
   price,
   qty,
+  selectedSize,
   onAdd,
   onRemove,
   onDelete,
@@ -28,6 +30,9 @@ const Item: FC<Props> = ({
       <Image className="w-2/12" src={img} alt={name} width={70} height={104} />
       <div className="midPart mx-4 flex-grow">
         <span>{name}</span>
+        {selectedSize ? (
+          <div className="text-sm text-gray400 mt-1">Size: {selectedSize}</div>
+        ) : null}
         <div className="plusOrMinus w-2/6 mt-4 flex border border-gray300 divide-x-2 divide-gray300">
           <div
             onClick={onRemove}

@@ -5,7 +5,11 @@ const addItemToCart = (
   item: itemType,
   add_one = false
 ) => {
-  const duplicate = cartItems.some((cartItem) => cartItem.id === item.id);
+  const targetSize = (item.selectedSize || "").trim().toUpperCase();
+  const isSameCartLine = (cartItem: itemType) =>
+    cartItem.id === item.id &&
+    ((cartItem.selectedSize || "").trim().toUpperCase() === targetSize);
+  const duplicate = cartItems.some(isSameCartLine);
 
   if (duplicate) {
     return cartItems.map((cartItem) => {
@@ -14,8 +18,7 @@ const addItemToCart = (
         ? (itemQty = cartItem.qty! + 1)
         : (itemQty = item.qty);
 
-      console.log(itemQty);
-      return cartItem.id === item.id ? { ...cartItem, qty: itemQty } : cartItem;
+      return isSameCartLine(cartItem) ? { ...cartItem, qty: itemQty } : cartItem;
     });
   }
   // console.log(itemQty);
@@ -29,7 +32,9 @@ const addItemToCart = (
       price: item.price,
       img1: item.img1,
       img2: item.img2,
+      slug: item.slug,
       qty: itemQty,
+      selectedSize: item.selectedSize,
     },
   ];
 };

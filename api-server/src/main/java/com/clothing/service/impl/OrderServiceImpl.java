@@ -655,6 +655,31 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional
+    public OrderResponse cancelMyOrder(String username, Long orderId) {
+        UserEntity user = getUser(username);
+        OrderEntity order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException("Order not found", HttpStatus.NOT_FOUND));
+        if (!order.getUserId().equals(user.getId())) {
+            throw new BusinessException("Order does not belong to current user", HttpStatus.FORBIDDEN);
+        }
+
+        String currentStatus = normalizeStatus(order.getStatus());
+        if (STATUS_CANCELLED.equals(currentStatus)) {
+            return toResponse(order);
+        }
+        validateStatusTransition(currentStatus, STATUS_CANCELLED, orderId);
+        applyOrderStatus(order, STATUS_CANCELLED, false);
+        auditLogService.log(
+                "ORDER_CANCELLED_BY_USER",
+                "ORDER",
+                orderId,
+                "Cancelled by user " + username + ", status " + currentStatus + " -> " + STATUS_CANCELLED
+        );
+        return toResponse(order);
+    }
+
+    @Override
     public void sendMyOrderConfirmationEmail(String username, Long orderId) {
         UserEntity user = getUser(username);
         OrderEntity order = orderRepository.findById(orderId)

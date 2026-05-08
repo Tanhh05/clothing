@@ -80,20 +80,55 @@ const MyApp = ({ Component, pageProps }: AppCustomProps) => {
   }, [router.locale]);
 
   useEffect(() => {
-    if (
-      process.env.NODE_ENV === "development" &&
-      typeof window !== "undefined" &&
-      "serviceWorker" in navigator
-    ) {
-      navigator.serviceWorker
-        .getRegistrations()
-        .then((registrations) => {
-          registrations.forEach((registration) => {
-            registration.unregister();
-          });
-        })
-        .catch(() => undefined);
-    }
+    if (typeof window === "undefined") return;
+
+    const reloadOnChunkError = (reason: unknown) => {
+      const message =
+        typeof reason === "string"
+          ? reason
+          : (reason as any)?.message || (reason as any)?.toString?.() || "";
+      const name = (reason as any)?.name || "";
+      const isChunkError =
+        name === "ChunkLoadError" ||
+        /Loading chunk [\d]+ failed/i.test(message) ||
+        /ChunkLoadError/i.test(message);
+      if (!isChunkError) return;
+
+      const reloadedKey = "__chunk_reload_once__";
+      if (sessionStorage.getItem(reloadedKey) === "1") return;
+      sessionStorage.setItem(reloadedKey, "1");
+      window.location.reload();
+    };
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      reloadOnChunkError(event.reason);
+    };
+
+    const onWindowError = (event: ErrorEvent) => {
+      reloadOnChunkError(event.error || event.message);
+    };
+
+    Router.events.on("routeChangeError", reloadOnChunkError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    window.addEventListener("error", onWindowError);
+
+    return () => {
+      Router.events.off("routeChangeError", reloadOnChunkError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+      window.removeEventListener("error", onWindowError);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker
+      .getRegistrations()
+      .then((registrations) => {
+        registrations.forEach((registration) => {
+          registration.unregister();
+        });
+      })
+      .catch(() => undefined);
   }, []);
 
   return (

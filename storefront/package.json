@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "clean": "rm -rf .next",
-    "dev": "npm run clean && next dev",
+    "dev": "next dev -p 3000",
+    "dev:reset": "npm run clean && next dev -p 3000",
+    "dev:restart": "pkill -f \"next dev -p 3000\" || true; npm run clean; next dev -p 3000",
     "lint": "next lint",
     "build": "npm run clean && next build",
     "start": "next start"

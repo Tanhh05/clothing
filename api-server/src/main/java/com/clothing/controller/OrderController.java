@@ -141,6 +141,11 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getMyOrderById(authentication.getName(), orderId));
     }
 
+    @PatchMapping("/my/{orderId}/cancel")
+    public ResponseEntity<OrderResponse> cancelMyOrder(Authentication authentication, @PathVariable Long orderId) {
+        return ResponseEntity.ok(orderService.cancelMyOrder(authentication.getName(), orderId));
+    }
+
     @PostMapping("/my/{orderId}/reorder")
     public ResponseEntity<OrderResponse> reorder(Authentication authentication, @PathVariable Long orderId) {
         return ResponseEntity.ok(orderService.reorder(authentication.getName(), orderId));

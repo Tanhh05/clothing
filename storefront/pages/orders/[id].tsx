@@ -33,6 +33,21 @@ type Order = {
   items?: OrderItem[];
 };
 
+type ApiEnvelope<T> = {
+  data?: T;
+};
+
+const extractPayload = <T,>(input: T | ApiEnvelope<T> | undefined): T | undefined => {
+  if (!input || typeof input !== "object") return input as T | undefined;
+  const wrapped = input as ApiEnvelope<T>;
+  return wrapped.data ?? (input as T);
+};
+
+const isCancelableOrder = (status?: string) =>
+  ["WAITING_PAYMENT", "PENDING", "PROCESSING", "CONFIRMED"].includes(
+    String(status || "").toUpperCase()
+  );
+
 const OrderDetailPage = () => {
   const t = useTranslations("Orders");
   const auth = useAuth();
@@ -40,6 +55,7 @@ const OrderDetailPage = () => {
   const { formatPrice } = useCurrency();
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -57,7 +73,7 @@ const OrderDetailPage = () => {
       setIsLoading(true);
       setError("");
       try {
-        const res = await axios.get(
+        const res = await axios.get<Order | ApiEnvelope<Order>>(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/my/${id}`,
           {
             headers: {
@@ -66,7 +82,7 @@ const OrderDetailPage = () => {
           }
         );
         if (!active) return;
-        setOrder(res.data || null);
+        setOrder(extractPayload<Order>(res.data) || null);
       } catch (err) {
         console.error("Load order detail failed:", err);
         if (!active) return;
@@ -81,6 +97,30 @@ const OrderDetailPage = () => {
       active = false;
     };
   }, [auth.isAuthReady, auth.user, router, router.query.id]);
+
+  const handleCancelOrder = async () => {
+    if (!auth.user?.token || !order?.id) return;
+    if (!window.confirm(t("cancel_confirm"))) return;
+    setIsCancelling(true);
+    setError("");
+    try {
+      const res = await axios.patch<Order | ApiEnvelope<Order>>(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/my/${order.id}/cancel`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${auth.user.token}`,
+          },
+        }
+      );
+      setOrder(extractPayload<Order>(res.data) || { ...order, status: "CANCELLED" });
+    } catch (err) {
+      console.error("Cancel order failed:", err);
+      setError(t("cannot_cancel_order"));
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   if (!auth.isAuthReady || !auth.user) return null;
 
@@ -181,6 +221,16 @@ const OrderDetailPage = () => {
                   <span>{formatPrice(order.totalPrice || 0)}</span>
                 </div>
               </div>
+              {isCancelableOrder(order.status) && (
+                <button
+                  type="button"
+                  onClick={handleCancelOrder}
+                  disabled={isCancelling}
+                  className="mt-5 w-full border border-gray300 text-red px-4 py-2 hover:bg-gray100 disabled:opacity-50"
+                >
+                  {isCancelling ? t("cancelling") : t("cancel_order")}
+                </button>
+              )}
             </section>
           </div>
         )}
