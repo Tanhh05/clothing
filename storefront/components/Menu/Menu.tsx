@@ -30,6 +30,14 @@ type Props = {
   categories: MenuCategory[];
 };
 
+const buildLocaleHref = (asPath: string, nextLocale: "en" | "my" | "vi") => {
+  const pathWithoutLocale = asPath.replace(/^\/(en|my|vi)(?=\/|$)/, "");
+  const normalizedPath = pathWithoutLocale.startsWith("/")
+    ? pathWithoutLocale
+    : `/${pathWithoutLocale}`;
+  return `/${nextLocale}${normalizedPath}`;
+};
+
 const toCategoryPath = (category: MenuCategory) =>
   category.slug ||
   category.name
@@ -40,7 +48,7 @@ const toCategoryPath = (category: MenuCategory) =>
 export default function Menu({ categories }: Props) {
   const t = useTranslations("Navigation");
   const router = useRouter();
-  const { asPath, locale } = router;
+  const { locale } = router;
   const { wishlist } = useWishlist();
   const { currency, setCurrency } = useCurrency();
   const auth = useAuth();
@@ -214,7 +222,7 @@ export default function Menu({ categories }: Props) {
                         className="text-xl py-2 my-3 w-full flex justify-between"
                         onClick={closeModal}
                       >
-                        <span>Đơn hàng của tôi</span>
+                        <span>{t("my_orders")}</span>
                         <OrderIcon />
                       </a>
                     </Link>
@@ -258,43 +266,43 @@ export default function Menu({ categories }: Props) {
                         style={{ zIndex: 9999 }}
                       >
                         <HMenu.Item>
-                          <Link href={asPath} locale="en">
-                            <a
-                              className={`${
-                                locale === "en"
-                                  ? "bg-gray200 text-gray500"
-                                  : "bg-white text-gray500"
-                              } py-2 px-4 text-center focus:outline-none`}
-                            >
-                              {t("english")}
-                            </a>
-                          </Link>
+                          <button
+                              type="button"
+                            onClick={() => window.location.assign(buildLocaleHref(router.asPath, "en"))}
+                            className={`${
+                              locale === "en"
+                                ? "bg-gray200 text-gray500"
+                                : "bg-white text-gray500"
+                            } py-2 px-4 text-center focus:outline-none w-full`}
+                          >
+                            {t("english")}
+                          </button>
                         </HMenu.Item>
                         <HMenu.Item>
-                          <Link href={asPath} locale="my">
-                            <a
-                              className={`${
-                                locale === "my"
-                                  ? "bg-gray200 text-gray500"
-                                  : "bg-white text-gray500"
-                              } py-2 px-4 text-center focus:outline-none`}
-                            >
-                              {t("myanmar")}
-                            </a>
-                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => window.location.assign(buildLocaleHref(router.asPath, "my"))}
+                            className={`${
+                              locale === "my"
+                                ? "bg-gray200 text-gray500"
+                                : "bg-white text-gray500"
+                            } py-2 px-4 text-center focus:outline-none w-full`}
+                          >
+                            {t("myanmar")}
+                          </button>
                         </HMenu.Item>
                         <HMenu.Item>
-                          <Link href={asPath} locale="vi">
-                            <a
-                              className={`${
-                                locale === "vi"
-                                  ? "bg-gray200 text-gray500"
-                                  : "bg-white text-gray500"
-                              } py-2 px-4 text-center focus:outline-none`}
-                            >
-                              {t("vietnamese")}
-                            </a>
-                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => window.location.assign(buildLocaleHref(router.asPath, "vi"))}
+                            className={`${
+                              locale === "vi"
+                                ? "bg-gray200 text-gray500"
+                                : "bg-white text-gray500"
+                            } py-2 px-4 text-center focus:outline-none w-full`}
+                          >
+                            {t("vietnamese")}
+                          </button>
                         </HMenu.Item>
                       </HMenu.Items>
                     </HMenu>
@@ -331,14 +339,14 @@ export default function Menu({ categories }: Props) {
                           {({ active }) => (
                             <button
                               type="button"
-                              onClick={() => setCurrency("MMK")}
+                              onClick={() => setCurrency("MYN")}
                               className={`${
-                                active || currency === "MMK"
+                                active || currency === "MYN"
                                   ? "bg-gray100 text-gray500"
                                   : "bg-white text-gray500"
                               } py-2 px-4 text-center focus:outline-none`}
                             >
-                              {t("mmk")}
+                              MYN
                             </button>
                           )}
                         </HMenu.Item>

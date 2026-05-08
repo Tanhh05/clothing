@@ -18,10 +18,25 @@ public class ProductUpsertRequest {
     @Size(max = 255, message = "name max length is 255")
     private String name;
 
+    @Size(max = 255, message = "nameVi max length is 255")
+    private String nameVi;
+
+    @Size(max = 255, message = "nameEn max length is 255")
+    private String nameEn;
+
+    @Size(max = 255, message = "nameMy max length is 255")
+    private String nameMy;
+
     @Size(max = 255, message = "slug max length is 255")
     private String slug;
 
     private String description;
+
+    private String descriptionVi;
+
+    private String descriptionEn;
+
+    private String descriptionMy;
 
     @Size(max = 100, message = "brand max length is 100")
     private String brand;

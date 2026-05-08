@@ -93,6 +93,33 @@ function useProvideAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
 
+  const getLocale = () => {
+    if (typeof window === "undefined") return "vi";
+    const pathname = window.location.pathname || "";
+    if (pathname.startsWith("/en")) return "en";
+    if (pathname.startsWith("/my")) return "my";
+    return "vi";
+  };
+
+  const tr = (key: "login_required" | "google_user") => {
+    const locale = getLocale();
+    const dict = {
+      vi: {
+        login_required: "Bạn cần đăng nhập để sử dụng tính năng này",
+        google_user: "Người dùng Google",
+      },
+      en: {
+        login_required: "You need to log in to use this feature",
+        google_user: "Google User",
+      },
+      my: {
+        login_required: "ဤလုပ်ဆောင်ချက်ကို အသုံးပြုရန် လော့ဂ်အင်ဝင်ရန် လိုအပ်သည်။",
+        google_user: "Google အသုံးပြုသူ",
+      },
+    } as const;
+    return dict[locale as "vi" | "en" | "my"]?.[key] || dict.vi[key];
+  };
+
   useEffect(() => {
     const initialAuth = getCookie("user");
     if (initialAuth) {
@@ -107,6 +134,41 @@ function useProvideAuth() {
   }, [user]);
 
   useEffect(() => {
+    let active = true;
+    const loadUserProfile = async () => {
+      if (!user?.token) return;
+      try {
+        const response = await axios.get(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/me`,
+          {
+            headers: {
+              Authorization: `Bearer ${user.token}`,
+            },
+          }
+        );
+        if (!active) return;
+        const me = response.data || {};
+        setUser((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            username: me.username ?? prev.username,
+            email: me.email ?? prev.email,
+            fullname: me.fullName ?? prev.fullname,
+            phone: me.phone ?? prev.phone ?? "",
+          };
+        });
+      } catch (error) {
+        console.error("Load profile failed:", error);
+      }
+    };
+    loadUserProfile();
+    return () => {
+      active = false;
+    };
+  }, [user?.token]);
+
+  useEffect(() => {
     const interceptorId = axios.interceptors.response.use(
       (response) => response,
       (error) => {
@@ -118,7 +180,7 @@ function useProvideAuth() {
           url.includes("/api/auth/refresh");
 
         if (status === 401 && !isAuthEndpoint) {
-          notify("Bạn cần đăng nhập để sử dụng tính năng này", "error");
+          notify(tr("login_required"), "error");
         }
         return Promise.reject(error);
       }
@@ -221,7 +283,7 @@ function useProvideAuth() {
         id: +loginResponse.userId,
         username: loginResponse.username,
         email: loginEmail,
-        fullname: loginResponse.username || "Google User",
+        fullname: loginResponse.username || tr("google_user"),
         token: loginResponse.accessToken,
         refreshToken: loginResponse.refreshToken,
         tokenType: loginResponse.tokenType,

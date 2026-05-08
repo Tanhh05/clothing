@@ -25,6 +25,15 @@ public class CategoryEntity {
     @Column(length = 100)
     private String name;
 
+    @Column(name = "name_en", length = 100)
+    private String nameEn;
+
+    @Column(name = "name_vi", length = 100)
+    private String nameVi;
+
+    @Column(name = "name_my", length = 100)
+    private String nameMy;
+
     @Column(length = 255, unique = true)
     private String slug;
 

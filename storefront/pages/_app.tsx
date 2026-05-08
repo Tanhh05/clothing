@@ -1,5 +1,8 @@
 import { NextComponentType, NextPageContext } from "next";
 import Router from "next/router";
+import { useEffect } from "react";
+import { useRouter } from "next/router";
+import axios from "axios";
 import NProgress from "nprogress";
 import { NextIntlProvider } from "next-intl";
 
@@ -31,6 +34,68 @@ type AppCustomProps = {
 };
 
 const MyApp = ({ Component, pageProps }: AppCustomProps) => {
+  const router = useRouter();
+
+  useEffect(() => {
+    const requestInterceptorId = axios.interceptors.request.use((config) => {
+      const nextConfig = { ...config };
+      nextConfig.headers = nextConfig.headers || {};
+
+      const locale = router.locale || "vi";
+      const savedCurrency =
+        typeof window !== "undefined" ? localStorage.getItem("currency_v2") : null;
+      const normalizedCurrency = savedCurrency === "MMK" ? "MYN" : savedCurrency;
+      const currency = normalizedCurrency || "VND";
+
+      nextConfig.headers["Accept-Language"] = locale;
+      nextConfig.headers["X-Currency"] = currency;
+      return nextConfig;
+    });
+
+    const responseInterceptorId = axios.interceptors.response.use(
+      (response) => {
+        const payload = response?.data;
+        if (
+          payload &&
+          typeof payload === "object" &&
+          Object.prototype.hasOwnProperty.call(payload, "meta") &&
+          Object.prototype.hasOwnProperty.call(payload, "data")
+        ) {
+          response.data = payload.data;
+        }
+        return response;
+      },
+      (error) => {
+        if (error?.response?.data?.data) {
+          error.response.data = error.response.data.data;
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.request.eject(requestInterceptorId);
+      axios.interceptors.response.eject(responseInterceptorId);
+    };
+  }, [router.locale]);
+
+  useEffect(() => {
+    if (
+      process.env.NODE_ENV === "development" &&
+      typeof window !== "undefined" &&
+      "serviceWorker" in navigator
+    ) {
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((registrations) => {
+          registrations.forEach((registration) => {
+            registration.unregister();
+          });
+        })
+        .catch(() => undefined);
+    }
+  }, []);
+
   return (
     <NextIntlProvider messages={pageProps?.messages}>
       <NotificationProvider>

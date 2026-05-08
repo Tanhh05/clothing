@@ -184,12 +184,13 @@ const ShoppingCart = () => {
                 ) : (
                   cart.map((item) => {
                     subtotal += item.price * item.qty!;
+                    const productLink = item.slug
+                      ? `/products/${encodeURIComponent(item.slug)}`
+                      : "/";
                     return (
                       <tr className="border-b-2 border-gray200" key={item.id}>
                         <td className="my-3 flex flex-col xl:flex-row items-start sm:items-center xl:space-x-2 text-center xl:text-left">
-                          <Link
-                            href={`/products/${encodeURIComponent(item.id)}`}
-                          >
+                          <Link href={productLink}>
                             <a>
                               <Image
                                 src={item.img1 as string}
@@ -264,11 +265,11 @@ const ShoppingCart = () => {
                 <span>{formatPrice(roundDecimal(subtotal))}</span>
               </div>
               <div className="py-3 flex justify-between">
-                <span className="uppercase">Phí vận chuyển</span>
+                <span className="uppercase">{t("shipping_fee")}</span>
                 <span>{deliFee === null ? "_" : formatPrice(deliFee)}</span>
               </div>
               <div className="flex justify-between py-3">
-                <span>Tổng đơn hàng</span>
+                <span>{t("order_total")}</span>
                 <span>{formatPrice(roundDecimal(subtotal + (deliFee ?? 0)))}</span>
               </div>
               <Button

@@ -39,7 +39,6 @@ const ProfilePage = () => {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [isSendingReset, setIsSendingReset] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -249,7 +248,7 @@ const ProfilePage = () => {
     if (phone.trim() !== "") payload.phone = phone.trim();
     const response = await auth.updateProfile?.(payload);
     if (response?.success) {
-      setMessage("Cập nhật hồ sơ thành công.");
+      setMessage(t("profile_updated_success"));
     } else {
       setError(t(response?.message || "error_occurs"));
     }
@@ -260,23 +259,6 @@ const ProfilePage = () => {
     auth.logout?.();
     notify(t("logout_successful"), "success");
     router.push("/");
-  };
-
-  const handleForgotPassword = async () => {
-    const targetEmail = (email || auth.user?.email || "").trim();
-    if (!targetEmail) {
-      notify("Không tìm thấy email để đặt lại mật khẩu.", "error");
-      return;
-    }
-
-    setIsSendingReset(true);
-    const response = await auth.forgotPassword?.(targetEmail);
-    if (response?.success) {
-      notify("Đã gửi yêu cầu đặt lại mật khẩu. Vui lòng kiểm tra email.", "success");
-    } else {
-      notify("Không thể gửi yêu cầu quên mật khẩu.", "error");
-    }
-    setIsSendingReset(false);
   };
 
   const handleSaveAddress = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -325,10 +307,10 @@ const ProfilePage = () => {
           data[0];
         fillAddressForm(selected);
       }
-      setAddressMessage("Cập nhật địa chỉ thành công.");
+      setAddressMessage(t("address_updated_success"));
     } catch (err) {
       console.error("Save address failed:", err);
-      setAddressError("Không thể cập nhật địa chỉ.");
+      setAddressError(t("address_update_failed"));
     } finally {
       setIsSavingAddress(false);
     }
@@ -398,10 +380,10 @@ const ProfilePage = () => {
       const data = await reloadAddresses();
       const defaultAddress = data.find((addr) => addr.isDefault) || data[0];
       if (defaultAddress) fillAddressForm(defaultAddress);
-      setAddressMessage("Đã đặt địa chỉ mặc định.");
+      setAddressMessage(t("address_set_default_success"));
     } catch (err) {
       console.error("Set default address failed:", err);
-      setAddressError("Không thể đặt địa chỉ mặc định.");
+      setAddressError(t("address_set_default_failed"));
     }
   };
 
@@ -425,10 +407,10 @@ const ProfilePage = () => {
         const defaultAddress = data.find((addr) => addr.isDefault) || data[0];
         fillAddressForm(defaultAddress);
       }
-      setAddressMessage("Đã xóa địa chỉ.");
+      setAddressMessage(t("address_deleted_success"));
     } catch (err) {
       console.error("Delete address failed:", err);
-      setAddressError("Không thể xóa địa chỉ.");
+      setAddressError(t("address_delete_failed"));
     }
   };
 
@@ -448,7 +430,7 @@ const ProfilePage = () => {
             <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label htmlFor="username" className="text-sm">
-              Username
+              {t("username")}
             </label>
             <Input
               name="username"
@@ -506,19 +488,11 @@ const ProfilePage = () => {
           {error && <p className="text-red mb-4">{error}</p>}
 
           <div className="flex flex-wrap gap-3 pt-2">
-            <Button
-              type="submit"
-              value={isSaving ? indexT("loading") : "Lưu thay đổi"}
-              extraClass="text-center"
-            />
-            <button
-              type="button"
-              onClick={handleForgotPassword}
-              className="text-xl sm:text-base py-2 sm:py-1 px-5 border border-gray400 bg-white text-gray500 hover:bg-gray100"
-              disabled={isSendingReset}
-            >
-              {isSendingReset ? indexT("loading") : t("forgot_password")}
-            </button>
+              <Button
+                type="submit"
+                value={isSaving ? indexT("loading") : t("save_changes")}
+                extraClass="text-center"
+              />
             <button
               type="button"
               onClick={handleLogout}
@@ -531,21 +505,21 @@ const ProfilePage = () => {
           </section>
 
           <section className="border border-gray200 p-5 md:p-7">
-            <h2 className="text-2xl mb-4">Địa chỉ mặc định</h2>
+            <h2 className="text-2xl mb-4">{t("default_address")}</h2>
             <div className="mb-5">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Danh sách địa chỉ</h3>
+                <h3 className="text-sm font-medium">{t("address_list")}</h3>
                 <button
                   type="button"
                   onClick={resetAddressForm}
                   className="text-xs py-1 px-3 border border-gray300 bg-white hover:bg-gray100"
                 >
-                  Thêm địa chỉ mới
+                  {t("add_new_address")}
                 </button>
               </div>
               <div className="space-y-2">
                 {addresses.length === 0 && (
-                  <p className="text-sm text-gray400">Chưa có địa chỉ nào.</p>
+                  <p className="text-sm text-gray400">{t("no_address")}</p>
                 )}
                 {addresses.map((item) => (
                   <div
@@ -564,7 +538,7 @@ const ProfilePage = () => {
                         </p>
                         {item.isDefault && (
                           <span className="inline-block mt-1 text-xs border border-gray400 px-2 py-0.5">
-                            Mặc định
+                            {t("default")}
                           </span>
                         )}
                       </div>
@@ -574,7 +548,7 @@ const ProfilePage = () => {
                           onClick={() => fillAddressForm(item)}
                           className="text-xs py-1 px-2 border border-gray300 hover:bg-gray100"
                         >
-                          Sửa
+                          {t("edit")}
                         </button>
                         {!item.isDefault && (
                           <button
@@ -582,7 +556,7 @@ const ProfilePage = () => {
                             onClick={() => handleSetDefaultAddress(item)}
                             className="text-xs py-1 px-2 border border-gray300 hover:bg-gray100"
                           >
-                            Đặt mặc định
+                            {t("set_default")}
                           </button>
                         )}
                         <button
@@ -590,7 +564,7 @@ const ProfilePage = () => {
                           onClick={() => handleDeleteAddress(item.id)}
                           className="text-xs py-1 px-2 border border-gray300 hover:bg-gray100"
                         >
-                          Xóa
+                          {t("delete")}
                         </button>
                       </div>
                     </div>
@@ -602,7 +576,7 @@ const ProfilePage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
               <label htmlFor="recipientName" className="text-sm">
-                Người nhận
+                {t("recipient")}
               </label>
               <Input
                 name="recipientName"
@@ -619,7 +593,7 @@ const ProfilePage = () => {
 
               <div>
               <label htmlFor="addressPhone" className="text-sm">
-                Số điện thoại nhận hàng
+                {t("recipient_phone")}
               </label>
               <Input
                 name="addressPhone"
@@ -638,7 +612,7 @@ const ProfilePage = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
               <div>
               <label htmlFor="province" className="text-sm">
-                Tỉnh / Thành phố
+                {t("province_city")}
               </label>
               <select
                 id="province"
@@ -649,7 +623,7 @@ const ProfilePage = () => {
                 disabled={isAddressOptionsLoading}
                 required
               >
-                <option value="">Chọn Tỉnh / Thành phố</option>
+                <option value="">{t("select_province_city")}</option>
                 {provinces.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
@@ -660,7 +634,7 @@ const ProfilePage = () => {
 
               <div>
               <label htmlFor="district" className="text-sm">
-                Quận / Huyện
+                {t("district")}
               </label>
               <select
                 id="district"
@@ -671,7 +645,7 @@ const ProfilePage = () => {
                 disabled={!selectedProvinceId || isAddressOptionsLoading}
                 required
               >
-                <option value="">Chọn Quận / Huyện</option>
+                <option value="">{t("select_district")}</option>
                 {districts.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
@@ -682,7 +656,7 @@ const ProfilePage = () => {
 
               <div>
               <label htmlFor="ward" className="text-sm">
-                Phường / Xã
+                {t("ward")}
               </label>
               <select
                 id="ward"
@@ -693,7 +667,7 @@ const ProfilePage = () => {
                 disabled={!selectedDistrictId || isAddressOptionsLoading}
                 required
               >
-                <option value="">Chọn Phường / Xã</option>
+                <option value="">{t("select_ward")}</option>
                 {wards.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
@@ -705,7 +679,7 @@ const ProfilePage = () => {
 
             <div className="mt-4">
               <label htmlFor="addressLine" className="text-sm">
-                Địa chỉ chi tiết
+                {t("address_detail")}
               </label>
               <Input
                 name="addressLine"
@@ -727,7 +701,7 @@ const ProfilePage = () => {
                   checked={setAsDefault}
                   onChange={(e) => setSetAsDefault(e.target.checked)}
                 />
-                Đặt làm địa chỉ mặc định
+                {t("set_as_default_address")}
               </label>
             </div>
 
@@ -737,7 +711,7 @@ const ProfilePage = () => {
             <div className="pt-2">
               <Button
                 type="submit"
-                value={isSavingAddress ? indexT("loading") : "Lưu địa chỉ"}
+                value={isSavingAddress ? indexT("loading") : t("save_address")}
                 extraClass="text-center"
               />
             </div>

@@ -3,6 +3,7 @@ import { GetServerSideProps } from "next";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import axios from "axios";
+import { useTranslations } from "next-intl";
 
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
@@ -33,6 +34,7 @@ type Order = {
 };
 
 const OrderDetailPage = () => {
+  const t = useTranslations("Orders");
   const auth = useAuth();
   const router = useRouter();
   const { formatPrice } = useCurrency();
@@ -68,7 +70,7 @@ const OrderDetailPage = () => {
       } catch (err) {
         console.error("Load order detail failed:", err);
         if (!active) return;
-        setError("Không thể tải chi tiết đơn hàng.");
+        setError(t("cannot_load_order_detail"));
       } finally {
         if (!active) return;
         setIsLoading(false);
@@ -84,31 +86,31 @@ const OrderDetailPage = () => {
 
   return (
     <div>
-      <Header title="Chi tiết đơn hàng - Twenty" />
+      <Header title={`${t("order_detail")} - Twenty`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl">Chi tiết đơn hàng</h1>
+          <h1 className="text-3xl">{t("order_detail")}</h1>
           <Link href="/orders">
-            <a className="px-4 py-2 border border-gray300 hover:bg-gray100">Quay lại</a>
+            <a className="px-4 py-2 border border-gray300 hover:bg-gray100">{t("back")}</a>
           </Link>
         </div>
 
-        {isLoading && <p>Đang tải...</p>}
+        {isLoading && <p>{t("loading")}</p>}
         {error && <p className="text-red">{error}</p>}
 
         {!isLoading && !error && order && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <section className="xl:col-span-2 border border-gray200 p-5">
-              <h2 className="text-xl mb-4">Sản phẩm</h2>
+              <h2 className="text-xl mb-4">{t("products")}</h2>
               <div className="overflow-auto">
                 <table className="w-full min-w-[640px]">
                   <thead>
                     <tr className="border-b border-gray200 bg-gray100">
-                      <th className="text-left font-medium px-4 py-3">Sản phẩm</th>
+                      <th className="text-left font-medium px-4 py-3">{t("product")}</th>
                       <th className="text-left font-medium px-4 py-3">SKU</th>
-                      <th className="text-right font-medium px-4 py-3">SL</th>
-                      <th className="text-right font-medium px-4 py-3">Đơn giá</th>
-                      <th className="text-right font-medium px-4 py-3">Thành tiền</th>
+                      <th className="text-right font-medium px-4 py-3">{t("qty")}</th>
+                      <th className="text-right font-medium px-4 py-3">{t("unit_price")}</th>
+                      <th className="text-right font-medium px-4 py-3">{t("line_total")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -131,49 +133,51 @@ const OrderDetailPage = () => {
             </section>
 
             <section className="border border-gray200 p-5">
-              <h2 className="text-xl mb-4">Thông tin đơn</h2>
+              <h2 className="text-xl mb-4">{t("order_info")}</h2>
               <div className="space-y-2 text-sm">
                 <p>
-                  <span className="text-gray400">Mã đơn:</span> #{order.id}
+                  <span className="text-gray400">{t("order_code")}:</span> #{order.id}
                 </p>
                 <p>
-                  <span className="text-gray400">Ngày tạo:</span>{" "}
+                  <span className="text-gray400">{t("created_at")}:</span>{" "}
                   {order.createdAt
-                    ? new Date(order.createdAt).toLocaleString("vi-VN")
+                    ? new Date(order.createdAt).toLocaleString(
+                        router.locale === "en" ? "en-US" : "vi-VN"
+                      )
                     : "-"}
                 </p>
                 <p>
-                  <span className="text-gray400">Trạng thái:</span>{" "}
+                  <span className="text-gray400">{t("status")}:</span>{" "}
                   {order.status || "-"}
                 </p>
                 <p>
-                  <span className="text-gray400">Vận chuyển:</span>{" "}
+                  <span className="text-gray400">{t("shipping")}:</span>{" "}
                   {order.shippingStatus || "-"}
                 </p>
                 <p>
-                  <span className="text-gray400">Thanh toán:</span>{" "}
+                  <span className="text-gray400">{t("payment")}:</span>{" "}
                   {order.paymentMethod || "-"}
                 </p>
                 <p>
-                  <span className="text-gray400">Địa chỉ:</span>{" "}
+                  <span className="text-gray400">{t("address")}:</span>{" "}
                   {order.address || "-"}
                 </p>
               </div>
               <div className="border-t border-gray200 mt-4 pt-4 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>Tạm tính</span>
+                  <span>{t("subtotal")}</span>
                   <span>{formatPrice(order.subTotal || 0)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Phí ship</span>
+                  <span>{t("shipping_fee")}</span>
                   <span>{formatPrice(order.shippingFee || 0)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Giảm giá</span>
+                  <span>{t("discount")}</span>
                   <span>{formatPrice(order.discountAmount || 0)}</span>
                 </div>
                 <div className="flex justify-between text-base font-semibold border-t border-gray200 pt-2">
-                  <span>Tổng</span>
+                  <span>{t("total")}</span>
                   <span>{formatPrice(order.totalPrice || 0)}</span>
                 </div>
               </div>

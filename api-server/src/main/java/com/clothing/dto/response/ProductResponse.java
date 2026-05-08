@@ -23,6 +23,7 @@ public class ProductResponse {
     private String brand;
     private Long categoryId;
     private String categoryName;
+    private String categorySlug;
     private String status;
     private LocalDateTime createdAt;
     private Double ratingAvg;

@@ -38,6 +38,9 @@ import com.clothing.service.WishlistService;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import com.clothing.config.RequestMetaResolver;
 import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -149,11 +152,24 @@ public class ProductServiceImpl implements ProductService {
         CategoryEntity category = getCategory(request.getCategoryId());
         String slug = resolveSlug(request.getSlug(), request.getName(), null);
         validateVariantSkus(request.getVariants(), null);
+        String normalizedName = request.getName().trim();
+        String resolvedNameVi = normalizeOptionalText(request.getNameVi(), normalizedName);
+        String resolvedNameEn = normalizeOptionalText(request.getNameEn(), normalizedName);
+        String resolvedNameMy = normalizeOptionalText(request.getNameMy(), resolvedNameVi);
+        String resolvedDescriptionVi = normalizeOptionalText(request.getDescriptionVi(), request.getDescription());
+        String resolvedDescriptionEn = normalizeOptionalText(request.getDescriptionEn(), request.getDescription());
+        String resolvedDescriptionMy = normalizeOptionalText(request.getDescriptionMy(), resolvedDescriptionVi);
 
         ProductEntity product = new ProductEntity();
-        product.setName(request.getName().trim());
+        product.setName(normalizedName);
+        product.setNameVi(resolvedNameVi);
+        product.setNameEn(resolvedNameEn);
+        product.setNameMy(resolvedNameMy);
         product.setSlug(slug);
         product.setDescription(request.getDescription());
+        product.setDescriptionVi(resolvedDescriptionVi);
+        product.setDescriptionEn(resolvedDescriptionEn);
+        product.setDescriptionMy(resolvedDescriptionMy);
         product.setBrand(request.getBrand());
         product.setCategoryId(category.getId());
         product.setStatus(normalizeStatus(request.getStatus()));
@@ -185,10 +201,23 @@ public class ProductServiceImpl implements ProductService {
         String slug = resolveSlug(request.getSlug(), request.getName(), id);
         validateVariantSkus(request.getVariants(), id);
         Long oldMinPrice = findCurrentMinPrice(id);
+        String normalizedName = request.getName().trim();
+        String resolvedNameVi = normalizeOptionalText(request.getNameVi(), normalizedName);
+        String resolvedNameEn = normalizeOptionalText(request.getNameEn(), normalizedName);
+        String resolvedNameMy = normalizeOptionalText(request.getNameMy(), resolvedNameVi);
+        String resolvedDescriptionVi = normalizeOptionalText(request.getDescriptionVi(), request.getDescription());
+        String resolvedDescriptionEn = normalizeOptionalText(request.getDescriptionEn(), request.getDescription());
+        String resolvedDescriptionMy = normalizeOptionalText(request.getDescriptionMy(), resolvedDescriptionVi);
 
-        product.setName(request.getName().trim());
+        product.setName(normalizedName);
+        product.setNameVi(resolvedNameVi);
+        product.setNameEn(resolvedNameEn);
+        product.setNameMy(resolvedNameMy);
         product.setSlug(slug);
         product.setDescription(request.getDescription());
+        product.setDescriptionVi(resolvedDescriptionVi);
+        product.setDescriptionEn(resolvedDescriptionEn);
+        product.setDescriptionMy(resolvedDescriptionMy);
         product.setBrand(request.getBrand());
         product.setCategoryId(category.getId());
         product.setStatus(normalizeStatus(request.getStatus()));
@@ -233,7 +262,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    @Cacheable(cacheNames = CacheConfig.PRODUCT_DETAIL_CACHE, key = "#id")
+    @Cacheable(
+            cacheNames = CacheConfig.PRODUCT_DETAIL_CACHE,
+            key = "#id + ':l:' + T(org.springframework.context.i18n.LocaleContextHolder).getLocale().getLanguage()"
+    )
     public ProductResponse getById(Long id) {
         ProductEntity product = findActiveProductById(id);
         return toResponse(product, true);
@@ -261,7 +293,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Cacheable(
             cacheNames = CacheConfig.PRODUCT_LIST_CACHE,
-            key = "'p:' + #page + ':s:' + #size + ':sb:' + #sortBy + ':d:' + #direction + ':c:' + #category + ':q:' + #q"
+            key = "'p:' + #page + ':s:' + #size + ':sb:' + #sortBy + ':d:' + #direction + ':c:' + #category + ':q:' + #q + ':l:' + T(org.springframework.context.i18n.LocaleContextHolder).getLocale().getLanguage()"
     )
     public PageResponse<ProductResponse> getAll(int page, int size, String sortBy, String direction, Long category, String q) {
         if (page < 0) {
@@ -887,6 +919,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private ProductResponse toResponse(ProductEntity product, boolean withRating) {
+        String language = resolveLanguage();
         CategoryEntity category = categoryRepository.findById(product.getCategoryId()).orElse(null);
         List<ProductVariantEntity> variants = productVariantRepository.findByProductIdOrderByIdAsc(product.getId());
         List<ProductImageEntity> images = productImageRepository.findByProductIdOrderByIdAsc(product.getId());
@@ -899,14 +932,38 @@ public class ProductServiceImpl implements ProductService {
             reviewCount = count;
         }
 
+        String localizedProductName;
+        String localizedDescription;
+        String localizedCategoryName;
+        if ("en".equalsIgnoreCase(language)) {
+            localizedProductName = pickFirst(product.getNameEn(), product.getName(), product.getNameVi(), product.getNameMy());
+            localizedDescription = pickFirst(product.getDescriptionEn(), product.getDescription(), product.getDescriptionVi(), product.getDescriptionMy());
+            localizedCategoryName = category == null
+                    ? null
+                    : pickFirst(category.getNameEn(), category.getName(), category.getNameVi(), category.getNameMy());
+        } else if ("my".equalsIgnoreCase(language)) {
+            localizedProductName = pickFirst(product.getNameMy(), product.getName(), product.getNameVi(), product.getNameEn());
+            localizedDescription = pickFirst(product.getDescriptionMy(), product.getDescription(), product.getDescriptionVi(), product.getDescriptionEn());
+            localizedCategoryName = category == null
+                    ? null
+                    : pickFirst(category.getNameMy(), category.getName(), category.getNameVi(), category.getNameEn());
+        } else {
+            localizedProductName = pickFirst(product.getNameVi(), product.getName(), product.getNameEn(), product.getNameMy());
+            localizedDescription = pickFirst(product.getDescriptionVi(), product.getDescription(), product.getDescriptionEn(), product.getDescriptionMy());
+            localizedCategoryName = category == null
+                    ? null
+                    : pickFirst(category.getNameVi(), category.getName(), category.getNameEn(), category.getNameMy());
+        }
+
         return ProductResponse.builder()
                 .id(product.getId())
-                .name(product.getName())
+                .name(localizedProductName)
                 .slug(product.getSlug())
-                .description(product.getDescription())
+                .description(localizedDescription)
                 .brand(product.getBrand())
                 .categoryId(product.getCategoryId())
-                .categoryName(category == null ? null : category.getName())
+                .categoryName(localizedCategoryName)
+                .categorySlug(category == null ? null : category.getSlug())
                 .status(product.getStatus())
                 .createdAt(product.getCreatedAt())
                 .ratingAvg(ratingAvg)
@@ -914,6 +971,40 @@ public class ProductServiceImpl implements ProductService {
                 .variants(variants.stream().map(this::toVariantResponse).toList())
                 .images(images.stream().map(this::toImageResponse).toList())
                 .build();
+    }
+
+    private String resolveLanguage() {
+        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes == null) {
+            return "vi";
+        }
+        return RequestMetaResolver.resolveLanguage(attributes.getRequest());
+    }
+
+    private String localizedOrFallback(String localized, String fallback) {
+        if (localized == null || localized.trim().isEmpty()) {
+            return fallback;
+        }
+        return localized;
+    }
+
+    private String pickFirst(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private String normalizeOptionalText(String preferred, String fallback) {
+        if (preferred != null && !preferred.isBlank()) {
+            return preferred.trim();
+        }
+        return fallback;
     }
 
     private ProductVariantResponse toVariantResponse(ProductVariantEntity variant) {

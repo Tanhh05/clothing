@@ -131,7 +131,7 @@ const ShoppingCart = () => {
 
         const authToken = auth?.user?.token;
         if (!authToken) {
-          setOrderError("Bạn cần đăng nhập lại để đặt hàng.");
+          setOrderError(t("login_required_reorder"));
           setIsOrdering(false);
           return;
         }
@@ -174,7 +174,7 @@ const ShoppingCart = () => {
               (variant.status || "").toUpperCase() !== "INACTIVE"
           );
           if (!pickedVariant?.id) {
-            throw new Error(`Không tìm thấy biến thể hợp lệ cho sản phẩm ${cartItem.name}`);
+            throw new Error(`${t("no_valid_variant_for_product")}: ${cartItem.name}`);
           }
           await axios.post(
             `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/cart/items`,
@@ -254,9 +254,7 @@ const ShoppingCart = () => {
           axiosErr?.response?.data?.error ||
           axiosErr?.message ||
           "";
-        setOrderError(
-          backendMessage || "Đặt hàng thất bại. Vui lòng kiểm tra thông tin nhận hàng."
-        );
+        setOrderError(backendMessage || t("place_order_failed"));
         setIsOrdering(false);
       } finally {
         placingOrderRef.current = false;
@@ -550,7 +548,7 @@ const ShoppingCart = () => {
   return (
     <div>
       {/* ===== Head Section ===== */}
-      <Header title={`Shopping Cart - Twenty`} />
+      <Header title={`${t("checkout")} - Twenty`} />
 
       <main id="main-content">
         {/* ===== Heading & Continue Shopping */}
@@ -661,7 +659,7 @@ const ShoppingCart = () => {
                 </div>
                 <div>
                   <label htmlFor="province" className="text-lg">
-                    Tỉnh/Thành
+                    {t("province_city")}
                   </label>
                   <select
                     id="province"
@@ -670,7 +668,7 @@ const ShoppingCart = () => {
                     onChange={(e) => handleProvinceChange(e.target.value)}
                     required
                   >
-                    <option value="">Chọn tỉnh / thành</option>
+                    <option value="">{t("select_province_city")}</option>
                     {provinces.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.name}
@@ -680,7 +678,7 @@ const ShoppingCart = () => {
                 </div>
                 <div>
                   <label htmlFor="district" className="text-lg">
-                    Quận/Huyện
+                    {t("district")}
                   </label>
                   <select
                     id="district"
@@ -690,7 +688,7 @@ const ShoppingCart = () => {
                     disabled={!selectedProvinceId}
                     required
                   >
-                    <option value="">Chọn quận / huyện</option>
+                    <option value="">{t("select_district")}</option>
                     {districts.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.name}
@@ -700,7 +698,7 @@ const ShoppingCart = () => {
                 </div>
                 <div>
                   <label htmlFor="ward" className="text-lg">
-                    Phường/Xã
+                    {t("ward")}
                   </label>
                   <select
                     id="ward"
@@ -710,7 +708,7 @@ const ShoppingCart = () => {
                     disabled={!selectedDistrictId}
                     required
                   >
-                    <option value="">Chọn phường / xã</option>
+                    <option value="">{t("select_ward")}</option>
                     {wards.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.name}
@@ -758,13 +756,13 @@ const ShoppingCart = () => {
                 </div>
 
                 <div className="py-3 flex justify-between">
-                  <span className="uppercase">Phí vận chuyển</span>
+                  <span className="uppercase">{t("shipping_fee")}</span>
                   <span>{deliFee === null ? "_" : formatPrice(deliFee)}</span>
                 </div>
 
                 <div>
                   <div className="flex justify-between py-3">
-                    <span>Tổng đơn hàng</span>
+                    <span>{t("order_total")}</span>
                     <span>{formatPrice(roundDecimal(+subtotal + (deliFee ?? 0)))}</span>
                   </div>
 
@@ -778,7 +776,7 @@ const ShoppingCart = () => {
                           {t("cash_on_delivery")}
                         </span>
                         <span className="text-gray400 text-sm mt-1 block">
-                          Thanh toán khi nhận hàng.
+                          {t("cash_on_delivery_desc")}
                         </span>
                       </div>
                       <input
@@ -829,7 +827,7 @@ const ShoppingCart = () => {
                             MoMo
                           </span>
                           <span className="text-gray400 text-sm mt-1 block">
-                            Thanh toán qua ví MoMo.
+                            {t("momo_desc")}
                           </span>
                         </div>
                       </div>
@@ -879,7 +877,7 @@ const ShoppingCart = () => {
                             VNPay
                           </span>
                           <span className="text-gray400 text-sm mt-1 block">
-                            Thanh toán online qua cổng VNPay.
+                            {t("vnpay_desc")}
                           </span>
                         </div>
                       </div>

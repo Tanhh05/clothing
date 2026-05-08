@@ -24,11 +24,29 @@ public class ProductEntity {
     @Column(length = 255)
     private String name;
 
+    @Column(name = "name_en", length = 255)
+    private String nameEn;
+
+    @Column(name = "name_vi", length = 255)
+    private String nameVi;
+
+    @Column(name = "name_my", length = 255)
+    private String nameMy;
+
     @Column(length = 255, unique = true)
     private String slug;
 
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Column(name = "description_en", columnDefinition = "TEXT")
+    private String descriptionEn;
+
+    @Column(name = "description_vi", columnDefinition = "TEXT")
+    private String descriptionVi;
+
+    @Column(name = "description_my", columnDefinition = "TEXT")
+    private String descriptionMy;
 
     @Column(length = 100)
     private String brand;

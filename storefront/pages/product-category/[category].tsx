@@ -22,6 +22,17 @@ type Props = {
   orderby: OrderType;
 };
 
+const unwrapApiData = <T,>(payload: any): T => {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    Object.prototype.hasOwnProperty.call(payload, "data")
+  ) {
+    return payload.data as T;
+  }
+  return payload as T;
+};
+
 const ProductCategory: React.FC<Props> = ({
   items,
   page,
@@ -117,12 +128,18 @@ export const getServerSideProps: GetServerSideProps = async ({
     direction = "desc";
   }
 
+  const headers = {
+    "Accept-Language": locale || "vi",
+    "X-Currency": "VND",
+  };
   let categoryId: number | undefined;
   if (paramCategory !== "new-arrivals") {
     const categoryRes = await axios.get(
-      `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/categories?page=0&size=100&sortBy=displayOrder&direction=asc`
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/categories?page=0&size=100&sortBy=displayOrder&direction=asc`,
+      { headers }
     );
-    const category = (categoryRes.data.content || []).find(
+    const categoryPage = unwrapApiData<any>(categoryRes.data);
+    const category = (categoryPage?.content || []).find(
       (item: { slug?: string }) => item.slug === paramCategory
     );
     categoryId = category?.id;
@@ -138,13 +155,14 @@ export const getServerSideProps: GetServerSideProps = async ({
     paramsForProducts.category = categoryId;
   }
 
-  const res = await axios.get(
-    `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products`,
-    { params: paramsForProducts }
-  );
+  const res = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products`, {
+    params: paramsForProducts,
+    headers,
+  });
+  const productPage = unwrapApiData<any>(res.data);
 
-  const items: itemType[] = (res.data.content || []).map(mapApiProductToItem);
-  const numberOfProducts = res.data.totalElements || items.length;
+  const items: itemType[] = (productPage?.content || []).map(mapApiProductToItem);
+  const numberOfProducts = productPage?.totalElements || items.length;
 
   return {
     props: {

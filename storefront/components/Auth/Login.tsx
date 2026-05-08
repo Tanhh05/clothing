@@ -44,7 +44,7 @@ const Login: React.FC<Props> = ({
           callback: async (response: { credential?: string }) => {
             try {
               if (!response?.credential) {
-                setErrorMsg("Google không trả về credential.");
+                setErrorMsg("google_no_credential");
                 return;
               }
               const loginResponse = await auth.loginWithGoogle!(response.credential);
@@ -56,7 +56,7 @@ const Login: React.FC<Props> = ({
               }
             } catch (error) {
               console.error("Google login callback failed:", error);
-              setErrorMsg("Không thể xử lý đăng nhập Google.");
+              setErrorMsg("google_login_process_failed");
             }
           },
         });
@@ -115,7 +115,7 @@ const Login: React.FC<Props> = ({
     const host = googleBtnHostRef.current;
     const google = (window as any).google;
     if (!clientId || !host || !google?.accounts?.id) {
-      setErrorMsg("Google SDK chưa sẵn sàng. Vui lòng thử lại sau 1-2 giây.");
+      setErrorMsg("google_sdk_not_ready");
       return;
     }
     const realBtn = host.querySelector("div[role='button']") as
@@ -134,7 +134,7 @@ const Login: React.FC<Props> = ({
           notification?.getNotDisplayedReason?.() ||
           notification?.getSkippedReason?.() ||
           "unknown";
-        setErrorMsg(`Google One Tap không hiển thị (${reason}).`);
+        setErrorMsg(`${t("google_onetap_not_displayed")}: ${reason}`);
       }
     });
   };
