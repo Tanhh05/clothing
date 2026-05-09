@@ -9,7 +9,6 @@ import com.clothing.dto.response.OrderItemResponse;
 import com.clothing.dto.response.OrderResponse;
 import com.clothing.dto.response.OrderStatusHistoryResponse;
 import com.clothing.dto.response.PageResponse;
-import com.clothing.dto.response.ProductSalesStatResponse;
 import com.clothing.entity.CartEntity;
 import com.clothing.entity.CartItemEntity;
 import com.clothing.entity.CouponEntity;
@@ -41,7 +40,6 @@ import com.clothing.repository.ProductRepository;
 import com.clothing.repository.ProductVariantRepository;
 import com.clothing.repository.StockReservationRepository;
 import com.clothing.repository.StatusCountProjection;
-import com.clothing.repository.TopProductSalesProjection;
 import com.clothing.repository.UserAddressRepository;
 import com.clothing.repository.UserRepository;
 import com.clothing.repository.VnpayCheckoutSessionRepository;
@@ -575,7 +573,6 @@ public class OrderServiceImpl implements OrderService {
         }
 
         double cancelRate = total30d == 0 ? 0D : (cancelLike30d * 100.0D) / total30d;
-        List<ProductSalesStatResponse> topProducts30d = buildTopProducts();
 
         return AdminDashboardSummaryResponse.builder()
                 .revenueToday(revenueToday)
@@ -587,7 +584,6 @@ public class OrderServiceImpl implements OrderService {
                 .pendingOrders(pendingOrders)
                 .cancelRate30d(Math.round(cancelRate * 10.0D) / 10.0D)
                 .statusCounts30d(statusCounts30d)
-                .topProducts30d(topProducts30d)
                 .build();
     }
 
@@ -1722,26 +1718,6 @@ public class OrderServiceImpl implements OrderService {
         } catch (Exception ex) {
             throw new BusinessException("Cannot serialize checkout snapshot", HttpStatus.INTERNAL_SERVER_ERROR);
         }
-    }
-
-    private List<ProductSalesStatResponse> buildTopProducts() {
-        List<TopProductSalesProjection> topRows = orderItemRepository.findTopProductSales30dDelivered();
-        if (topRows.isEmpty()) {
-            return List.of();
-        }
-
-        List<ProductSalesStatResponse> responses = new ArrayList<>(topRows.size());
-        for (TopProductSalesProjection row : topRows) {
-            Long productId = row.getProductId();
-            String productName = row.getProductName();
-            responses.add(ProductSalesStatResponse.builder()
-                    .productId(productId)
-                    .productName(productName == null || productName.isBlank() ? ("Product #" + productId) : productName)
-                    .totalQuantity(safeLong(row.getTotalQuantity()))
-                    .totalRevenue(safeLong(row.getTotalRevenue()))
-                    .build());
-        }
-        return responses;
     }
 
     private String normalizeStatus(String status) {
