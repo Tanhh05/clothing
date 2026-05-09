@@ -10,6 +10,7 @@ import Loading from "../../public/icons/Loading";
 import GhostButton from "../Buttons/GhostButton";
 import { useRouter } from "next/router";
 import { mapApiProductToItem } from "../../context/Util/productMapper";
+import { pushWithLang } from "../../lib/router-utils";
 
 export default function SearchForm() {
   const t = useTranslations("Navigation");
@@ -162,7 +163,7 @@ export default function SearchForm() {
                       {moreThanFour && (
                         <GhostButton
                           onClick={() =>
-                            router.push(`/search?q=${searchValue}`)
+                            pushWithLang(router, `/search?q=${searchValue}`)
                           }
                         >
                           {t("view_all")}

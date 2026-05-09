@@ -22,5 +22,5 @@ public class AdminDashboardSummaryResponse {
     private Double cancelRate30d;
     private Map<String, Long> statusCounts30d;
     private List<ProductSalesStatResponse> topProducts30d;
+    private List<TopBuyerStatResponse> topBuyers30d;
 }
-

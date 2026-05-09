@@ -1,5 +1,7 @@
 import { FC } from "react";
 import Link from "next/link";
+import { useRouter } from "next/router";
+import { withLang } from "../../lib/router-utils";
 
 type Props = {
   extraClass?: string;
@@ -20,6 +22,7 @@ const LinkButton: FC<Props> = ({
   noBorder = true,
   inverted = true,
 }) => {
+  const router = useRouter();
   let btnSize = "";
   if (size === "sm") {
     btnSize = "py-2 sm:py-1 px-5";
@@ -30,7 +33,7 @@ const LinkButton: FC<Props> = ({
   }
 
   return (
-    <Link href={href}>
+    <Link href={withLang(href, router.locale)}>
       <a
         role="button"
         aria-label={aria_label}

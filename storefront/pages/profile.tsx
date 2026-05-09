@@ -10,6 +10,7 @@ import Input from "../components/Input/Input";
 import Button from "../components/Buttons/Button";
 import { useAuth } from "../context/AuthContext";
 import { useNotify } from "../context/NotificationContext";
+import { pushWithLang } from "../lib/router-utils";
 
 type UserAddress = {
   id: number;
@@ -25,6 +26,17 @@ type UserAddress = {
 type AddressUnit = {
   id: string;
   name: string;
+};
+
+const unwrapApiData = <T,>(payload: any): T => {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    Object.prototype.hasOwnProperty.call(payload, "data")
+  ) {
+    return payload.data as T;
+  }
+  return payload as T;
 };
 
 const ProfilePage = () => {
@@ -89,7 +101,7 @@ const ProfilePage = () => {
   useEffect(() => {
     if (!auth.isAuthReady) return;
     if (!auth.user) {
-      router.push("/");
+      pushWithLang(router, "/");
       return;
     }
     setUsername(auth.user.username || "");
@@ -106,7 +118,8 @@ const ProfilePage = () => {
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/address/provinces`
         );
         if (!active) return;
-        setProvinces(Array.isArray(res.data) ? res.data : []);
+        const provinceData = unwrapApiData<AddressUnit[]>(res.data);
+        setProvinces(Array.isArray(provinceData) ? provinceData : []);
       } catch (err) {
         console.error("Load provinces failed:", err);
       }
@@ -132,8 +145,9 @@ const ProfilePage = () => {
           }
         );
         if (!active) return;
-        const loadedAddresses: UserAddress[] = Array.isArray(res.data)
-          ? res.data
+        const addressData = unwrapApiData<UserAddress[]>(res.data);
+        const loadedAddresses: UserAddress[] = Array.isArray(addressData)
+          ? addressData
           : [];
         setAddresses(loadedAddresses);
         if (loadedAddresses.length === 0) {
@@ -171,7 +185,8 @@ const ProfilePage = () => {
           { params: { provinceId: selectedProvinceId } }
         );
         if (!active) return;
-        const data: AddressUnit[] = Array.isArray(res.data) ? res.data : [];
+        const districtData = unwrapApiData<AddressUnit[]>(res.data);
+        const data: AddressUnit[] = Array.isArray(districtData) ? districtData : [];
         setDistricts(data);
       } catch (err) {
         console.error("Load districts failed:", err);
@@ -199,7 +214,8 @@ const ProfilePage = () => {
           { params: { districtId: selectedDistrictId } }
         );
         if (!active) return;
-        const data: AddressUnit[] = Array.isArray(res.data) ? res.data : [];
+        const wardData = unwrapApiData<AddressUnit[]>(res.data);
+        const data: AddressUnit[] = Array.isArray(wardData) ? wardData : [];
         setWards(data);
       } catch (err) {
         console.error("Load wards failed:", err);
@@ -258,7 +274,7 @@ const ProfilePage = () => {
   const handleLogout = () => {
     auth.logout?.();
     notify(t("logout_successful"), "success");
-    router.push("/");
+    pushWithLang(router, "/");
   };
 
   const handleSaveAddress = async (e: React.FormEvent<HTMLFormElement>) => {

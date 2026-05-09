@@ -219,6 +219,12 @@
     "recipient":"လက်ခံသူ",
     "recipient_phone":"လက်ခံသူဖုန်း",
     "address_detail":"လိပ်စာအသေးစိတ်",
+    "province_city":"တိုင်း/မြို့",
+    "select_province_city":"တိုင်း/မြို့ ရွေးချယ်ပါ",
+    "district":"ခရိုင်/မြို့နယ်",
+    "select_district":"ခရိုင်/မြို့နယ် ရွေးချယ်ပါ",
+    "ward":"ရပ်ကွက်/ကျေးရွာ",
+    "select_ward":"ရပ်ကွက်/ကျေးရွာ ရွေးချယ်ပါ",
     "set_as_default_address":"မူလလိပ်စာအဖြစ် သတ်မှတ်မည်",
     "save_address":"လိပ်စာသိမ်းမည်"
     ,"profile_updated_success":"ပရိုဖိုင် ပြင်ဆင်မှု အောင်မြင်သည်။",

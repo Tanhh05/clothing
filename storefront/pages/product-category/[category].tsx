@@ -12,6 +12,7 @@ import Pagination from "../../components/Util/Pagination";
 import { itemType } from "../../context/cart/cart-types";
 import DownArrow from "../../public/icons/DownArrow";
 import { mapApiProductToItem } from "../../context/Util/productMapper";
+import { pushWithLang } from "../../lib/router-utils";
 
 type OrderType = "latest" | "price" | "price-desc";
 
@@ -200,7 +201,7 @@ const SortMenu: React.FC<{ orderby: OrderType }> = ({ orderby }) => {
             <button
               type="button"
               onClick={() =>
-                router.push(`/product-category/${category}?orderby=latest`)
+                pushWithLang(router, `/product-category/${category}?orderby=latest`)
               }
               className={`${
                 active ? "bg-gray100 text-gray500" : "bg-white"
@@ -217,7 +218,7 @@ const SortMenu: React.FC<{ orderby: OrderType }> = ({ orderby }) => {
             <button
               type="button"
               onClick={() =>
-                router.push(`/product-category/${category}?orderby=price`)
+                pushWithLang(router, `/product-category/${category}?orderby=price`)
               }
               className={`${
                 active ? "bg-gray100 text-gray500" : "bg-white"
@@ -234,7 +235,7 @@ const SortMenu: React.FC<{ orderby: OrderType }> = ({ orderby }) => {
             <button
               type="button"
               onClick={() =>
-                router.push(`/product-category/${category}?orderby=price-desc`)
+                pushWithLang(router, `/product-category/${category}?orderby=price-desc`)
               }
               className={`${
                 active ? "bg-gray100 text-gray500" : "bg-white"

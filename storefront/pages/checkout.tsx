@@ -63,10 +63,22 @@ type ProductVariantApi = {
   id: number;
   stock?: number;
   status?: string;
+  size?: string;
 };
 
 type ProductDetailApi = {
   variants?: ProductVariantApi[];
+};
+
+const unwrapApiData = <T,>(payload: any): T => {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    Object.prototype.hasOwnProperty.call(payload, "data")
+  ) {
+    return payload.data as T;
+  }
+  return payload as T;
 };
 
 const ShoppingCart = () => {
@@ -99,6 +111,7 @@ const ShoppingCart = () => {
   const [selectedWardCode, setSelectedWardCode] = useState("");
   const placingOrderRef = useRef(false);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!isOrdering || placingOrderRef.current) return;
     placingOrderRef.current = true;
@@ -145,8 +158,9 @@ const ShoppingCart = () => {
             },
           }
         );
-        const backendItems = Array.isArray(backendCartRes.data?.items)
-          ? backendCartRes.data.items
+        const backendCartData = unwrapApiData<BackendCartResponse>(backendCartRes.data);
+        const backendItems = Array.isArray(backendCartData?.items)
+          ? backendCartData.items
           : [];
         await Promise.all(
           backendItems.map((item) =>
@@ -168,11 +182,21 @@ const ShoppingCart = () => {
           const variants = Array.isArray(productRes.data?.variants)
             ? productRes.data.variants
             : [];
-          const pickedVariant = variants.find(
+          const normalizedSelectedSize = (cartItem.selectedSize || "")
+            .trim()
+            .toUpperCase();
+          const pickedVariantBySize = variants.find(
+            (variant) =>
+              (variant.size || "").trim().toUpperCase() === normalizedSelectedSize &&
+              Number(variant.stock || 0) > 0 &&
+              (variant.status || "").toUpperCase() !== "INACTIVE"
+          );
+          const pickedVariantFallback = variants.find(
             (variant) =>
               Number(variant.stock || 0) > 0 &&
               (variant.status || "").toUpperCase() !== "INACTIVE"
           );
+          const pickedVariant = pickedVariantBySize || pickedVariantFallback;
           if (!pickedVariant?.id) {
             throw new Error(`${t("no_valid_variant_for_product")}: ${cartItem.name}`);
           }
@@ -261,6 +285,7 @@ const ShoppingCart = () => {
       }
     };
     makeOrder();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOrdering, auth.user]);
 
   useEffect(() => {
@@ -283,7 +308,8 @@ const ShoppingCart = () => {
         const res = await axios.get(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/address/provinces`
         );
-        setProvinces(Array.isArray(res.data) ? res.data : []);
+        const provinceData = unwrapApiData<AddressUnit[]>(res.data);
+        setProvinces(Array.isArray(provinceData) ? provinceData : []);
       } catch (err) {
         console.error("Load provinces failed:", err);
       }
@@ -305,7 +331,8 @@ const ShoppingCart = () => {
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/address/districts`,
           { params: { provinceId: selectedProvinceId } }
         );
-        setDistricts(Array.isArray(res.data) ? res.data : []);
+        const districtData = unwrapApiData<AddressUnit[]>(res.data);
+        setDistricts(Array.isArray(districtData) ? districtData : []);
       } catch (err) {
         console.error("Load districts failed:", err);
       }
@@ -325,7 +352,8 @@ const ShoppingCart = () => {
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/address/wards`,
           { params: { districtId: selectedDistrictId } }
         );
-        setWards(Array.isArray(res.data) ? res.data : []);
+        const wardData = unwrapApiData<AddressUnit[]>(res.data);
+        setWards(Array.isArray(wardData) ? wardData : []);
       } catch (err) {
         console.error("Load wards failed:", err);
       }
@@ -368,7 +396,8 @@ const ShoppingCart = () => {
             },
           }
         );
-        const addresses: UserAddress[] = Array.isArray(res.data) ? res.data : [];
+        const addressData = unwrapApiData<UserAddress[]>(res.data);
+        const addresses: UserAddress[] = Array.isArray(addressData) ? addressData : [];
         setSavedAddresses(addresses);
         if (addresses.length === 0) return;
         const defaultAddress =
@@ -382,8 +411,9 @@ const ShoppingCart = () => {
         const provincesRes = await axios.get(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/address/provinces`
         );
-        const provinceOptions: AddressUnit[] = Array.isArray(provincesRes.data)
-          ? provincesRes.data
+        const provinceData = unwrapApiData<AddressUnit[]>(provincesRes.data);
+        const provinceOptions: AddressUnit[] = Array.isArray(provinceData)
+          ? provinceData
           : [];
         if (provinceOptions.length > 0) setProvinces(provinceOptions);
         const matchedProvince = provinceOptions.find(
@@ -396,8 +426,9 @@ const ShoppingCart = () => {
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/address/districts`,
           { params: { provinceId: matchedProvince.id } }
         );
-        const districtOptions: AddressUnit[] = Array.isArray(districtsRes.data)
-          ? districtsRes.data
+        const districtData = unwrapApiData<AddressUnit[]>(districtsRes.data);
+        const districtOptions: AddressUnit[] = Array.isArray(districtData)
+          ? districtData
           : [];
         setDistricts(districtOptions);
         const matchedDistrict = districtOptions.find(
@@ -410,8 +441,9 @@ const ShoppingCart = () => {
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/address/wards`,
           { params: { districtId: matchedDistrict.id } }
         );
-        const wardOptions: AddressUnit[] = Array.isArray(wardsRes.data)
-          ? wardsRes.data
+        const wardData = unwrapApiData<AddressUnit[]>(wardsRes.data);
+        const wardOptions: AddressUnit[] = Array.isArray(wardData)
+          ? wardData
           : [];
         setWards(wardOptions);
         const matchedWard = wardOptions.find(
@@ -536,7 +568,8 @@ const ShoppingCart = () => {
             },
           }
         );
-        setDeliFee(Number(res.data?.fee || 0));
+        const feeData = unwrapApiData<{ fee?: number }>(res.data);
+        setDeliFee(Number(feeData?.fee || 0));
       } catch (err) {
         console.error("Load shipping fee failed:", err);
         setDeliFee(null);

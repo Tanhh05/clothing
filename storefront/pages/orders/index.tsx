@@ -9,6 +9,7 @@ import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
 import { useAuth } from "../../context/AuthContext";
 import { useCurrency } from "../../context/CurrencyContext";
+import { pushWithLang } from "../../lib/router-utils";
 
 type OrderItem = {
   id: number;
@@ -20,6 +21,7 @@ type OrderItem = {
 
 type Order = {
   id: number;
+  shippingCode?: string;
   status?: string;
   paymentMethod?: string;
   totalPrice?: number;
@@ -54,6 +56,11 @@ const isCancelableOrder = (status?: string) =>
     String(status || "").toUpperCase()
   );
 
+const getInvoiceCode = (order: Order) =>
+  order.shippingCode && order.shippingCode.trim()
+    ? order.shippingCode.trim()
+    : `HD${order.id}`;
+
 const OrdersPage = () => {
   const t = useTranslations("Orders");
   const auth = useAuth();
@@ -70,7 +77,7 @@ const OrdersPage = () => {
   useEffect(() => {
     if (!auth.isAuthReady) return;
     if (!auth.user) {
-      router.push("/");
+      pushWithLang(router, "/");
       return;
     }
     setCurrentPage(1);
@@ -113,7 +120,7 @@ const OrdersPage = () => {
     return () => {
       active = false;
     };
-  }, [auth.user?.token, currentPage]);
+  }, [auth.user?.token, currentPage, t]);
 
   const handleCancelOrder = async (orderId: number) => {
     if (!auth.user?.token) return;
@@ -149,11 +156,8 @@ const OrdersPage = () => {
     <div>
       <Header title={`${t("my_orders")} - Twenty`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6">
           <h1 className="text-3xl">{t("my_orders")}</h1>
-          <Link href="/profile">
-            <a className="px-4 py-2 border border-gray300 hover:bg-gray100">{t("profile")}</a>
-          </Link>
         </div>
 
         {isLoading && <p>{t("loading")}</p>}
@@ -180,7 +184,7 @@ const OrdersPage = () => {
               <tbody>
                 {orders.map((order) => (
                   <tr key={order.id} className="border-b border-gray200">
-                    <td className="px-4 py-3">#{order.id}</td>
+                    <td className="px-4 py-3">{getInvoiceCode(order)}</td>
                     <td className="px-4 py-3">
                       {order.createdAt
                         ? new Date(order.createdAt).toLocaleString(

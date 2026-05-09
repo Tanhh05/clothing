@@ -219,6 +219,12 @@
     "recipient":"Người nhận",
     "recipient_phone":"Số điện thoại nhận hàng",
     "address_detail":"Địa chỉ chi tiết",
+    "province_city":"Tỉnh/Thành",
+    "select_province_city":"Chọn tỉnh/thành",
+    "district":"Quận/Huyện",
+    "select_district":"Chọn quận/huyện",
+    "ward":"Phường/Xã",
+    "select_ward":"Chọn phường/xã",
     "set_as_default_address":"Đặt làm địa chỉ mặc định",
     "save_address":"Lưu địa chỉ"
     ,"profile_updated_success":"Cập nhật hồ sơ thành công.",

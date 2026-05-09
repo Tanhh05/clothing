@@ -48,6 +48,45 @@
     </el-row>
 
     <el-row :gutter="14">
+      <el-col :xs="24" :lg="12">
+        <div class="table-card admin-card">
+          <div class="card-head">
+            <h3>Top sản phẩm (30 ngày)</h3>
+          </div>
+          <el-table :data="summary.topProducts30d || []" border stripe :size="elementSize" class="admin-table" empty-text="Chưa có dữ liệu">
+            <el-table-column label="Sản phẩm" min-width="220">
+              <template slot-scope="{ row }">{{ row.productName || `#${row.productId || '-'}` }}</template>
+            </el-table-column>
+            <el-table-column label="Số lượng" width="120" align="right">
+              <template slot-scope="{ row }">{{ row.totalQuantity || 0 }}</template>
+            </el-table-column>
+            <el-table-column label="Doanh thu" min-width="150" align="right">
+              <template slot-scope="{ row }">{{ formatPrice(row.totalRevenue) }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </el-col>
+      <el-col :xs="24" :lg="12">
+        <div class="table-card admin-card">
+          <div class="card-head">
+            <h3>Top người mua (30 ngày)</h3>
+          </div>
+          <el-table :data="summary.topBuyers30d || []" border stripe :size="elementSize" class="admin-table" empty-text="Chưa có dữ liệu">
+            <el-table-column label="Khách hàng" min-width="220">
+              <template slot-scope="{ row }">{{ row.buyerName || `User #${row.userId || '-'}` }}</template>
+            </el-table-column>
+            <el-table-column label="Đơn đã mua" width="120" align="right">
+              <template slot-scope="{ row }">{{ row.totalOrders || 0 }}</template>
+            </el-table-column>
+            <el-table-column label="Tổng chi" min-width="150" align="right">
+              <template slot-scope="{ row }">{{ formatPrice(row.totalSpent) }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="14" class="mt-14">
       <el-col :xs="24">
         <div class="table-card admin-card">
           <div class="card-head">
@@ -103,7 +142,9 @@ export default {
         revenue7d: 0,
         revenue30d: 0,
         pendingOrders: 0,
-        statusCounts30d: {}
+        statusCounts30d: {},
+        topProducts30d: [],
+        topBuyers30d: []
       },
       recentOrders: [],
       revenueSeries: [],
@@ -251,6 +292,11 @@ export default {
 }
 
 .chart-row {
+  margin-bottom: 14px;
+}
+
+.mt-14 {
+  margin-top: 14px;
   margin-bottom: 14px;
 }
 

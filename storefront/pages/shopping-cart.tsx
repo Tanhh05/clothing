@@ -15,6 +15,7 @@ import { useCart } from "../context/cart/CartProvider";
 import { useCurrency } from "../context/CurrencyContext";
 import { useRouter } from "next/router";
 import { useAuth } from "../context/AuthContext";
+import { pushWithLang } from "../lib/router-utils";
 
 type UserAddress = {
   id: number;
@@ -27,6 +28,17 @@ type UserAddress = {
 type AddressUnit = {
   id: string;
   name: string;
+};
+
+const unwrapApiData = <T,>(payload: any): T => {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    Object.prototype.hasOwnProperty.call(payload, "data")
+  ) {
+    return payload.data as T;
+  }
+  return payload as T;
 };
 
 // let w = window.innerWidth;
@@ -55,8 +67,9 @@ const ShoppingCart = () => {
             },
           }
         );
-        const addresses: UserAddress[] = Array.isArray(addressesRes.data)
-          ? addressesRes.data
+        const addressData = unwrapApiData<UserAddress[]>(addressesRes.data);
+        const addresses: UserAddress[] = Array.isArray(addressData)
+          ? addressData
           : [];
         if (addresses.length === 0) return;
 
@@ -66,8 +79,9 @@ const ShoppingCart = () => {
         const provincesRes = await axios.get(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/address/provinces`
         );
-        const provinceOptions: AddressUnit[] = Array.isArray(provincesRes.data)
-          ? provincesRes.data
+        const provinceData = unwrapApiData<AddressUnit[]>(provincesRes.data);
+        const provinceOptions: AddressUnit[] = Array.isArray(provinceData)
+          ? provinceData
           : [];
         const matchedProvince = provinceOptions.find(
           (item) => item.name === defaultAddress.province
@@ -78,8 +92,9 @@ const ShoppingCart = () => {
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/address/districts`,
           { params: { provinceId: matchedProvince.id } }
         );
-        const districtOptions: AddressUnit[] = Array.isArray(districtsRes.data)
-          ? districtsRes.data
+        const districtData = unwrapApiData<AddressUnit[]>(districtsRes.data);
+        const districtOptions: AddressUnit[] = Array.isArray(districtData)
+          ? districtData
           : [];
         const matchedDistrict = districtOptions.find(
           (item) => item.name === defaultAddress.district
@@ -91,8 +106,9 @@ const ShoppingCart = () => {
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/address/wards`,
           { params: { districtId: matchedDistrict.id } }
         );
-        const wardOptions: AddressUnit[] = Array.isArray(wardsRes.data)
-          ? wardsRes.data
+        const wardData = unwrapApiData<AddressUnit[]>(wardsRes.data);
+        const wardOptions: AddressUnit[] = Array.isArray(wardData)
+          ? wardData
           : [];
         const matchedWard = wardOptions.find(
           (item) => item.name === defaultAddress.ward
@@ -122,7 +138,8 @@ const ShoppingCart = () => {
             },
           }
         );
-        setDeliFee(Number(res.data?.fee || 0));
+        const feeData = unwrapApiData<{ fee?: number }>(res.data);
+        setDeliFee(Number(feeData?.fee || 0));
       } catch (err) {
         console.error("Load cart shipping fee failed:", err);
         setDeliFee(null);
@@ -286,7 +303,7 @@ const ShoppingCart = () => {
                 value={t("proceed_to_checkout")}
                 size="xl"
                 extraClass="w-full"
-                onClick={() => router.push(`/checkout`)}
+                onClick={() => pushWithLang(router, "/checkout")}
                 disabled={cart.length < 1 ? true : false}
               />
             </div>

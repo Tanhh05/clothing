@@ -18,6 +18,7 @@ import OrderIcon from "../../public/icons/OrderIcon";
 import { useWishlist } from "../../context/wishlist/WishlistProvider";
 import { useAuth } from "../../context/AuthContext";
 import { useCurrency } from "../../context/CurrencyContext";
+import { pushWithLang } from "../../lib/router-utils";
 
 type MenuCategory = {
   id: number;
@@ -69,7 +70,7 @@ export default function Menu({ categories }: Props) {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setOpen(false);
-    router.push(`/search?q=${searchValue}`);
+    pushWithLang(router, `/search?q=${searchValue}`);
   };
 
   const handleChange = (e: React.FormEvent<HTMLInputElement>) => {

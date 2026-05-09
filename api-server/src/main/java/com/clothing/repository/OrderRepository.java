@@ -79,4 +79,21 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long>, JpaSp
             group by upper(coalesce(o.status, ''))
             """, nativeQuery = true)
     List<StatusCountProjection> findStatusCounts30d();
+
+    @Query(value = """
+            select
+                o.user_id as userId,
+                coalesce(nullif(trim(u.full_name), ''), nullif(trim(u.username), ''), concat('User #', o.user_id::text)) as buyerName,
+                count(*) as totalOrders,
+                coalesce(sum(coalesce(o.total_price, 0)), 0) as totalSpent
+            from orders o
+            left join users u on u.id = o.user_id
+            where o.created_at >= date_trunc('day', now()) - interval '29 day'
+              and o.user_id is not null
+              and upper(coalesce(o.status, '')) = 'DELIVERED'
+            group by o.user_id, u.full_name, u.username
+            order by totalSpent desc, totalOrders desc
+            limit 5
+            """, nativeQuery = true)
+    List<TopBuyerProjection> findTopBuyers30dDelivered();
 }

@@ -22,8 +22,14 @@ module.exports = {
       "next-intl": require("path").resolve(__dirname, "lib/next-intl.tsx"),
     };
     if (dev) {
-      // Avoid unstable filesystem pack cache in dev (ENOENT rename/stat on .next/cache/webpack/*.pack).
-      config.cache = false;
+      // Keep dev fast with memory cache, while avoiding flaky filesystem pack cache (.next/cache/webpack/*.pack).
+      config.cache = {
+        type: "memory",
+      };
+      config.watchOptions = {
+        poll: 1000,
+        aggregateTimeout: 300,
+      };
     }
     return config;
   },

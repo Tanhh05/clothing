@@ -219,6 +219,12 @@
     "recipient":"Recipient",
     "recipient_phone":"Recipient Phone",
     "address_detail":"Detailed Address",
+    "province_city":"Province/City",
+    "select_province_city":"Select province/city",
+    "district":"District",
+    "select_district":"Select district",
+    "ward":"Ward",
+    "select_ward":"Select ward",
     "set_as_default_address":"Set as default address",
     "save_address":"Save Address"
     ,"profile_updated_success":"Profile updated successfully.",

@@ -1,6 +1,7 @@
 import { useRouter } from "next/router";
 import NextArrow from "../../public/icons/NextArrow";
 import PrevArrow from "../../public/icons/PrevArrow";
+import { pushWithLang } from "../../lib/router-utils";
 
 type Props = {
   lastPage: number;
@@ -61,7 +62,8 @@ const Pagination: React.FC<Props> = ({ lastPage, currentPage, orderby }) => {
             type="button"
             aria-label="Navigate to Previous Page"
             onClick={() =>
-              router.push(
+              pushWithLang(
+                router,
                 `/product-category/${category}?page=${
                   currentPage - 1
                 }&orderby=${orderby}`
@@ -87,7 +89,8 @@ const Pagination: React.FC<Props> = ({ lastPage, currentPage, orderby }) => {
               <button
                 type="button"
                 onClick={() =>
-                  router.push(
+                  pushWithLang(
+                    router,
                     `/product-category/${category}?page=${num}&orderby=${orderby}`
                   )
                 }
@@ -110,7 +113,8 @@ const Pagination: React.FC<Props> = ({ lastPage, currentPage, orderby }) => {
             type="button"
             aria-label="Navigate to Next Page"
             onClick={() =>
-              router.push(
+              pushWithLang(
+                router,
                 `/product-category/${category}?page=${
                   currentPage + 1
                 }&orderby=${orderby}`

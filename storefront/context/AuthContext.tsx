@@ -200,7 +200,7 @@ function useProvideAuth() {
   ) => {
     try {
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/auth/register`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/register`,
         {
           email,
           fullname,
@@ -224,13 +224,12 @@ function useProvideAuth() {
         message: "register_successful",
       };
     } catch (err) {
-      const errResponse = (err as any).response.data;
-      let errorMessage: string;
-      if (errResponse.error.type === "alreadyExists") {
-        errorMessage = errResponse.error.type;
-      } else {
-        errorMessage = errResponse.error.detail.message;
-      }
+      const errResponse = (err as any)?.response?.data || {};
+      const errorMessage =
+        errResponse?.error?.type ||
+        errResponse?.error?.detail?.message ||
+        errResponse?.message ||
+        "error_occurs";
       return {
         success: false,
         message: errorMessage,

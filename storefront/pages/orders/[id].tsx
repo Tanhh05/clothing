@@ -9,6 +9,7 @@ import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
 import { useAuth } from "../../context/AuthContext";
 import { useCurrency } from "../../context/CurrencyContext";
+import { pushWithLang } from "../../lib/router-utils";
 
 type OrderItem = {
   id: number;
@@ -21,6 +22,7 @@ type OrderItem = {
 
 type Order = {
   id: number;
+  shippingCode?: string;
   status?: string;
   paymentMethod?: string;
   totalPrice?: number;
@@ -48,6 +50,11 @@ const isCancelableOrder = (status?: string) =>
     String(status || "").toUpperCase()
   );
 
+const getInvoiceCode = (order: Order) =>
+  order.shippingCode && order.shippingCode.trim()
+    ? order.shippingCode.trim()
+    : `HD${order.id}`;
+
 const OrderDetailPage = () => {
   const t = useTranslations("Orders");
   const auth = useAuth();
@@ -61,7 +68,7 @@ const OrderDetailPage = () => {
   useEffect(() => {
     if (!auth.isAuthReady) return;
     if (!auth.user) {
-      router.push("/");
+      pushWithLang(router, "/");
       return;
     }
     const id = router.query.id;
@@ -96,7 +103,7 @@ const OrderDetailPage = () => {
     return () => {
       active = false;
     };
-  }, [auth.isAuthReady, auth.user, router, router.query.id]);
+  }, [auth.isAuthReady, auth.user, router, router.query.id, t]);
 
   const handleCancelOrder = async () => {
     if (!auth.user?.token || !order?.id) return;
@@ -176,7 +183,8 @@ const OrderDetailPage = () => {
               <h2 className="text-xl mb-4">{t("order_info")}</h2>
               <div className="space-y-2 text-sm">
                 <p>
-                  <span className="text-gray400">{t("order_code")}:</span> #{order.id}
+                  <span className="text-gray400">{t("order_code")}:</span>{" "}
+                  {getInvoiceCode(order)}
                 </p>
                 <p>
                   <span className="text-gray400">{t("created_at")}:</span>{" "}

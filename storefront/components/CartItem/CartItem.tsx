@@ -10,6 +10,7 @@ import { roundDecimal } from "../Util/utilFunc";
 import { useCart } from "../../context/cart/CartProvider";
 import { useRouter } from "next/router";
 import { useCurrency } from "../../context/CurrencyContext";
+import { pushWithLang } from "../../lib/router-utils";
 
 export default function CartItem() {
   const router = useRouter();
@@ -154,7 +155,7 @@ export default function CartItem() {
                     </LinkButton>
                     <Button
                       value={t("checkout")}
-                      onClick={() => router.push(`/checkout`)}
+                      onClick={() => pushWithLang(router, "/checkout")}
                       disabled={cart.length < 1 ? true : false}
                       extraClass="text-center"
                       size="lg"
