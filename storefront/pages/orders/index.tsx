@@ -66,9 +66,10 @@ const OrdersPage = () => {
   const auth = useAuth();
   const router = useRouter();
   const { formatPrice } = useCurrency();
+  const token = auth.user?.token;
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [errorKey, setErrorKey] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
   const [totalPages, setTotalPages] = useState(1);
@@ -76,20 +77,19 @@ const OrdersPage = () => {
 
   useEffect(() => {
     if (!auth.isAuthReady) return;
-    if (!auth.user) {
+    if (!token) {
       pushWithLang(router, "/");
       return;
     }
-    setCurrentPage(1);
-  }, [auth.isAuthReady, auth.user, router]);
+    setCurrentPage((prev) => (prev === 1 ? prev : 1));
+  }, [auth.isAuthReady, token, router]);
 
   useEffect(() => {
-    const token = auth.user?.token;
     if (!token) return;
     let active = true;
     const loadOrders = async () => {
       setIsLoading(true);
-      setError("");
+      setErrorKey("");
       try {
         const res = await axios.get<PagedOrderResponse | ApiEnvelope<PagedOrderResponse>>(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/my`,
@@ -110,7 +110,7 @@ const OrdersPage = () => {
       } catch (err) {
         console.error("Load orders failed:", err);
         if (!active) return;
-        setError(t("cannot_load_orders"));
+        setErrorKey("cannot_load_orders");
       } finally {
         if (!active) return;
         setIsLoading(false);
@@ -120,13 +120,13 @@ const OrdersPage = () => {
     return () => {
       active = false;
     };
-  }, [auth.user?.token, currentPage, t]);
+  }, [token, currentPage]);
 
   const handleCancelOrder = async (orderId: number) => {
     if (!auth.user?.token) return;
     if (!window.confirm(t("cancel_confirm"))) return;
     setActionLoadingId(orderId);
-    setError("");
+    setErrorKey("");
     try {
       await axios.patch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/my/${orderId}/cancel`,
@@ -144,13 +144,13 @@ const OrdersPage = () => {
       );
     } catch (err) {
       console.error("Cancel order failed:", err);
-      setError(t("cannot_cancel_order"));
+      setErrorKey("cannot_cancel_order");
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  if (!auth.isAuthReady || !auth.user) return null;
+  if (!auth.isAuthReady || !token) return null;
 
   return (
     <div>
@@ -161,13 +161,13 @@ const OrdersPage = () => {
         </div>
 
         {isLoading && <p>{t("loading")}</p>}
-        {error && <p className="text-red">{error}</p>}
+        {errorKey && <p className="text-red">{t(errorKey)}</p>}
 
-        {!isLoading && !error && orders.length === 0 && (
+        {!isLoading && !errorKey && orders.length === 0 && (
           <div className="border border-gray200 p-6 text-gray500">{t("no_orders")}</div>
         )}
 
-        {!isLoading && !error && orders.length > 0 && (
+        {!isLoading && !errorKey && orders.length > 0 && (
           <div className="space-y-4">
             <div className="overflow-auto border border-gray200">
             <table className="w-full min-w-[760px]">

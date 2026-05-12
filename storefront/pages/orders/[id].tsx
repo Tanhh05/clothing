@@ -60,14 +60,15 @@ const OrderDetailPage = () => {
   const auth = useAuth();
   const router = useRouter();
   const { formatPrice } = useCurrency();
+  const token = auth.user?.token;
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [error, setError] = useState("");
+  const [errorKey, setErrorKey] = useState("");
 
   useEffect(() => {
     if (!auth.isAuthReady) return;
-    if (!auth.user) {
+    if (!token) {
       pushWithLang(router, "/");
       return;
     }
@@ -76,15 +77,14 @@ const OrderDetailPage = () => {
 
     let active = true;
     const loadOrder = async () => {
-      if (!auth.user?.token) return;
       setIsLoading(true);
-      setError("");
+      setErrorKey("");
       try {
         const res = await axios.get<Order | ApiEnvelope<Order>>(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/my/${id}`,
           {
             headers: {
-              Authorization: `Bearer ${auth.user.token}`,
+              Authorization: `Bearer ${token}`,
             },
           }
         );
@@ -93,7 +93,7 @@ const OrderDetailPage = () => {
       } catch (err) {
         console.error("Load order detail failed:", err);
         if (!active) return;
-        setError(t("cannot_load_order_detail"));
+        setErrorKey("cannot_load_order_detail");
       } finally {
         if (!active) return;
         setIsLoading(false);
@@ -103,33 +103,33 @@ const OrderDetailPage = () => {
     return () => {
       active = false;
     };
-  }, [auth.isAuthReady, auth.user, router, router.query.id, t]);
+  }, [auth.isAuthReady, token, router, router.query.id]);
 
   const handleCancelOrder = async () => {
-    if (!auth.user?.token || !order?.id) return;
+    if (!token || !order?.id) return;
     if (!window.confirm(t("cancel_confirm"))) return;
     setIsCancelling(true);
-    setError("");
+    setErrorKey("");
     try {
       const res = await axios.patch<Order | ApiEnvelope<Order>>(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/my/${order.id}/cancel`,
         {},
         {
           headers: {
-            Authorization: `Bearer ${auth.user.token}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
       setOrder(extractPayload<Order>(res.data) || { ...order, status: "CANCELLED" });
     } catch (err) {
       console.error("Cancel order failed:", err);
-      setError(t("cannot_cancel_order"));
+      setErrorKey("cannot_cancel_order");
     } finally {
       setIsCancelling(false);
     }
   };
 
-  if (!auth.isAuthReady || !auth.user) return null;
+  if (!auth.isAuthReady || !token) return null;
 
   return (
     <div>
@@ -143,9 +143,9 @@ const OrderDetailPage = () => {
         </div>
 
         {isLoading && <p>{t("loading")}</p>}
-        {error && <p className="text-red">{error}</p>}
+        {errorKey && <p className="text-red">{t(errorKey)}</p>}
 
-        {!isLoading && !error && order && (
+        {!isLoading && !errorKey && order && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <section className="xl:col-span-2 border border-gray200 p-5">
               <h2 className="text-xl mb-4">{t("products")}</h2>

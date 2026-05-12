@@ -31,9 +31,12 @@ export type commonType = {
 export interface itemType extends commonType {
   img1?: string;
   img2?: string;
+  colors?: string[];
   categoryName?: string;
   categorySlug?: string;
   selectedSize?: string;
+  selectedColor?: string;
+  selectedVariantId?: number;
 }
 
 export interface apiProductsType extends commonType {

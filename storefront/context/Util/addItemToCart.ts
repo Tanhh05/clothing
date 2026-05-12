@@ -6,24 +6,25 @@ const addItemToCart = (
   add_one = false
 ) => {
   const targetSize = (item.selectedSize || "").trim().toUpperCase();
+  const targetColor = (item.selectedColor || "").trim().toUpperCase();
+  const targetVariantId = Number(item.selectedVariantId || 0);
   const isSameCartLine = (cartItem: itemType) =>
     cartItem.id === item.id &&
-    ((cartItem.selectedSize || "").trim().toUpperCase() === targetSize);
+    (targetVariantId > 0
+      ? Number(cartItem.selectedVariantId || 0) === targetVariantId
+      : ((cartItem.selectedSize || "").trim().toUpperCase() === targetSize) &&
+        ((cartItem.selectedColor || "").trim().toUpperCase() === targetColor));
   const duplicate = cartItems.some(isSameCartLine);
 
   if (duplicate) {
     return cartItems.map((cartItem) => {
-      let itemQty = 0;
-      !item.qty || add_one
-        ? (itemQty = cartItem.qty! + 1)
-        : (itemQty = item.qty);
+      const addQty = add_one ? 1 : item.qty || 1;
+      const itemQty = (cartItem.qty || 0) + addQty;
 
       return isSameCartLine(cartItem) ? { ...cartItem, qty: itemQty } : cartItem;
     });
   }
-  // console.log(itemQty);
-  let itemQty = 0;
-  !item.qty ? itemQty++ : (itemQty = item.qty);
+  const itemQty = item.qty || 1;
   return [
     ...cartItems,
     {
@@ -35,6 +36,8 @@ const addItemToCart = (
       slug: item.slug,
       qty: itemQty,
       selectedSize: item.selectedSize,
+      selectedColor: item.selectedColor,
+      selectedVariantId: item.selectedVariantId,
     },
   ];
 };

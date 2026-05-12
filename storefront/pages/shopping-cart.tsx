@@ -207,7 +207,7 @@ const ShoppingCart = () => {
                     return (
                       <tr
                         className="border-b-2 border-gray200"
-                        key={`${item.id}-${item.selectedSize || "na"}`}
+                        key={`${item.id}-${item.selectedSize || "na"}-${item.selectedColor || "na"}`}
                       >
                         <td className="my-3 flex flex-col xl:flex-row items-start sm:items-center xl:space-x-2 text-center xl:text-left">
                           <Link href={productLink}>
@@ -226,6 +226,11 @@ const ShoppingCart = () => {
                             {item.selectedSize ? (
                               <span className="block text-sm text-gray400">
                                 Size: {item.selectedSize}
+                              </span>
+                            ) : null}
+                            {item.selectedColor ? (
+                              <span className="block text-sm text-gray400">
+                                Màu: {item.selectedColor}
                               </span>
                             ) : null}
                           </span>

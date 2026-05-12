@@ -955,6 +955,13 @@ public class ProductServiceImpl implements ProductService {
                     : pickFirst(category.getNameVi(), category.getName(), category.getNameEn(), category.getNameMy());
         }
 
+        List<ProductVariantResponse> variantResponses = variants.stream().map(this::toVariantResponse).toList();
+        List<String> colors = variantResponses.stream()
+                .map(ProductVariantResponse::getColor)
+                .filter(color -> color != null && !color.isBlank())
+                .distinct()
+                .toList();
+
         return ProductResponse.builder()
                 .id(product.getId())
                 .name(localizedProductName)
@@ -968,7 +975,8 @@ public class ProductServiceImpl implements ProductService {
                 .createdAt(product.getCreatedAt())
                 .ratingAvg(ratingAvg)
                 .reviewCount(reviewCount)
-                .variants(variants.stream().map(this::toVariantResponse).toList())
+                .colors(colors)
+                .variants(variantResponses)
                 .images(images.stream().map(this::toImageResponse).toList())
                 .build();
     }

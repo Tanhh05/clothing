@@ -28,6 +28,7 @@ public class ProductResponse {
     private LocalDateTime createdAt;
     private Double ratingAvg;
     private Long reviewCount;
+    private List<String> colors;
     private List<ProductVariantResponse> variants;
     private List<ProductImageResponse> images;
 }

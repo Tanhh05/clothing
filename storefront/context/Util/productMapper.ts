@@ -20,6 +20,7 @@ type ApiProduct = {
   images?: ProductImage[];
   price?: number | string;
   minPrice?: number | string;
+  colors?: string[];
 };
 
 const toNumber = (value: unknown) => {
@@ -58,6 +59,11 @@ export const mapApiProductToItem = (product: ApiProduct): itemType => {
     price: basePrice,
     img1,
     img2,
+    colors: Array.isArray(product.colors)
+      ? product.colors.filter(
+          (color): color is string => typeof color === "string" && color.trim().length > 0
+        )
+      : [],
     categoryName: product.categoryName || undefined,
     categorySlug: product.categorySlug || undefined,
   };

@@ -36,13 +36,18 @@ const cartReducer = (state: cartType, action: actionType) => {
     case DELETE_ITEM: {
       const payload = action.payload as itemType;
       const targetSize = (payload?.selectedSize || "").trim().toUpperCase();
+      const targetColor = (payload?.selectedColor || "").trim().toUpperCase();
+      const targetVariantId = Number(payload?.selectedVariantId || 0);
       return {
         ...state,
         cart: state.cart.filter(
           (cartItem) =>
             !(
               cartItem.id === payload.id &&
-              ((cartItem.selectedSize || "").trim().toUpperCase() === targetSize)
+              (targetVariantId > 0
+                ? Number(cartItem.selectedVariantId || 0) === targetVariantId
+                : ((cartItem.selectedSize || "").trim().toUpperCase() === targetSize) &&
+                  ((cartItem.selectedColor || "").trim().toUpperCase() === targetColor))
             )
         ),
       };

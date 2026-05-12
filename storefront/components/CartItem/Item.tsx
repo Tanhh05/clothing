@@ -9,6 +9,7 @@ type Props = {
   price: number;
   qty: number;
   selectedSize?: string;
+  selectedColor?: string;
   onAdd?: () => void;
   onRemove?: () => void;
   onDelete?: () => void;
@@ -20,6 +21,7 @@ const Item: FC<Props> = ({
   price,
   qty,
   selectedSize,
+  selectedColor,
   onAdd,
   onRemove,
   onDelete,
@@ -32,6 +34,9 @@ const Item: FC<Props> = ({
         <span>{name}</span>
         {selectedSize ? (
           <div className="text-sm text-gray400 mt-1">Size: {selectedSize}</div>
+        ) : null}
+        {selectedColor ? (
+          <div className="text-sm text-gray400">Màu: {selectedColor}</div>
         ) : null}
         <div className="plusOrMinus w-2/6 mt-4 flex border border-gray300 divide-x-2 divide-gray300">
           <div

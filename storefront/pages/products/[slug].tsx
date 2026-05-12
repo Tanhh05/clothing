@@ -39,6 +39,7 @@ type Props = {
   product: itemType;
   products: itemType[];
   sizeOptions: string[];
+  colorOptions: string[];
 };
 
 const unwrapApiData = <T,>(payload: any): T => {
@@ -58,7 +59,12 @@ const getMessagesByLocale = (locale?: string) => {
   return viMessages;
 };
 
-const Product: React.FC<Props> = ({ product, products, sizeOptions = [] }) => {
+const Product: React.FC<Props> = ({
+  product,
+  products,
+  sizeOptions = [],
+  colorOptions = [],
+}) => {
   const img1 = product.img1;
   const img2 = product.img2;
 
@@ -70,7 +76,12 @@ const Product: React.FC<Props> = ({ product, products, sizeOptions = [] }) => {
     () => (Array.isArray(sizeOptions) && sizeOptions.length ? sizeOptions : ["M"]),
     [sizeOptions]
   );
+  const safeColorOptions = useMemo(
+    () => (Array.isArray(colorOptions) ? colorOptions.filter(Boolean) : []),
+    [colorOptions]
+  );
   const [size, setSize] = useState(safeSizeOptions[0]);
+  const [color, setColor] = useState(safeColorOptions[0] || "");
   const [mainImg, setMainImg] = useState(img1);
   const [currentQty, setCurrentQty] = useState(1);
   const t = useTranslations("Category");
@@ -89,6 +100,10 @@ const Product: React.FC<Props> = ({ product, products, sizeOptions = [] }) => {
     setSize(safeSizeOptions[0]);
   }, [safeSizeOptions]);
 
+  useEffect(() => {
+    setColor(safeColorOptions[0] || "");
+  }, [safeColorOptions]);
+
   const handleSize = (value: string) => {
     setSize(value);
   };
@@ -97,6 +112,7 @@ const Product: React.FC<Props> = ({ product, products, sizeOptions = [] }) => {
     ...product,
     qty: currentQty,
     selectedSize: size,
+    selectedColor: color,
   };
 
   const handleWishlist = () => {
@@ -229,6 +245,28 @@ const Product: React.FC<Props> = ({ product, products, sizeOptions = [] }) => {
                 </div>
               ))}
             </div>
+            {safeColorOptions.length > 0 && (
+              <>
+                <span className="mb-2">
+                  Màu sắc: {color}
+                </span>
+                <div className="colorContainer flex flex-wrap gap-3 text-sm mb-4">
+                  {safeColorOptions.map((option) => (
+                    <div
+                      key={option}
+                      onClick={() => setColor(option)}
+                      className={`min-w-[3rem] h-8 px-3 flex items-center justify-center border ${
+                        color === option
+                          ? "border-gray500"
+                          : "border-gray300 text-gray400"
+                      } cursor-pointer hover:bg-gray500 hover:text-gray100`}
+                    >
+                      {option}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
             <div className="addToCart flex flex-col sm:flex-row md:flex-col lg:flex-row space-y-4 sm:space-y-0 mb-4">
               <div className="plusOrMinus h-12 flex border justify-center border-gray300 divide-x-2 divide-gray300 mb-4 mr-0 sm:mr-4 md:mr-0 lg:mr-4">
                 <div
@@ -356,6 +394,13 @@ export const getServerSideProps: GetServerSideProps = async ({
           .filter((value: string) => Boolean(value))
       )
     );
+    const colorOptions = Array.from(
+      new Set(
+        (Array.isArray(productData?.colors) ? productData.colors : [])
+          .map((color: any) => (typeof color === "string" ? color.trim() : ""))
+          .filter((value: string) => Boolean(value))
+      )
+    );
 
     const recommendationRes = await axios.get(
       `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products/recommendations?productIds=${product.id}&limit=5`,
@@ -369,6 +414,7 @@ export const getServerSideProps: GetServerSideProps = async ({
         product,
         products,
         sizeOptions,
+        colorOptions,
         messages: getMessagesByLocale(locale),
       },
     };
@@ -390,6 +436,7 @@ export const getServerSideProps: GetServerSideProps = async ({
         },
         products: [],
         sizeOptions: ["M"],
+        colorOptions: [],
         messages: getMessagesByLocale(locale),
       },
     };

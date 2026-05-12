@@ -64,6 +64,7 @@ type ProductVariantApi = {
   stock?: number;
   status?: string;
   size?: string;
+  color?: string;
 };
 
 type ProductDetailApi = {
@@ -185,6 +186,16 @@ const ShoppingCart = () => {
           const normalizedSelectedSize = (cartItem.selectedSize || "")
             .trim()
             .toUpperCase();
+          const normalizedSelectedColor = (cartItem.selectedColor || "")
+            .trim()
+            .toUpperCase();
+          const pickedVariantBySizeAndColor = variants.find(
+            (variant) =>
+              (variant.size || "").trim().toUpperCase() === normalizedSelectedSize &&
+              (variant.color || "").trim().toUpperCase() === normalizedSelectedColor &&
+              Number(variant.stock || 0) > 0 &&
+              (variant.status || "").toUpperCase() !== "INACTIVE"
+          );
           const pickedVariantBySize = variants.find(
             (variant) =>
               (variant.size || "").trim().toUpperCase() === normalizedSelectedSize &&
@@ -196,7 +207,8 @@ const ShoppingCart = () => {
               Number(variant.stock || 0) > 0 &&
               (variant.status || "").toUpperCase() !== "INACTIVE"
           );
-          const pickedVariant = pickedVariantBySize || pickedVariantFallback;
+          const pickedVariant =
+            pickedVariantBySizeAndColor || pickedVariantBySize || pickedVariantFallback;
           if (!pickedVariant?.id) {
             throw new Error(`${t("no_valid_variant_for_product")}: ${cartItem.name}`);
           }
@@ -773,13 +785,18 @@ const ShoppingCart = () => {
                   {cart.map((item) => (
                     <div
                       className="flex justify-between mb-2"
-                      key={`${item.id}-${item.selectedSize || "na"}`}
+                      key={`${item.id}-${item.selectedSize || "na"}-${item.selectedColor || "na"}`}
                     >
                       <span className="text-base font-medium">
                         {item.name}
                         {item.selectedSize ? (
                           <span className="text-gray400 ml-1">
                             ({item.selectedSize})
+                          </span>
+                        ) : null}
+                        {item.selectedColor ? (
+                          <span className="text-gray400 ml-1">
+                            [{item.selectedColor}]
                           </span>
                         ) : null}{" "}
                         <span className="text-gray400">x {item.qty}</span>

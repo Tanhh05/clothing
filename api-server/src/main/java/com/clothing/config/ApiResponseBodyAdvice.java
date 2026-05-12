@@ -47,6 +47,12 @@ public class ApiResponseBodyAdvice implements ResponseBodyAdvice<Object> {
         HttpServletRequest servletRequest = request instanceof ServletServerHttpRequest servletServerHttpRequest
                 ? servletServerHttpRequest.getServletRequest()
                 : null;
+        if (servletRequest != null) {
+            String uri = servletRequest.getRequestURI();
+            if (uri != null && uri.startsWith("/api/orders")) {
+                return body;
+            }
+        }
         ResponseMeta meta = RequestMetaResolver.resolve(servletRequest);
 
         return ApiEnvelopeResponse.builder()

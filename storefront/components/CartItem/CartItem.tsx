@@ -127,12 +127,13 @@ export default function CartItem() {
                       subtotal += item.price * item.qty!;
                       return (
                         <Item
-                          key={`${item.id}-${item.selectedSize || "na"}`}
+                          key={`${item.id}-${item.selectedVariantId || "na"}-${item.selectedSize || "na"}-${item.selectedColor || "na"}`}
                           name={item.name}
                           price={item.price * item.qty!}
                           qty={item.qty!}
                           img={item.img1 as string}
                           selectedSize={item.selectedSize}
+                          selectedColor={item.selectedColor}
                           onAdd={() => addOne!(item)}
                           onRemove={() => removeItem!(item)}
                           onDelete={() => deleteItem!(item)}
