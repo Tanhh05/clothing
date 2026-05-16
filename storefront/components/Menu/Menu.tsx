@@ -373,14 +373,14 @@ export default function Menu({ categories }: Props) {
                       <a
                         href="#"
                         className="text-gray400 w-10 h-10 py-1 px-auto flex justify-center rounded-md active:bg-gray300"
-                        aria-label="Twenty Facebook Page"
+                        aria-label="Haru Facebook Page"
                       >
                         <FacebookLogo extraClass="h-8" />
                       </a>
                       <a
                         href="#"
                         className="text-gray400 w-10 h-10 py-1 px-auto flex justify-center rounded-md active:bg-gray300"
-                        aria-label="Twenty Facebook Page"
+                        aria-label="Haru Facebook Page"
                       >
                         <InstagramLogo extraClass="h-8" />
                       </a>

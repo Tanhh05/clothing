@@ -75,6 +75,9 @@ import java.util.UUID;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.LinkedHashSet;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Order;
+import jakarta.persistence.criteria.Subquery;
 
 @Service
 public class ProductServiceImpl implements ProductService {
@@ -303,10 +306,13 @@ public class ProductServiceImpl implements ProductService {
             throw new BusinessException("size must be between 1 and 100", HttpStatus.BAD_REQUEST);
         }
 
-        String safeSortBy = (sortBy == null || sortBy.isBlank()) ? "id" : sortBy.trim();
+        String safeSortBy = resolveSortBy(sortBy);
+        boolean sortByPrice = "price".equals(safeSortBy);
         Sort.Direction sortDirection = "asc".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, safeSortBy));
+        Pageable pageable = sortByPrice
+                ? PageRequest.of(page, size)
+                : PageRequest.of(page, size, Sort.by(sortDirection, safeSortBy));
         Specification<ProductEntity> specification = Specification.where(
                 (root, query, cb) -> cb.or(
                         cb.isNull(root.get("deleted")),
@@ -340,6 +346,24 @@ public class ProductServiceImpl implements ProductService {
             });
         }
 
+        if (sortByPrice) {
+            specification = specification.and((root, query, cb) -> {
+                if (query != null) {
+                    Subquery<Long> minPriceSubquery = query.subquery(Long.class);
+                    var variantRoot = minPriceSubquery.from(ProductVariantEntity.class);
+                    minPriceSubquery.select(cb.min(variantRoot.get("price")));
+                    minPriceSubquery.where(cb.equal(variantRoot.get("productId"), root.get("id")));
+
+                    Expression<Long> minPrice = sortDirection == Sort.Direction.ASC
+                            ? cb.coalesce(minPriceSubquery.getSelection(), cb.literal(Long.MAX_VALUE))
+                            : cb.coalesce(minPriceSubquery.getSelection(), cb.literal(Long.MIN_VALUE));
+                    Order priceOrder = sortDirection == Sort.Direction.ASC ? cb.asc(minPrice) : cb.desc(minPrice);
+                    query.orderBy(priceOrder, cb.desc(root.get("id")));
+                }
+                return cb.conjunction();
+            });
+        }
+
         Page<ProductEntity> productPage = productRepository.findAll(specification, pageable);
 
         return PageResponse.<ProductResponse>builder()
@@ -351,6 +375,16 @@ public class ProductServiceImpl implements ProductService {
                 .first(productPage.isFirst())
                 .last(productPage.isLast())
                 .build();
+    }
+
+    private String resolveSortBy(String sortBy) {
+        if (sortBy == null || sortBy.isBlank()) {
+            return "id";
+        }
+        return switch (sortBy.trim()) {
+            case "id", "createdAt", "name", "brand", "status", "price" -> sortBy.trim();
+            default -> "id";
+        };
     }
 
     @Override

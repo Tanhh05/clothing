@@ -15,7 +15,7 @@ type Props = {
 const fallbackTesti: TestimonialItem[] = [
   {
     speech: "Chưa có đánh giá khách hàng.",
-    name: "Twenty",
+    name: "Haru",
     occupation: "Customer Reviews",
   },
 ];

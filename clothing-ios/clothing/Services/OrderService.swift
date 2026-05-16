@@ -13,7 +13,7 @@ final class OrderService {
             ],
             requiresAuth: true
         )
-        return try JSONDecoder().decode(PageResponse<OrderSummary>.self, from: data)
+        return try APIClient.shared.decodeResponse(PageResponse<OrderSummary>.self, from: data)
     }
 
     func getMyOrderDetail(orderId: Int) async throws -> OrderSummary {
@@ -21,7 +21,35 @@ final class OrderService {
             path: "/api/orders/my/\(orderId)",
             requiresAuth: true
         )
-        return try JSONDecoder().decode(OrderSummary.self, from: data)
+        return try APIClient.shared.decodeResponse(OrderSummary.self, from: data)
+    }
+
+    func createOrder(_ payload: CreateOrderRequest) async throws -> OrderSummary {
+        let body = try JSONEncoder().encode(payload)
+        let data = try await APIClient.shared.request(
+            path: "/api/orders",
+            method: "POST",
+            body: body,
+            requiresAuth: true
+        )
+        return try APIClient.shared.decodeResponse(OrderSummary.self, from: data)
+    }
+
+    func cancelMyOrder(orderId: Int) async throws -> OrderSummary {
+        let data = try await APIClient.shared.request(
+            path: "/api/orders/my/\(orderId)/cancel",
+            method: "PATCH",
+            requiresAuth: true
+        )
+        return try APIClient.shared.decodeResponse(OrderSummary.self, from: data)
+    }
+
+    func reorder(orderId: Int) async throws -> OrderSummary {
+        let data = try await APIClient.shared.request(
+            path: "/api/orders/my/\(orderId)/reorder",
+            method: "POST",
+            requiresAuth: true
+        )
+        return try APIClient.shared.decodeResponse(OrderSummary.self, from: data)
     }
 }
-

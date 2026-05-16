@@ -14,7 +14,6 @@ import CartItem from "../CartItem/CartItem";
 import Menu from "../Menu/Menu";
 import AppHeader from "./AppHeader";
 import { useWishlist } from "../../context/wishlist/WishlistProvider";
-import OrderIcon from "../../public/icons/OrderIcon";
 
 import styles from "./Header.module.css";
 
@@ -207,7 +206,7 @@ const Header: React.FC<Props> = ({ title }) => {
               })}
             </ul>
 
-            {/* Twenty Logo */}
+            {/* Haru Logo */}
             <div className="flex-1 flex justify-center items-center cursor-pointer">
               <div className="w-32 h-auto">
                 <Link href="/">
@@ -215,7 +214,7 @@ const Header: React.FC<Props> = ({ title }) => {
                     <Image
                       className="justify-center"
                       src="/logo.svg"
-                      alt="Twenty"
+                      alt="Haru"
                       width={220}
                       height={50}
                       layout="responsive"
@@ -253,17 +252,6 @@ const Header: React.FC<Props> = ({ title }) => {
                     )}
                   </button>
                   {/* </a> */}
-                </Link>
-              </li>
-              <li>
-                <Link href="/orders" passHref>
-                  <button
-                    type="button"
-                    className="relative"
-                    aria-label={t("my_orders")}
-                  >
-                    <OrderIcon />
-                  </button>
                 </Link>
               </li>
               <li>

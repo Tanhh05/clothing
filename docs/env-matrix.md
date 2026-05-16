@@ -1,0 +1,45 @@
+# Environment Variable Matrix
+
+## Backend (`api-server`)
+
+Required in `staging` and `production`:
+- `APP_PORT`
+- `APP_CORS_ALLOWED_ORIGINS`
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+- `JWT_SECRET`, `JWT_EXPIRATION_SECONDS`, `JWT_REFRESH_EXPIRATION_SECONDS`
+- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY`, `R2_SECRET_KEY`, `R2_BUCKET`, `R2_ENDPOINT`, `R2_PUBLIC_BASE_URL`
+- `MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY`, `MOMO_REDIRECT_URL`, `MOMO_IPN_URL`
+- `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, `VNPAY_RETURN_URL`, `VNPAY_IPN_URL`
+- `GHN_TOKEN`, `GHN_SHOP_ID`
+
+Optional but recommended:
+- `REDIS_*`
+- `RABBITMQ_*`
+- `ELASTICSEARCH_*`
+- `BREVO_*`
+
+## Storefront (`storefront`)
+Required:
+- `NEXT_PUBLIC_BACKEND_URL`
+- `NEXT_PUBLIC_SITE_URL`
+
+Optional:
+- `NEXT_PUBLIC_GA_ID` (if analytics enabled)
+
+## Admin Portal (`admin-portal`)
+Required:
+- `VUE_APP_BASE_API` (or equivalent API base URL used by admin build mode)
+
+## CI/CD secrets (`GitHub Actions`)
+
+Staging:
+- `STAGING_SSH_HOST`, `STAGING_SSH_USER`, `STAGING_SSH_PRIVATE_KEY`, `STAGING_SSH_PORT`, `STAGING_APP_DIR`
+- `STAGING_API_BASE_URL`
+- `STAGING_STOREFRONT_BASE_URL`
+- `STAGING_ADMIN_BASE_URL`
+
+Production:
+- `PROD_SSH_HOST`, `PROD_SSH_USER`, `PROD_SSH_PRIVATE_KEY`, `PROD_SSH_PORT`, `PROD_APP_DIR`
+- `PROD_API_BASE_URL`
+- `PROD_STOREFRONT_BASE_URL`
+- `PROD_ADMIN_BASE_URL`

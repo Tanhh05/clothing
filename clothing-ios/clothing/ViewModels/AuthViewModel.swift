@@ -5,6 +5,7 @@ import SwiftUI
 class AuthViewModel: ObservableObject {
     @Published var usernameOrEmail = ""
     @Published var username = ""
+    @Published var fullName = ""
     @Published var email = ""
     @Published var password = ""
     
@@ -32,17 +33,19 @@ class AuthViewModel: ObservableObject {
     
     // MARK: - Đăng nhập
     
-    func login() {
-        guard !usernameOrEmail.isEmpty, !password.isEmpty else {
+    func login(onComplete: ((Bool) -> Void)? = nil) {
+        let normalizedUsernameOrEmail = usernameOrEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedUsernameOrEmail.isEmpty, !password.isEmpty else {
             self.errorMessage = "Vui lòng nhập đầy đủ thông tin."
             self.isError = true
+            onComplete?(false)
             return
         }
         
         isLoading = true
         errorMessage = nil
         
-        let request = LoginRequest(usernameOrEmail: usernameOrEmail, password: password)
+        let request = LoginRequest(usernameOrEmail: normalizedUsernameOrEmail, password: password)
         
         AuthService.shared.login(request: request)
             .sink { [weak self] completion in
@@ -51,6 +54,7 @@ class AuthViewModel: ObservableObject {
                 case .failure(let error):
                     self?.errorMessage = error.localizedDescription
                     self?.isError = true
+                    onComplete?(false)
                 case .finished:
                     break
                 }
@@ -66,6 +70,7 @@ class AuthViewModel: ObservableObject {
                 self?.currentFullName = response.fullName
                 
                 self?.isAuthenticated = true
+                onComplete?(true)
             }
             .store(in: &cancellables)
     }
@@ -73,7 +78,10 @@ class AuthViewModel: ObservableObject {
     // MARK: - Đăng ký
     
     func register(completionHandler: @escaping (Bool) -> Void) {
-        guard !username.isEmpty, !email.isEmpty, !password.isEmpty else {
+        let normalizedFullName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedFullName.isEmpty, !normalizedUsername.isEmpty, !normalizedEmail.isEmpty, !password.isEmpty else {
             self.errorMessage = "Vui lòng nhập đầy đủ thông tin."
             self.isError = true
             return
@@ -82,7 +90,12 @@ class AuthViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        let request = RegisterRequest(username: username, email: email, password: password)
+        let request = RegisterRequest(
+            fullName: normalizedFullName,
+            username: normalizedUsername,
+            email: normalizedEmail,
+            password: password
+        )
         
         AuthService.shared.register(request: request)
             .sink { [weak self] completion in

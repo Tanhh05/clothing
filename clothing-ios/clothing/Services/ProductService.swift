@@ -50,16 +50,15 @@ class ProductService {
         }
         
         return URLSession.shared.dataTaskPublisher(for: request)
-            .tryMap { data, response -> Data in
+            .tryMap { data, response -> PageResponse<Product> in
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw AuthError.unknown
                 }
                 guard (200...299).contains(httpResponse.statusCode) else {
                     throw AuthError.serverError("Lỗi server: \(httpResponse.statusCode)")
                 }
-                return data
+                return try APIClient.shared.decodeResponse(PageResponse<Product>.self, from: data)
             }
-            .decode(type: PageResponse<Product>.self, decoder: JSONDecoder())
             .mapError { error -> Error in
                 if let authError = error as? AuthError {
                     return authError
@@ -93,16 +92,15 @@ class ProductService {
         }
         
         return URLSession.shared.dataTaskPublisher(for: request)
-            .tryMap { data, response -> Data in
+            .tryMap { data, response -> Product in
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw AuthError.unknown
                 }
                 guard (200...299).contains(httpResponse.statusCode) else {
                     throw AuthError.serverError("Lỗi server: \(httpResponse.statusCode)")
                 }
-                return data
+                return try APIClient.shared.decodeResponse(Product.self, from: data)
             }
-            .decode(type: Product.self, decoder: JSONDecoder())
             .mapError { error -> Error in
                 if let authError = error as? AuthError {
                     return authError
@@ -118,11 +116,7 @@ class ProductService {
 
     func getProductAsync(by slugOrId: String) async throws -> Product {
         let data = try await APIClient.shared.request(path: "/api/products/\(slugOrId)")
-        do {
-            return try JSONDecoder().decode(Product.self, from: data)
-        } catch {
-            throw APIError.decoding
-        }
+        return try APIClient.shared.decodeResponse(Product.self, from: data)
     }
 
     func getProductsAsync(
@@ -147,10 +141,6 @@ class ProductService {
         }
 
         let data = try await APIClient.shared.request(path: "/api/products", queryItems: items)
-        do {
-            return try JSONDecoder().decode(PageResponse<Product>.self, from: data)
-        } catch {
-            throw APIError.decoding
-        }
+        return try APIClient.shared.decodeResponse(PageResponse<Product>.self, from: data)
     }
 }

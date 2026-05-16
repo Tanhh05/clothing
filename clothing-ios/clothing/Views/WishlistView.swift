@@ -52,7 +52,10 @@ struct WishlistView: View {
             }
             .navigationTitle("Yêu thích")
             .onAppear {
-                Task { await viewModel.load(ids: Array(wishlistStore.productIds)) }
+                Task {
+                    await wishlistStore.refreshFromServer()
+                    await viewModel.load(ids: Array(wishlistStore.productIds))
+                }
             }
             .onChange(of: wishlistStore.productIds) { _, newValue in
                 Task { await viewModel.load(ids: Array(newValue)) }

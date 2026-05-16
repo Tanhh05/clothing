@@ -168,11 +168,11 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
       const productVariants = Array.isArray(payload?.variants)
         ? payload.variants
         : [];
-      const sizeList = Array.from(
-        new Set(
+      const sizeList: string[] = Array.from(
+        new Set<string>(
           productVariants
             .map((variant: ProductVariantApi) => normalizeOptionLabel(variant?.size))
-            .filter(Boolean)
+            .filter((value: string) => Boolean(value))
         )
       );
       const colorList = Array.from(new Set(extractStringOptions(payload?.colors)));

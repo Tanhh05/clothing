@@ -4,28 +4,36 @@ struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
     @EnvironmentObject private var cartStore: CartStore
     @EnvironmentObject private var wishlistStore: WishlistStore
-
-    private let bestSellingColumns = [GridItem(.flexible()), GridItem(.flexible())]
-    private let featuredColumns = [GridItem(.flexible()), GridItem(.flexible())]
+    private let columns = [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 28) {
+                VStack(spacing: 20) {
                     heroSection
-                    bestSellingSection
-                    featuredSection
+                    categorySection
+                    productsSection
                 }
-                .padding(.bottom, 12)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 24)
             }
-            .background(Color(white: 0.98))
-            .safeAreaInset(edge: .bottom) {
-                Color.clear.frame(height: 86)
-            }
-            .navigationTitle("Twenty")
+            .background(Color(white: 0.96))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Image(systemName: "line.3.horizontal")
+                }
+                ToolbarItem(placement: .principal) {
+                    Text("HARU")
+                        .font(.system(size: 34, weight: .black, design: .serif))
+                        .tracking(1)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Image(systemName: "bell")
+                }
+            }
             .task {
-                if viewModel.featuredProducts.isEmpty && viewModel.bestSellingProducts.isEmpty {
+                if viewModel.products.isEmpty {
                     await viewModel.loadInitial()
                 }
             }
@@ -36,157 +44,144 @@ struct HomeView: View {
     }
 
     private var heroSection: some View {
-        VStack(spacing: 12) {
-            LinearGradient(colors: [.black.opacity(0.78), .gray.opacity(0.45)],
-                           startPoint: .topLeading,
-                           endPoint: .bottomTrailing)
-                .frame(height: 220)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(alignment: .bottomLeading) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("New Arrivals")
-                        .font(.title3.bold())
-                        .foregroundColor(.white)
-                    Text("Mẫu mới cập nhật từ storefront")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.9))
+        let heroProduct = viewModel.products.first
+        return ZStack(alignment: .bottomLeading) {
+            AsyncImage(url: URL(string: heroProduct?.mainImageURL ?? "")) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().scaledToFill()
+                default:
+                    Rectangle().fill(Color.black.opacity(0.4))
                 }
-                .padding(14)
             }
+            .frame(height: 370)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay {
+                LinearGradient(colors: [.clear, .black.opacity(0.5)], startPoint: .center, endPoint: .bottom)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Bộ Sưu Tập Mới")
+                    .font(.title3.weight(.medium))
+                    .foregroundColor(.white)
+                Text("Phong cách tối giản, hiện đại cho ngày mới.")
+                    .font(.body)
+                    .foregroundColor(.white.opacity(0.95))
+                Button("Mua Ngay") {}
+                    .font(.title3.weight(.medium))
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 10)
+                    .background(Color.white)
+                    .foregroundColor(.black)
+                    .clipShape(Capsule())
+            }
+            .padding(20)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
     }
 
-    private var bestSellingSection: some View {
-        VStack(spacing: 14) {
-            sectionHeader(title: "Best Selling", subtitle: "Top sản phẩm nổi bật")
+    private var categorySection: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                chip(title: "Tất cả", isSelected: viewModel.selectedCategoryId == nil) {
+                    Task { await viewModel.selectCategory(nil) }
+                }
+                ForEach(viewModel.categories, id: \.id) { category in
+                    chip(
+                        title: category.name,
+                        isSelected: viewModel.selectedCategoryId == category.id
+                    ) {
+                        Task { await viewModel.selectCategory(category.id) }
+                    }
+                }
+            }
+        }
+    }
 
-            if viewModel.isLoadingBestSelling && viewModel.bestSellingProducts.isEmpty {
-                ProgressView().frame(maxWidth: .infinity)
-            } else if let err = viewModel.bestSellingError, viewModel.bestSellingProducts.isEmpty {
-                Text(err).foregroundColor(.red).padding(.horizontal, 16)
+    private var productsSection: some View {
+        VStack(spacing: 14) {
+            HStack {
+                Text("Nổi bật nhất")
+                    .font(.system(size: 42, weight: .regular, design: .serif))
+                Spacer()
+                NavigationLink("Xem tất cả", destination: SearchView())
+                    .foregroundColor(.gray)
+            }
+
+            if viewModel.isLoading && viewModel.products.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            } else if let error = viewModel.error, viewModel.products.isEmpty {
+                Text(error).foregroundColor(.red)
             } else {
-                LazyVGrid(columns: bestSellingColumns, spacing: 12) {
-                    ForEach(viewModel.bestSellingProducts) { product in
+                LazyVGrid(columns: columns, spacing: 14) {
+                    ForEach(viewModel.products) { product in
                         NavigationLink {
                             ProductDetailView(product: product)
                         } label: {
-                            ProductCard(product: product, isFavorite: wishlistStore.contains(product.id))
+                            VStack(alignment: .leading, spacing: 6) {
+                                ZStack(alignment: .bottomTrailing) {
+                                    AsyncImage(url: URL(string: product.mainImageURL ?? "")) { phase in
+                                        switch phase {
+                                        case .success(let image):
+                                            image.resizable().scaledToFill()
+                                        default:
+                                            Rectangle().fill(Color.gray.opacity(0.2))
+                                        }
+                                    }
+                                    .frame(height: 190)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                                    Button {
+                                        cartStore.add(product: product, variant: product.variants?.first)
+                                    } label: {
+                                        Image(systemName: "bag")
+                                            .foregroundColor(.black)
+                                            .padding(10)
+                                            .background(Color.white.opacity(0.9))
+                                            .clipShape(Circle())
+                                    }
+                                    .padding(8)
+                                }
+                                Text((product.categoryName ?? "Sản phẩm").uppercased())
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                Text(product.name ?? "Sản phẩm")
+                                    .font(.title3.weight(.medium))
+                                    .foregroundColor(.black)
+                                    .lineLimit(2)
+                                Text(product.priceRange)
+                                    .font(.title3.weight(.medium))
+                                    .foregroundColor(Color(red: 0.42, green: 0.26, blue: 0.05))
+                            }
                         }
                         .buttonStyle(.plain)
-                        .contextMenu {
-                            Button("Thêm giỏ hàng") {
-                                cartStore.add(product: product, variant: product.variants?.first)
-                            }
-                            Button(wishlistStore.contains(product.id) ? "Bỏ yêu thích" : "Yêu thích") {
-                                wishlistStore.toggle(product.id)
-                            }
-                        }
                     }
                 }
-                .padding(.horizontal, 16)
+                if viewModel.hasNextPage {
+                    Button("Xem thêm") {
+                        Task { await viewModel.loadMore() }
+                    }
+                    .font(.headline)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.black)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
             }
         }
     }
 
-    private var featuredSection: some View {
-        VStack(spacing: 14) {
-            sectionHeader(title: "Featured Products", subtitle: "Danh sách đồng bộ storefront")
-
-            if viewModel.isLoadingFeatured && viewModel.featuredProducts.isEmpty {
-                ProgressView().frame(maxWidth: .infinity)
-            } else if let err = viewModel.featuredError, viewModel.featuredProducts.isEmpty {
-                Text(err).foregroundColor(.red).padding(.horizontal, 16)
-            } else {
-                LazyVGrid(columns: featuredColumns, spacing: 12) {
-                    ForEach(viewModel.featuredProducts) { product in
-                        NavigationLink {
-                            ProductDetailView(product: product)
-                        } label: {
-                            ProductCard(product: product, isFavorite: wishlistStore.contains(product.id))
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button("Thêm giỏ hàng") {
-                                cartStore.add(product: product, variant: product.variants?.first)
-                            }
-                            Button(wishlistStore.contains(product.id) ? "Bỏ yêu thích" : "Yêu thích") {
-                                wishlistStore.toggle(product.id)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-
-                Button {
-                    Task { await viewModel.loadMoreFeatured() }
-                } label: {
-                    Text(viewModel.isLoadingFeatured ? "Đang tải..." : "See More")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 10)
-                        .background(Color.black)
-                        .foregroundColor(.white)
-                        .clipShape(Capsule())
-                }
-                .disabled(viewModel.isLoadingFeatured)
-            }
-        }
-    }
-
-    private func sectionHeader(title: String, subtitle: String) -> some View {
-        VStack(spacing: 6) {
+    private func chip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             Text(title)
-                .font(.title3.weight(.semibold))
-            Text(subtitle)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(.headline)
+                .padding(.horizontal, 22)
+                .padding(.vertical, 9)
+                .background(isSelected ? Color.black : Color(white: 0.92))
+                .foregroundColor(isSelected ? .white : .black)
+                .clipShape(Capsule())
         }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-struct ProductCard: View {
-    let product: Product
-    let isFavorite: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .topTrailing) {
-                AsyncImage(url: URL(string: product.mainImageURL ?? "")) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    default:
-                        Rectangle().fill(Color.gray.opacity(0.15))
-                    }
-                }
-                .frame(height: 148)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                if isFavorite {
-                    Image(systemName: "heart.fill")
-                        .foregroundColor(.pink)
-                        .padding(8)
-                }
-            }
-
-            Text(product.name ?? "Sản phẩm")
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(2)
-                .frame(height: 38, alignment: .topLeading)
-
-            Text(product.priceRange)
-                .font(.subheadline.bold())
-                .foregroundColor(.blue)
-
-            Spacer(minLength: 0)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, minHeight: 252, maxHeight: 252, alignment: .topLeading)
-        .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.05), radius: 4, y: 1)
     }
 }

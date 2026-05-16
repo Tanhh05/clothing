@@ -151,7 +151,7 @@ const ShoppingCart = () => {
   return (
     <div>
       {/* ===== Head Section ===== */}
-      <Header title={`Shopping Cart - Twenty`} />
+      <Header title={`Shopping Cart - Haru`} />
 
       <main id="main-content">
         {/* ===== Heading & Continue Shopping */}

@@ -1,8 +1,8 @@
 import { Html, Head, Main, NextScript } from "next/document";
 
-const title = "Twenty";
-const desc = "Twenty e-commerce web app built with Next.js.";
-const keywords = "Twenty, Online Shop, E-commerce, NextJS";
+const title = "Haru";
+const desc = "Haru e-commerce web app built with Next.js.";
+const keywords = "Haru, Online Shop, E-commerce, NextJS";
 
 export default function Document() {
   return (
@@ -17,6 +17,11 @@ export default function Document() {
         <meta content="#282828" name="theme-color" />
         <meta content="#282828" name="msapplication-TileColor" />
 
+        <link
+          href="/favicons/favicon.svg"
+          rel="icon"
+          type="image/svg+xml"
+        />
         <link
           href="/favicons/apple-touch-icon.png"
           rel="apple-touch-icon"
@@ -34,17 +39,17 @@ export default function Document() {
           sizes="16x16"
           type="image/png"
         />
-        <link href="/favicons/favicon.ico" rel="shortcut icon" />
+        <link href="/favicons/favicon.svg" rel="shortcut icon" />
         <link href="/favicons/site.webmanifest" rel="manifest" />
 
-        <meta property="og:url" content="https://twenty.vercel.app" />
-        <link rel="canonical" href="https://twenty.vercel.app" />
-        <meta property="og:site_name" content="Twenty" />
+        <meta property="og:url" content="https://haru.vercel.app" />
+        <link rel="canonical" href="https://haru.vercel.app" />
+        <meta property="og:site_name" content="Haru" />
         <meta property="og:description" content={desc} key="og_description" />
         <meta property="og:title" content={title} key="og_title" />
         <meta
           property="og:image"
-          content="https://twenty.vercel.app/og.png"
+          content="https://haru.vercel.app/og.png"
         />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:site" content="@satnaing.dev" />
@@ -56,7 +61,7 @@ export default function Document() {
         />
         <meta
           name="twitter:image"
-          content="https://twenty.vercel.app/og.png"
+          content="https://haru.vercel.app/og.png"
         />
 
         <meta name="apple-mobile-web-app-capable" content="yes" />

@@ -18,11 +18,6 @@ struct MainTabView: View {
                     Label("Giỏ hàng", systemImage: "cart")
                 }
 
-            WishlistView()
-                .tabItem {
-                    Label("Yêu thích", systemImage: "heart")
-                }
-
             ProfileViewIOS()
                 .tabItem {
                     Label("Tài khoản", systemImage: "person")
@@ -30,4 +25,3 @@ struct MainTabView: View {
         }
     }
 }
-

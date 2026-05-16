@@ -1,6 +1,10 @@
 import Foundation
 import Combine
 
+extension Notification.Name {
+    static let authStateDidChange = Notification.Name("authStateDidChange")
+}
+
 // MARK: - Auth Error
 
 enum AuthError: Error, LocalizedError {
@@ -66,6 +70,7 @@ class TokenManager {
         if let roles = response.roles {
             UserDefaults.standard.set(roles, forKey: rolesKey)
         }
+        NotificationCenter.default.post(name: .authStateDidChange, object: nil)
     }
     
     var accessToken: String? {
@@ -109,6 +114,7 @@ class TokenManager {
         UserDefaults.standard.removeObject(forKey: emailKey)
         UserDefaults.standard.removeObject(forKey: fullNameKey)
         UserDefaults.standard.removeObject(forKey: rolesKey)
+        NotificationCenter.default.post(name: .authStateDidChange, object: nil)
     }
 }
 
@@ -215,7 +221,7 @@ class AuthService {
         }
         
         return URLSession.shared.dataTaskPublisher(for: urlRequest)
-            .tryMap { data, response -> Data in
+            .tryMap { data, response -> AuthResponse in
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw AuthError.unknown
                 }
@@ -223,11 +229,28 @@ class AuthService {
                 // Xử lý các mã lỗi HTTP
                 switch httpResponse.statusCode {
                 case 200...299:
-                    return data
+                    let decoder = JSONDecoder()
+                    if let wrapped = try? decoder.decode(APIEnvelope<AuthResponse>.self, from: data),
+                       let unwrapped = wrapped.data,
+                       let token = unwrapped.accessToken,
+                       !token.isEmpty {
+                        return unwrapped
+                    }
+                    if let direct = try? decoder.decode(AuthResponse.self, from: data),
+                       let token = direct.accessToken,
+                       !token.isEmpty {
+                        return direct
+                    }
+                    throw AuthError.decodingError
                 case 401:
                     throw AuthError.unauthorized
                 default:
                     // Cố gắng đọc message lỗi từ server
+                    if let wrappedError = try? JSONDecoder().decode(ApiErrorEnvelope.self, from: data),
+                       let innerError = wrappedError.data {
+                        let message = innerError.message ?? innerError.error ?? "Lỗi server"
+                        throw AuthError.serverError(message)
+                    }
                     if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
                         let message = errorResponse.message ?? errorResponse.error ?? "Lỗi server"
                         throw AuthError.serverError(message)
@@ -235,7 +258,6 @@ class AuthService {
                     throw AuthError.serverError("Lỗi server: \(httpResponse.statusCode)")
                 }
             }
-            .decode(type: AuthResponse.self, decoder: JSONDecoder())
             .mapError { error -> Error in
                 if let authError = error as? AuthError {
                     return authError

@@ -3,74 +3,65 @@ import Combine
 
 @MainActor
 final class HomeViewModel: ObservableObject {
-    @Published var featuredProducts: [Product] = []
-    @Published var bestSellingProducts: [Product] = []
-    @Published var isLoadingFeatured = false
-    @Published var isLoadingBestSelling = false
-    @Published var featuredError: String?
-    @Published var bestSellingError: String?
-
-    private var featuredPage = 0
-    private let featuredSize = 10
+    @Published var categories: [Category] = []
+    @Published var selectedCategoryId: Int? = nil
+    @Published var products: [Product] = []
+    @Published var isLoading = false
+    @Published var error: String?
+    @Published var hasNextPage = true
+    private var currentPage = 0
+    private let pageSize = 10
 
     func loadInitial() async {
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.loadFeatured(reset: true) }
-            group.addTask { await self.loadBestSelling() }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            categories = try await CategoryService.shared.getCategories()
+            currentPage = 0
+            hasNextPage = true
+            products = []
+            try await loadProducts(reset: true)
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 
-    func loadMoreFeatured() async {
-        await loadFeatured(reset: false)
+    func loadMore() async {
+        guard hasNextPage else { return }
+        do {
+            try await loadProducts(reset: false)
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
-    private func loadFeatured(reset: Bool) async {
-        if isLoadingFeatured { return }
-        isLoadingFeatured = true
-        featuredError = nil
-        defer { isLoadingFeatured = false }
+    func selectCategory(_ categoryId: Int?) async {
+        selectedCategoryId = categoryId
+        currentPage = 0
+        hasNextPage = true
+        products = []
+        do {
+            try await loadProducts(reset: true)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
 
+    private func loadProducts(reset: Bool) async throws {
+        let page = try await ProductService.shared.getProductsAsync(
+            page: currentPage,
+            size: pageSize,
+            sortBy: "createdAt",
+            direction: "desc",
+            category: selectedCategoryId
+        )
+        let items = page.content ?? []
         if reset {
-            featuredPage = 0
-            featuredProducts = []
+            products = items
+        } else {
+            products.append(contentsOf: items)
         }
-
-        do {
-            let page = try await ProductService.shared.getProductsAsync(
-                page: featuredPage,
-                size: featuredSize,
-                sortBy: "createdAt",
-                direction: "desc"
-            )
-            let items = page.content ?? []
-            if reset {
-                featuredProducts = items
-            } else {
-                featuredProducts.append(contentsOf: items)
-            }
-            featuredPage += 1
-        } catch {
-            featuredError = error.localizedDescription
-        }
-    }
-
-    private func loadBestSelling() async {
-        if isLoadingBestSelling { return }
-        isLoadingBestSelling = true
-        bestSellingError = nil
-        defer { isLoadingBestSelling = false }
-
-        do {
-            let page = try await ProductService.shared.getProductsAsync(
-                page: 0,
-                size: 4,
-                sortBy: "createdAt",
-                direction: "desc"
-            )
-            bestSellingProducts = page.content ?? []
-        } catch {
-            bestSellingError = error.localizedDescription
-        }
+        hasNextPage = !(page.last ?? true)
+        currentPage += 1
     }
 }
-

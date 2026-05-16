@@ -7,7 +7,15 @@ import Footer from "../components/Footer/Footer";
 import Card from "../components/Card/Card";
 import { itemType } from "../context/cart/cart-types";
 import axios from "axios";
-import { mapApiProductToItem } from "../context/Util/productMapper";
+
+type ProductSearchItem = {
+  id?: number;
+  name?: string;
+  slug?: string;
+  categoryName?: string;
+  mainImageUrl?: string;
+  minPrice?: number;
+};
 
 type Props = {
   items: itemType[];
@@ -20,7 +28,7 @@ const Search: React.FC<Props> = ({ items, searchWord }) => {
   return (
     <div>
       {/* ===== Head Section ===== */}
-      <Header title={`Twenty`} />
+      <Header title={`Haru`} />
 
       <main id="main-content">
         {/* ===== Breadcrumb Section ===== */}
@@ -77,16 +85,41 @@ export const getServerSideProps: GetServerSideProps = async ({
   locale,
   query: { q = "" },
 }) => {
+  const keyword = String(q || "").trim();
+  if (!keyword) {
+    return {
+      props: {
+        messages: (await import(`../messages/common/${locale}.json`)).default,
+        items: [],
+        searchWord: "",
+      },
+    };
+  }
+
   const res = await axios.get(
-    `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products?page=0&size=50&sortBy=createdAt&direction=desc&q=${q}`
+    `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/search/products?q=${encodeURIComponent(
+      keyword
+    )}&size=50`
   );
-  const items: itemType[] = (res.data.content || []).map(mapApiProductToItem);
+  const searchResults: ProductSearchItem[] = Array.isArray(res.data) ? res.data : [];
+  const items: itemType[] = searchResults
+    .filter((product) => !!product?.id && !!product?.name)
+    .map((product) => ({
+      id: Number(product.id),
+      slug: product.slug || String(product.id),
+      name: product.name || "",
+      price: Number(product.minPrice || 0),
+      img1: product.mainImageUrl || "",
+      img2: product.mainImageUrl || "",
+      categoryName: product.categoryName || undefined,
+      qty: 1,
+    }));
 
   return {
     props: {
       messages: (await import(`../messages/common/${locale}.json`)).default,
       items,
-      searchWord: q,
+      searchWord: keyword,
     },
   };
 };
