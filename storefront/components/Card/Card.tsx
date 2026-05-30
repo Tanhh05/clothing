@@ -567,8 +567,8 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
                           </>
                         )}
 
-                        <div className="grid grid-cols-[auto_minmax(0,1fr)_3.5rem] items-stretch gap-3 pt-1 w-full">
-                          <div className="h-12 flex border border-gray300 divide-x divide-gray300">
+                        <div className="flex items-stretch gap-3 pt-2 w-full flex-nowrap">
+                          <div className="h-12 w-[9.25rem] shrink-0 flex border border-gray300 divide-x divide-gray300">
                             <button
                               type="button"
                               className="w-12 text-xl cursor-pointer hover:bg-gray500 hover:text-gray100"
@@ -576,7 +576,7 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
                             >
                               -
                             </button>
-                            <div className="w-16 sm:w-12 flex items-center justify-center">
+                            <div className="w-[3.25rem] flex items-center justify-center">
                               {selectedQty}
                             </div>
                             <button
@@ -594,11 +594,11 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
                                 : t("add_to_cart")
                             }
                             size="lg"
-                            extraClass="h-12 w-full min-w-0 text-center whitespace-nowrap px-3"
+                            extraClass="h-12 min-w-0 flex-1 text-center whitespace-nowrap px-4 text-base"
                             onClick={handleConfirmQuickAction}
                           />
                           <GhostButton
-                            extraClass="h-12 w-14 min-w-0 flex items-center justify-center px-0"
+                            extraClass="h-12 w-12 shrink-0 min-w-0 flex items-center justify-center px-0 text-base"
                             onClick={handleDialogWishlist}
                           >
                             {alreadyWishlistedVariant ? (
