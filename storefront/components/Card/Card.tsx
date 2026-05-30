@@ -567,7 +567,7 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
                           </>
                         )}
 
-                        <div className="flex items-stretch gap-4 pt-1">
+                        <div className="grid grid-cols-[auto_minmax(0,1fr)_3.5rem] items-stretch gap-3 pt-1 w-full">
                           <div className="h-12 flex border border-gray300 divide-x divide-gray300">
                             <button
                               type="button"
@@ -594,11 +594,11 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
                                 : t("add_to_cart")
                             }
                             size="lg"
-                            extraClass="h-12 flex-grow text-center whitespace-nowrap"
+                            extraClass="h-12 w-full min-w-0 text-center whitespace-nowrap px-3"
                             onClick={handleConfirmQuickAction}
                           />
                           <GhostButton
-                            extraClass="h-12 min-w-[3rem] flex items-center justify-center"
+                            extraClass="h-12 w-14 min-w-0 flex items-center justify-center px-0"
                             onClick={handleDialogWishlist}
                           >
                             {alreadyWishlistedVariant ? (
