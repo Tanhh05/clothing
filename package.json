@@ -1,0 +1,13 @@
+{
+  "name": "clothing-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "cd storefront && npm run dev",
+    "build": "cd storefront && npm run build",
+    "start": "cd storefront && npm run start"
+  },
+  "dependencies": {
+    "next": "^12.1.0"
+  }
+}
