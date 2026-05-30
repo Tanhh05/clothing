@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/router";
 import axios from "axios";
 import Image from "next/image";
 import { GetStaticProps } from "next";
@@ -13,6 +14,7 @@ import Input from "../components/Input/Input";
 import { itemType } from "../context/wishlist/wishlist-type";
 import { useAuth } from "../context/AuthContext";
 import { useCurrency } from "../context/CurrencyContext";
+import { toLocalizedColorLabel } from "../lib/color-utils";
 
 // let w = window.innerWidth;
 type PaymentType = "CASH_ON_DELIVERY" | "MOMO" | "VNPAY" | "BANK_TRANSFER";
@@ -101,6 +103,8 @@ const unwrapApiData = <T,>(payload: any): T => {
 
 const ShoppingCart = () => {
   const t = useTranslations("CartWishlist");
+  const categoryT = useTranslations("Category");
+  const router = useRouter();
   const { formatPrice } = useCurrency();
   const { cart, clearCart } = useCart();
   const auth = useAuth();
@@ -741,7 +745,7 @@ const ShoppingCart = () => {
   return (
     <div>
       {/* ===== Head Section ===== */}
-      <Header title={`${t("checkout")} - Haru`} />
+      <Header title={`${t("checkout")} - TWENTY`} />
 
       <main id="main-content">
         {/* ===== Heading & Continue Shopping */}
@@ -944,7 +948,7 @@ const ShoppingCart = () => {
                         ) : null}
                         {item.selectedColor ? (
                           <span className="text-gray400 ml-1">
-                            [{item.selectedColor}]
+                            [{categoryT("color")}: {toLocalizedColorLabel(item.selectedColor, router.locale)}]
                           </span>
                         ) : null}{" "}
                         <span className="text-gray400">x {item.qty}</span>
@@ -1313,15 +1317,14 @@ const ShoppingCart = () => {
                   </div>
                 ) : (
                   <div className="flex justify-center items-center h-56">
-                    <div className="w-3/4">
+                    <div className="flex items-center gap-3">
                       <Image
-                        className="justify-center"
-                        src="/logo.svg"
-                        alt="Haru"
-                        width={220}
-                        height={50}
-                        layout="responsive"
+                        src="/admin-logo.png"
+                        alt="TWENTY"
+                        width={36}
+                        height={36}
                       />
+                      <span className="text-3xl font-semibold tracking-wide">TWENTY</span>
                     </div>
                   </div>
                 )}

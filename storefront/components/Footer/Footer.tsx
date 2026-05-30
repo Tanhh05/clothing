@@ -83,20 +83,20 @@ export default function Footer() {
       </div>
       <div className={styles.bottomFooter}>
         <div className="app-max-width app-x-padding w-full flex justify-between">
-          <span className="">@2022 Haru. {t("all_rights_reserved")}</span>
+          <span className="">@2022 TWENTY. {t("all_rights_reserved")}</span>
           <span className="flex items-center">
             <span className="hidden sm:block">
               {t("follow_us_on_social_media")}:
             </span>{" "}
             <a
               href="www.facebook.com"
-              aria-label="Facebook Page for Haru"
+              aria-label="Facebook Page for TWENTY"
             >
               <FacebookLogo />
             </a>
             <a
               href="www.ig.com"
-              aria-label="Instagram Account for Haru"
+              aria-label="Instagram Account for TWENTY"
             >
               <InstagramLogo />
             </a>

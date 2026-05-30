@@ -262,24 +262,35 @@ function useProvideAuth() {
     phone: string
   ) => {
     try {
+      const normalizedFullName = fullname.trim();
+      const usernameFromEmail = email.split("@")[0]?.trim();
+      const username =
+        usernameFromEmail && usernameFromEmail.length > 0
+          ? usernameFromEmail
+          : normalizedFullName.replace(/\s+/g, "").toLowerCase();
+
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/register`,
         {
           email,
-          fullname,
+          fullName: normalizedFullName,
+          username,
           password,
           shippingAddress,
           phone,
         }
       );
-      const registerResponse = response.data;
+      const registerResponse = response.data?.data || response.data;
       const user: User = {
-        id: +registerResponse.id,
-        email,
-        fullname,
+        id: +(registerResponse.userId ?? registerResponse.id),
+        username: registerResponse.username || username,
+        email: registerResponse.email || email,
+        fullname: registerResponse.fullName || normalizedFullName,
         shippingAddress,
-        phone,
-        token: registerResponse.token,
+        phone: registerResponse.phone || phone,
+        token: registerResponse.accessToken || registerResponse.token,
+        refreshToken: registerResponse.refreshToken,
+        tokenType: registerResponse.tokenType,
       };
       setUser(user);
       return {

@@ -3,6 +3,7 @@ import axios from "axios";
 import { FC, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/router";
 import { useTranslations } from "next-intl";
 
 import Heart from "../../public/icons/Heart";
@@ -15,6 +16,7 @@ import { useCart } from "../../context/cart/CartProvider";
 import { useWishlist } from "../../context/wishlist/WishlistProvider";
 import { useCurrency } from "../../context/CurrencyContext";
 import { useNotify } from "../../context/NotificationContext";
+import { toLocalizedColorLabel } from "../../lib/color-utils";
 
 type Props = {
   item: itemType;
@@ -77,6 +79,8 @@ const extractImageSources = (payload: any, item: itemType): string[] => {
 const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
   const t = useTranslations("CartWishlist");
   const authT = useTranslations("LoginRegister");
+  const categoryT = useTranslations("Category");
+  const router = useRouter();
   const { wishlist, addToWishlist, deleteWishlistItem } = useWishlist();
   const { addOne, addItem } = useCart();
   const { notify } = useNotify();
@@ -406,7 +410,9 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
                         <div className="text-2xl text-gray500">{formatPrice(price)}</div>
                         <div className="text-base text-gray500">{dialogDescription}</div>
                         <div className="text-base">Tình trạng: Còn hàng</div>
-                        <div className="text-base">Kích cỡ: {selectedSize}</div>
+                        <div className="text-base">
+                          {categoryT("size")}: {selectedSize}
+                        </div>
                         <div className="flex flex-wrap gap-3 text-sm">
                           {sizeOptions.map((option, index) => {
                             const normalizedOption = normalizeOptionLabel(option);
@@ -432,7 +438,10 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
 
                         {colorOptions.length > 0 && (
                           <>
-                            <div className="text-base">Màu sắc: {selectedColor}</div>
+                            <div className="text-base">
+                              {categoryT("color")}:{" "}
+                              {toLocalizedColorLabel(selectedColor, router.locale)}
+                            </div>
                             <div className="flex flex-wrap gap-3 text-sm">
                               {colorOptions.map((option, index) => {
                                 const normalizedOption = normalizeOptionLabel(option);
@@ -450,7 +459,7 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
                                     }`}
                                     onClick={() => setSelectedColor(option)}
                                   >
-                                    {option}
+                                    {toLocalizedColorLabel(option, router.locale)}
                                   </button>
                                 );
                               })}

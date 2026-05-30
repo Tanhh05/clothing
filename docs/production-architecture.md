@@ -16,10 +16,10 @@
 - `object storage` (Cloudflare R2) for product/media assets.
 
 ## 3) Domain Plan
-- `haru.vn` -> storefront
-- `admin.haru.vn` -> admin portal
-- `api.haru.vn` -> api server
-- `cdn.haru.vn` -> static/media assets
+- `TWENTY.vn` -> storefront
+- `admin.TWENTY.vn` -> admin portal
+- `api.TWENTY.vn` -> api server
+- `cdn.TWENTY.vn` -> static/media assets
 
 ## 4) Network & Security Baseline
 - TLS everywhere (Let's Encrypt or managed cert).
@@ -29,7 +29,7 @@
   - `Referrer-Policy: strict-origin-when-cross-origin`
   - `Content-Security-Policy` (phased rollout)
 - CORS allowlist by env:
-  - prod: `https://haru.vn,https://admin.haru.vn`
+  - prod: `https://TWENTY.vn,https://admin.TWENTY.vn`
   - staging: staging domains only.
 - Admin routes protected by role + optional VPN/IP allowlist.
 

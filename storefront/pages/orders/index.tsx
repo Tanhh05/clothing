@@ -351,11 +351,11 @@ const OrdersPage = () => {
 
   return (
     <div>
-      <Header title={`${t("my_orders")} - Haru`} />
+      <Header title={`${t("my_orders")} - TWENTY`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
-        <AccountPageLayout section="ĐƠN HÀNG">
-        <div className="mb-6">
-          <h1 className="text-3xl">{t("my_orders")}</h1>
+        <AccountPageLayout section={t("my_orders")}>
+        <div className="mb-4">
+          <h1 className="text-2xl font-semibold">{t("my_orders")}</h1>
         </div>
         {paymentResult && (
           <div
@@ -392,10 +392,7 @@ const OrdersPage = () => {
             )}
           </div>
         )}
-        <div className="mb-4 flex items-center gap-3">
-          <label htmlFor="order-status-filter" className="text-sm text-gray500">
-            {t("filter_by_status")}
-          </label>
+        <div className="mb-4 flex items-center justify-end">
           <select
             id="order-status-filter"
             value={statusFilter}
@@ -419,23 +416,23 @@ const OrdersPage = () => {
 
         {!isLoading && !errorKey && filteredOrders.length > 0 && (
           <div className="space-y-4">
-            <div className="overflow-auto border border-gray200">
-            <table className="w-full min-w-[760px]">
+            <div className="border border-gray200">
+            <table className="w-full table-fixed">
               <thead>
                 <tr className="border-b border-gray200 bg-gray100">
-                  <th className="text-left font-medium px-4 py-3">{t("product")}</th>
-                  <th className="text-left font-medium px-4 py-3">{t("order_code")}</th>
-                  <th className="text-left font-medium px-4 py-3">{t("created_at")}</th>
-                  <th className="text-left font-medium px-4 py-3">{t("status")}</th>
-                  <th className="text-left font-medium px-4 py-3">{t("payment")}</th>
-                  <th className="text-right font-medium px-4 py-3">{t("total")}</th>
-                  <th className="text-right font-medium px-4 py-3">{t("action")}</th>
+                  <th className="w-[24%] text-left font-medium px-3 py-3">{t("product")}</th>
+                  <th className="w-[12%] text-left font-medium px-3 py-3">{t("order_code")}</th>
+                  <th className="w-[16%] text-left font-medium px-3 py-3">{t("created_at")}</th>
+                  <th className="w-[12%] text-left font-medium px-3 py-3">{t("status")}</th>
+                  <th className="w-[12%] text-left font-medium px-3 py-3">{t("payment")}</th>
+                  <th className="w-[10%] text-right font-medium px-3 py-3">{t("total")}</th>
+                  <th className="w-[14%] text-right font-medium px-3 py-3">{t("action")}</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredOrders.map((order) => (
                   <tr key={order.id} className="border-b border-gray200">
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <div className="flex items-center gap-3">
                         {(() => {
                           const firstItem = (order.items || [])[0];
@@ -458,26 +455,26 @@ const OrdersPage = () => {
                             />
                           );
                         })()}
-                        <span className="line-clamp-1 max-w-[180px]">
+                        <span className="line-clamp-2 text-sm leading-5">
                           {(order.items || [])[0]?.productName || "-"}
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3">{getInvoiceCode(order)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 text-sm break-all">{getInvoiceCode(order)}</td>
+                    <td className="px-3 py-3 text-sm">
                       {order.createdAt
                         ? new Date(order.createdAt).toLocaleString(
                             router.locale === "en" ? "en-US" : "vi-VN"
                           )
                         : "-"}
                     </td>
-                    <td className="px-4 py-3">{order.status || "-"}</td>
-                    <td className="px-4 py-3">{order.paymentMethod || "-"}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 py-3 text-sm break-words">{order.status || "-"}</td>
+                    <td className="px-3 py-3 text-sm break-words">{order.paymentMethod || "-"}</td>
+                    <td className="px-3 py-3 text-right text-sm">
                       {formatPrice(order.totalPrice || 0)}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="inline-flex items-center gap-3">
+                    <td className="px-3 py-3 text-right">
+                      <div className="inline-flex items-center justify-end flex-wrap gap-x-3 gap-y-1 text-sm">
                         <Link href={`/orders/${order.id}`}>
                           <a className="text-blue-600 hover:underline">{t("view")}</a>
                         </Link>
