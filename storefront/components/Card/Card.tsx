@@ -577,7 +577,7 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
                             >
                               -
                             </button>
-                            <div className="h-full w-[3.25rem] flex justify-center items-center pointer-events-none text-lg font-medium">
+                            <div className="h-full w-[4.25rem] flex justify-center items-center pointer-events-none text-lg font-medium">
                               {selectedQty}
                             </div>
                             <button
