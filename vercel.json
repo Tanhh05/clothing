@@ -5,15 +5,5 @@
       "src": "storefront/package.json",
       "use": "@vercel/next"
     }
-  ],
-  "routes": [
-    {
-      "src": "/",
-      "dest": "/storefront"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/storefront/$1"
-    }
   ]
 }
