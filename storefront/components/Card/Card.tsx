@@ -567,20 +567,22 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
                         )}
 
                         <div className="flex items-stretch gap-3 pt-2 w-full flex-nowrap">
-                          <div className="h-12 w-[9.25rem] shrink-0 grid grid-cols-3 border border-gray300">
+                          <div className="h-12 w-[9.25rem] shrink-0 flex border justify-center border-gray300 divide-x-2 divide-gray300">
                             <button
                               type="button"
-                              className="h-full w-full text-2xl leading-none font-normal flex items-center justify-center cursor-pointer text-gray500 hover:bg-gray500 hover:text-gray100 border-r border-gray300"
+                              className={`${
+                                selectedQty === 1 && "pointer-events-none text-gray400"
+                              } h-full w-12 flex justify-center items-center cursor-pointer hover:bg-gray500 hover:text-gray100 text-2xl leading-none`}
                               onClick={() => setSelectedQty((q) => Math.max(1, q - 1))}
                             >
                               -
                             </button>
-                            <div className="h-full w-full flex items-center justify-center text-lg font-medium text-gray500">
+                            <div className="h-full w-[3.25rem] flex justify-center items-center pointer-events-none text-lg font-medium">
                               {selectedQty}
                             </div>
                             <button
                               type="button"
-                              className="h-full w-full text-2xl leading-none font-normal flex items-center justify-center cursor-pointer text-gray500 hover:bg-gray500 hover:text-gray100 border-l border-gray300"
+                              className="h-full w-12 flex justify-center items-center cursor-pointer hover:bg-gray500 hover:text-gray100 text-2xl leading-none"
                               onClick={() => setSelectedQty((q) => q + 1)}
                             >
                               +
