@@ -21,12 +21,34 @@ const wishlistReducer = (state: wishlistType, action: actionType) => {
         wishlist: addWishlist(state.wishlist, action.payload as itemType),
       };
     case DELETE_WISHLIST_ITEM:
-      return {
-        ...state,
-        wishlist: state.wishlist.filter(
-          (wishlistItem) => wishlistItem.id !== (action.payload as itemType).id
-        ),
-      };
+      {
+        const payload = action.payload as itemType;
+        const targetSize = (payload?.selectedSize || "").trim().toUpperCase();
+        const targetColor = (payload?.selectedColor || "").trim().toUpperCase();
+        const targetVariantId = Number(payload?.selectedVariantId || 0);
+        const hasVariantSelector = targetVariantId > 0 || targetSize || targetColor;
+        if (!hasVariantSelector) {
+          return {
+            ...state,
+            wishlist: state.wishlist.filter(
+              (wishlistItem) => wishlistItem.id !== payload.id
+            ),
+          };
+        }
+        return {
+          ...state,
+          wishlist: state.wishlist.filter(
+            (wishlistItem) =>
+              !(
+                wishlistItem.id === payload.id &&
+                (targetVariantId > 0
+                  ? Number(wishlistItem.selectedVariantId || 0) === targetVariantId
+                  : ((wishlistItem.selectedSize || "").trim().toUpperCase() === targetSize) &&
+                    ((wishlistItem.selectedColor || "").trim().toUpperCase() === targetColor))
+              )
+          ),
+        };
+      }
     case SET_WISHLIST:
       return {
         ...state,

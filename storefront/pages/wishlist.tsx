@@ -18,6 +18,7 @@ import { itemType } from "../context/cart/cart-types";
 
 const Wishlist = () => {
   const t = useTranslations("CartWishlist");
+  const categoryT = useTranslations("Category");
   const authT = useTranslations("LoginRegister");
   const { formatPrice } = useCurrency();
   const { addOne } = useCart();
@@ -98,7 +99,10 @@ const Wishlist = () => {
                       ? `/products/${encodeURIComponent(item.slug)}`
                       : "/";
                     return (
-                      <tr className="border-b-2 border-gray200" key={item.id}>
+                      <tr
+                        className="border-b-2 border-gray200"
+                        key={`${item.id}-${item.selectedVariantId || ""}-${item.selectedSize || ""}-${item.selectedColor || ""}`}
+                      >
                         <td className="my-3 flex justify-center flex-col items-start sm:items-center">
                           <Link href={productLink}>
                             <a>
@@ -112,9 +116,17 @@ const Wishlist = () => {
                             </a>
                           </Link>
                           <span className="text-xs md:hidden">{item.name}</span>
+                          <span className="text-[11px] text-gray400 md:hidden">
+                            {categoryT("size")}: {item.selectedSize || "M"}
+                            {item.selectedColor ? ` · ${categoryT("color")}: ${item.selectedColor}` : ""}
+                          </span>
                         </td>
                         <td className="text-center hidden md:table-cell">
-                          {item.name}
+                          <div>{item.name}</div>
+                          <div className="text-xs text-gray400 mt-1">
+                            {categoryT("size")}: {item.selectedSize || "M"}
+                            {item.selectedColor ? ` · ${categoryT("color")}: ${item.selectedColor}` : ""}
+                          </div>
                         </td>
                         <td className="text-right text-gray400">{formatPrice(item.price)}</td>
                         <td className="text-center hidden sm:table-cell max-w-xs text-gray400">

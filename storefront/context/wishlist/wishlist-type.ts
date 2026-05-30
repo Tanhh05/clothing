@@ -11,6 +11,9 @@ export type itemType = {
   name: string;
   price: number;
   qty?: number;
+  selectedSize?: string;
+  selectedColor?: string;
+  selectedVariantId?: number;
 };
 
 export type wishlistType = {
