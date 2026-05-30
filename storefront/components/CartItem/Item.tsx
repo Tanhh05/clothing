@@ -1,7 +1,10 @@
 import Image from "next/image";
 import React, { FC } from "react";
+import { useTranslations } from "next-intl";
+import { useRouter } from "next/router";
 import { roundDecimal } from "../Util/utilFunc";
 import { useCurrency } from "../../context/CurrencyContext";
+import { toLocalizedColorLabel } from "../../lib/color-utils";
 
 type Props = {
   img: string;
@@ -26,6 +29,8 @@ const Item: FC<Props> = ({
   onRemove,
   onDelete,
 }) => {
+  const t = useTranslations("Category");
+  const router = useRouter();
   const { formatPrice } = useCurrency();
   return (
     <div className="item flex bg-white my-4 border-b-2 pb-4 border-gray200">
@@ -33,10 +38,14 @@ const Item: FC<Props> = ({
       <div className="midPart mx-4 flex-grow">
         <span>{name}</span>
         {selectedSize ? (
-          <div className="text-sm text-gray400 mt-1">Size: {selectedSize}</div>
+          <div className="text-sm text-gray400 mt-1">
+            {t("size")}: {selectedSize}
+          </div>
         ) : null}
         {selectedColor ? (
-          <div className="text-sm text-gray400">Màu: {selectedColor}</div>
+          <div className="text-sm text-gray400">
+            {t("color")}: {toLocalizedColorLabel(selectedColor, router.locale)}
+          </div>
         ) : null}
         <div className="plusOrMinus w-2/6 mt-4 flex border border-gray300 divide-x-2 divide-gray300">
           <div

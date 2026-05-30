@@ -129,7 +129,7 @@ struct ProductDetailView: View {
                 Image(systemName: "line.3.horizontal")
             }
             ToolbarItem(placement: .principal) {
-                Text("HARU")
+                Text("TWENTY")
                     .font(.system(size: 34, weight: .black, design: .serif))
                     .tracking(1)
             }

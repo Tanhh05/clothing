@@ -98,7 +98,7 @@
     "email_already_exists": "Email đã tồn tại",
     "error_occurs": "Đã xảy ra lỗi",
     "email_address": "Địa chỉ email",
-    "form_note": "Lưu ý! Khi gửi biểu mẫu này, bạn sẽ tự động đăng ký tài khoản Haru Shop",
+    "form_note": "Lưu ý! Khi gửi biểu mẫu này, bạn sẽ tự động đăng ký tài khoản TWENTY Shop",
 
     "thank_you_note": "Cảm ơn bạn. Chúng tôi đã nhận được đơn hàng của bạn",
     "order_id": "Mã đơn hàng",
@@ -309,6 +309,17 @@
     "payment_cancelled": "Bạn đã hủy thanh toán",
     "retry_payment": "Thanh toán lại",
     "payment_result_not_found": "Không tìm thấy kết quả thanh toán."
+  },
+  "Account": {
+    "home": "Trang chủ",
+    "account": "Tài khoản",
+    "my_profile": "Thông tin của tôi",
+    "shipping_addresses": "Địa chỉ giao hàng",
+    "order_tracking": "Theo dõi đơn hàng",
+    "wishlist": "Yêu thích",
+    "notifications": "Thông báo",
+    "returns": "Yêu cầu đổi trả",
+    "hide_form": "Ẩn form"
   },
   "Search": {
     "home": "Trang chủ",

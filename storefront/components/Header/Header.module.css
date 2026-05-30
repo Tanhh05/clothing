@@ -13,14 +13,14 @@
 
 /* Main Menu */
 .mainMenu {
-  @apply py-6;
+  @apply py-5;
 }
 /* .leftMenu {
   @apply ml-8 my-6;
 } */
 
 .leftMenu > li {
-  @apply mr-12 hidden lg:block whitespace-nowrap;
+  @apply mr-10 whitespace-nowrap;
 }
 
 .leftMenu > li:hover {
@@ -32,7 +32,7 @@
 }
 
 .rightMenu li {
-  @apply ml-12;
+  @apply ml-10;
 }
 
 .rightMenu li:not(:last-child) {

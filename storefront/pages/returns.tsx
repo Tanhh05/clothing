@@ -3,6 +3,7 @@ import { GetServerSideProps } from "next";
 import Link from "next/link";
 import axios from "axios";
 import { useRouter } from "next/router";
+import { useTranslations } from "next-intl";
 
 import Header from "../components/Header/Header";
 import Footer from "../components/Footer/Footer";
@@ -29,6 +30,8 @@ type ReturnRequest = {
 };
 
 const ReturnsPage = () => {
+  const accountT = useTranslations("Account");
+  const indexT = useTranslations("Index");
   const auth = useAuth();
   const router = useRouter();
   const token = auth.user?.token;
@@ -79,47 +82,47 @@ const ReturnsPage = () => {
 
   return (
     <div>
-      <Header title="Đổi trả - Haru" />
+      <Header title={`${accountT("returns")} - TWENTY`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
-        <AccountPageLayout section="ĐỔI TRẢ">
+        <AccountPageLayout section={accountT("returns")}>
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl">Yêu cầu đổi trả</h1>
+          <h1 className="text-2xl font-semibold">{accountT("returns")}</h1>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => pushWithLang(router, "/returns")}
               className="px-4 py-2 border border-gray300 hover:bg-gray100"
             >
-              Tất cả
+              {router.locale === "en" ? "All" : "Tất cả"}
             </button>
             <button
               type="button"
               onClick={() => pushWithLang(router, "/returns?status=PENDING")}
               className="px-4 py-2 border border-gray300 hover:bg-gray100"
             >
-              Chờ xử lý
+              {router.locale === "en" ? "Pending" : "Chờ xử lý"}
             </button>
             <button
               type="button"
               onClick={() => pushWithLang(router, "/returns?status=APPROVED")}
               className="px-4 py-2 border border-gray300 hover:bg-gray100"
             >
-              Đã duyệt
+              {router.locale === "en" ? "Approved" : "Đã duyệt"}
             </button>
             <button
               type="button"
               onClick={() => pushWithLang(router, "/returns?status=REJECTED")}
               className="px-4 py-2 border border-gray300 hover:bg-gray100"
             >
-              Từ chối
+              {router.locale === "en" ? "Rejected" : "Từ chối"}
             </button>
             <Link href="/orders">
-              <a className="px-4 py-2 border border-gray300 hover:bg-gray100">Đơn hàng</a>
+              <a className="px-4 py-2 border border-gray300 hover:bg-gray100">{accountT("order_tracking")}</a>
             </Link>
           </div>
         </div>
 
-        {loading && <p>Đang tải...</p>}
+        {loading && <p>{indexT("loading")}</p>}
         {!loading && items.length === 0 && <p className="text-gray400">Chưa có yêu cầu đổi trả.</p>}
 
         <div className="space-y-4">

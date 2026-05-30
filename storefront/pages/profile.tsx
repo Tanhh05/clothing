@@ -14,6 +14,7 @@ import { pushWithLang } from "../lib/router-utils";
 const ProfilePage = () => {
   const t = useTranslations("LoginRegister");
   const indexT = useTranslations("Index");
+  const accountT = useTranslations("Account");
   const auth = useAuth();
   const router = useRouter();
 
@@ -67,14 +68,13 @@ const ProfilePage = () => {
 
   return (
     <div>
-      <Header title={`Profile - Haru`} />
+      <Header title={`${t("profile")} - TWENTY`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
-        <AccountPageLayout section="THÔNG TIN CỦA TÔI">
-          <h1 className="text-3xl mb-8">{t("profile")}</h1>
-          <section className="border border-gray200 p-5 md:p-7 max-w-3xl">
-            <h2 className="text-xl mb-5">{t("profile")}</h2>
+        <AccountPageLayout section={accountT("my_profile")}>
+          <section className="max-w-3xl">
+            <h2 className="text-2xl font-semibold mb-6">{t("profile")}</h2>
             <form onSubmit={handleSubmit}>
-                <div className="mb-4">
+                <div className="mb-5">
                   <label htmlFor="username" className="text-sm">
                     {t("username")}
                   </label>
@@ -88,7 +88,7 @@ const ProfilePage = () => {
                   />
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-5">
                   <label htmlFor="fullName" className="text-sm">
                     {t("name")}
                   </label>
@@ -102,7 +102,7 @@ const ProfilePage = () => {
                   />
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-5">
                   <label htmlFor="email" className="text-sm">
                     {t("email_address")}
                   </label>
@@ -116,7 +116,7 @@ const ProfilePage = () => {
                   />
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-5">
                   <label htmlFor="phone" className="text-sm">
                     {t("phone")}
                   </label>
@@ -130,10 +130,10 @@ const ProfilePage = () => {
                   />
                 </div>
 
-                {message && <p className="text-green-700 mb-4">{message}</p>}
-                {error && <p className="text-red mb-4">{error}</p>}
+                {message && <p className="text-green-700 mb-4 text-sm">{message}</p>}
+                {error && <p className="text-red mb-4 text-sm">{error}</p>}
 
-                <div className="flex flex-wrap gap-3 pt-2">
+                <div className="flex flex-wrap gap-3 pt-1">
                   <Button
                     type="submit"
                     value={isSaving ? indexT("loading") : t("save_changes")}

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:9528}"
+BASE_URL="${BASE_URL:-http://localhost:5174}"
 
 echo "Smoke testing admin portal at ${BASE_URL}"
 

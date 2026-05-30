@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Disclosure } from "@headlessui/react";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/router";
 import axios from "axios";
 
 import Heart from "../../public/icons/Heart";
@@ -28,6 +29,7 @@ import HeartSolid from "../../public/icons/HeartSolid";
 import { mapApiProductToItem } from "../../context/Util/productMapper";
 import { useCurrency } from "../../context/CurrencyContext";
 import { useNotify } from "../../context/NotificationContext";
+import { toLocalizedColorLabel } from "../../lib/color-utils";
 import enMessages from "../../messages/common/en.json";
 import viMessages from "../../messages/common/vi.json";
 import myMessages from "../../messages/common/my.json";
@@ -69,6 +71,7 @@ const Product: React.FC<Props> = ({
   const img2 = product.img2;
 
   const { addItem } = useCart();
+  const router = useRouter();
   const { notify } = useNotify();
   const { formatPrice } = useCurrency();
   const { wishlist, addToWishlist, deleteWishlistItem } = useWishlist();
@@ -129,7 +132,7 @@ const Product: React.FC<Props> = ({
   return (
     <div>
       {/* ===== Head Section ===== */}
-      <Header title={`${product.name} - Haru`} />
+      <Header title={`${product.name} - TWENTY`} />
 
       <main id="main-content">
         {/* ===== Breadcrumb Section ===== */}
@@ -248,7 +251,7 @@ const Product: React.FC<Props> = ({
             {safeColorOptions.length > 0 && (
               <>
                 <span className="mb-2">
-                  Màu sắc: {color}
+                  {t("color")}: {toLocalizedColorLabel(color, router.locale)}
                 </span>
                 <div className="colorContainer flex flex-wrap gap-3 text-sm mb-4">
                   {safeColorOptions.map((option) => (
@@ -261,7 +264,7 @@ const Product: React.FC<Props> = ({
                           : "border-gray300 text-gray400"
                       } cursor-pointer hover:bg-gray500 hover:text-gray100`}
                     >
-                      {option}
+                      {toLocalizedColorLabel(option, router.locale)}
                     </div>
                   ))}
                 </div>

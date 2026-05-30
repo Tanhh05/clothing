@@ -7,9 +7,10 @@ import { GetStaticProps } from "next";
 
 const ComingSoon = () => {
   const t = useTranslations("Others");
+  const categoryT = useTranslations("Category");
   return (
     <>
-      <AppHeader title="Coming Soon!" />
+      <AppHeader title={t("coming_soon")} />
       <div className="flex flex-col h-screen justify-center items-center">
         <h1 className="text-3xl tracking-wider leading-10">
           {t("coming_soon")}
@@ -19,14 +20,14 @@ const ComingSoon = () => {
         </h2>
         <Image
           src="/bg-img/coding.svg"
-          alt="Not created yet"
+          alt={t("page_not_created_msg")}
           width={400}
           height={300}
         />
         <span className="text-gray400">
           {t("go_back_to")}{" "}
           <Link href="/">
-            <a className="underline font-bold hover:text-gray500">home page</a>
+            <a className="underline font-bold hover:text-gray500">{categoryT("home")}</a>
           </Link>
           ?
         </span>

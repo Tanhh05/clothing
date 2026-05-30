@@ -29,7 +29,7 @@ wait_until_ok() {
   local started_at now elapsed
   started_at="$(date +%s)"
   while true; do
-    if check_endpoint "/" "haru"; then
+    if check_endpoint "/" "TWENTY"; then
       echo "Storefront home is healthy."
       return 0
     fi
@@ -44,6 +44,6 @@ wait_until_ok() {
 }
 
 wait_until_ok
-check_endpoint "/shopping-cart" "haru"
-check_endpoint "/orders" "haru"
+check_endpoint "/shopping-cart" "TWENTY"
+check_endpoint "/orders" "TWENTY"
 echo "Storefront smoke test passed."

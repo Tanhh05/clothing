@@ -42,6 +42,7 @@ const unwrapApiData = <T,>(payload: any): T => {
 const ProfileAddressesPage = () => {
   const t = useTranslations("LoginRegister");
   const indexT = useTranslations("Index");
+  const accountT = useTranslations("Account");
   const auth = useAuth();
   const router = useRouter();
 
@@ -412,12 +413,12 @@ const ProfileAddressesPage = () => {
 
   return (
     <div>
-      <Header title={`Địa chỉ giao hàng - Haru`} />
+      <Header title={`${accountT("shipping_addresses")} - TWENTY`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
-        <AccountPageLayout section="ĐỊA CHỈ">
-            <div className="mb-5">
+        <AccountPageLayout section={accountT("shipping_addresses")}>
+            <div className="mb-6">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xl font-medium">{t("default_address")}</h2>
+                <h2 className="text-2xl font-semibold">{t("default_address")}</h2>
                 <button
                   type="button"
                   onClick={resetAddressForm}
@@ -433,8 +434,8 @@ const ProfileAddressesPage = () => {
                 {addresses.map((item) => (
                   <div
                     key={item.id}
-                    className={`py-4 border-b ${
-                      addressId === item.id ? "border-gray500" : "border-gray200"
+                    className={`py-4 px-3 ${
+                      addressId === item.id ? "bg-gray100" : ""
                     }`}
                   >
                     <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -446,7 +447,7 @@ const ProfileAddressesPage = () => {
                           {item.addressLine}, {item.ward}, {item.district}, {item.province}
                         </p>
                         {item.isDefault && (
-                          <span className="inline-block mt-1 text-xs border border-gray400 px-2 py-0.5">
+                          <span className="inline-block mt-1 text-xs bg-gray200 px-2 py-0.5">
                             {t("default")}
                           </span>
                         )}
@@ -483,7 +484,7 @@ const ProfileAddressesPage = () => {
             </div>
 
             {showAddressForm && (
-            <form onSubmit={handleSaveAddress} className="mt-8">
+            <form onSubmit={handleSaveAddress} className="mt-8 border-t border-gray200 pt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="recipientName" className="text-sm">
@@ -628,7 +629,7 @@ const ProfileAddressesPage = () => {
                   onClick={() => setShowAddressForm(false)}
                   className="ml-3 px-5 py-2 border border-gray300 bg-white hover:bg-gray100"
                 >
-                  Ẩn form
+                  {accountT("hide_form")}
                 </button>
               </div>
             </form>
