@@ -24,7 +24,12 @@ type Props = {
 };
 
 type ProductVariantApi = {
+  id?: number;
   size?: string;
+  color?: string;
+  price?: number;
+  stock?: number;
+  status?: string;
 };
 
 const normalizeOptionLabel = (value: unknown): string => {
@@ -93,6 +98,7 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [dialogSizeOptions, setDialogSizeOptions] = useState<string[]>([]);
   const [dialogColorOptions, setDialogColorOptions] = useState<string[]>([]);
+  const [dialogVariants, setDialogVariants] = useState<ProductVariantApi[]>([]);
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
   const [selectedQty, setSelectedQty] = useState(1);
@@ -116,17 +122,81 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
         : ["M"],
     [dialogSizeOptions]
   );
-  const colorOptions = useMemo(
-    () => (Array.isArray(dialogColorOptions) ? dialogColorOptions.filter(Boolean) : []),
-    [dialogColorOptions]
-  );
+  const colorOptions = useMemo(() => {
+    if (!Array.isArray(dialogVariants) || dialogVariants.length === 0) {
+      return Array.isArray(dialogColorOptions)
+        ? dialogColorOptions.filter(Boolean)
+        : [];
+    }
+    const colorsFromVariants = dialogVariants
+      .filter((variant) => {
+        const variantSize = normalizeOptionLabel(variant?.size);
+        return !selectedSize || variantSize === selectedSize;
+      })
+      .map((variant) => normalizeOptionLabel(variant?.color))
+      .filter((value) => Boolean(value));
+    if (colorsFromVariants.length > 0) {
+      return Array.from(new Set(colorsFromVariants));
+    }
+    return Array.isArray(dialogColorOptions)
+      ? dialogColorOptions.filter(Boolean)
+      : [];
+  }, [dialogVariants, dialogColorOptions, selectedSize]);
+
+  const selectedVariant = useMemo(() => {
+    if (!Array.isArray(dialogVariants) || dialogVariants.length === 0) return null;
+    return (
+      dialogVariants.find((variant) => {
+        const variantSize = normalizeOptionLabel(variant?.size);
+        const variantColor = normalizeOptionLabel(variant?.color);
+        const sizeMatch = !selectedSize || variantSize === selectedSize;
+        const colorMatch = colorOptions.length === 0 || !selectedColor || variantColor === selectedColor;
+        return sizeMatch && colorMatch;
+      }) || null
+    );
+  }, [dialogVariants, selectedSize, selectedColor, colorOptions.length]);
+
+  const selectedPrice = useMemo(() => {
+    const variantPrice =
+      typeof selectedVariant?.price === "number" && Number.isFinite(selectedVariant.price)
+        ? selectedVariant.price
+        : NaN;
+    return Number.isFinite(variantPrice) && variantPrice > 0 ? variantPrice : price;
+  }, [selectedVariant, price]);
+
+  const alreadyWishlistedVariant = useMemo(() => {
+    const targetSize = (selectedSize || "").trim().toUpperCase();
+    const targetColor = (selectedColor || "").trim().toUpperCase();
+    const targetVariantId = Number(selectedVariant?.id || 0);
+    return wishlist.some((wishlistItem) => {
+      if (wishlistItem.id !== id) return false;
+      if (targetVariantId > 0) {
+        return Number(wishlistItem.selectedVariantId || 0) === targetVariantId;
+      }
+      return (
+        ((wishlistItem.selectedSize || "").trim().toUpperCase() === targetSize) &&
+        ((wishlistItem.selectedColor || "").trim().toUpperCase() === targetColor)
+      );
+    });
+  }, [wishlist, id, selectedSize, selectedColor, selectedVariant]);
 
   useEffect(() => {
     setSelectedSize(sizeOptions[0]);
   }, [sizeOptions]);
 
   useEffect(() => {
-    setSelectedColor(colorOptions[0] || "");
+    setSelectedColor((prevColor) => {
+      if (colorOptions.length === 0) return "";
+      if (
+        prevColor &&
+        colorOptions.some(
+          (option) => normalizeOptionKey(option) === normalizeOptionKey(prevColor)
+        )
+      ) {
+        return prevColor;
+      }
+      return colorOptions[0] || "";
+    });
   }, [colorOptions]);
 
   useEffect(() => {
@@ -141,9 +211,11 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
 
   const currentItem: itemType = {
     ...item,
+    price: selectedPrice,
     qty: selectedQty,
     selectedSize,
     selectedColor,
+    selectedVariantId: Number(selectedVariant?.id || 0),
   };
 
   const handleWishlist = () => {
@@ -156,7 +228,7 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
   };
 
   const handleDialogWishlist = () => {
-    alreadyWishlisted
+    alreadyWishlistedVariant
       ? deleteWishlistItem!(currentItem)
       : addToWishlist!(currentItem);
   };
@@ -168,6 +240,7 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
     setActiveImageIndex(0);
     setDialogSizeOptions([]);
     setDialogColorOptions([]);
+    setDialogVariants([]);
     setDialogImages([item.img1, item.img2].filter((value): value is string => Boolean(value)));
     try {
       const productKey = slug || String(id);
@@ -178,14 +251,28 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
       const productVariants = Array.isArray(payload?.variants)
         ? payload.variants
         : [];
+      const normalizedVariants: ProductVariantApi[] = productVariants
+        .map((variant: ProductVariantApi) => ({
+          ...variant,
+          id: Number(variant?.id || 0) || undefined,
+          size: normalizeOptionLabel(variant?.size),
+          color: normalizeOptionLabel(variant?.color),
+        }))
+        .filter((variant: ProductVariantApi) => Boolean(variant?.size));
       const sizeList: string[] = Array.from(
         new Set<string>(
-          productVariants
+          normalizedVariants
             .map((variant: ProductVariantApi) => normalizeOptionLabel(variant?.size))
             .filter((value: string) => Boolean(value))
         )
       );
-      const colorList = Array.from(new Set(extractStringOptions(payload?.colors)));
+      const colorList = Array.from(
+        new Set(
+          normalizedVariants
+            .map((variant: ProductVariantApi) => normalizeOptionLabel(variant?.color))
+            .filter((value: string) => Boolean(value))
+        )
+      );
       const fallbackColorList = Array.from(
         new Set(extractStringOptions(item?.colors))
       );
@@ -197,6 +284,7 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
           ? payload.description.trim()
           : item.description || ""
       );
+      setDialogVariants(normalizedVariants);
       setDialogSizeOptions(sizeList);
       setDialogColorOptions(mergedColors);
       setDialogImages(images.length > 0 ? images : ["/bg-img/ourshop.png"]);
@@ -419,7 +507,7 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
                       <div className="text-sm text-gray400 mt-4">Đang tải...</div>
                     ) : (
                       <div className="space-y-4 mt-4">
-                        <div className="text-2xl text-gray500">{formatPrice(price)}</div>
+                        <div className="text-2xl text-gray500">{formatPrice(selectedPrice)}</div>
                         <div className="text-base text-gray500">{dialogDescription}</div>
                         <div className="text-base">Tình trạng: Còn hàng</div>
                         <div className="text-base">
@@ -513,10 +601,10 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
                             extraClass="h-12 min-w-[3rem] flex items-center justify-center"
                             onClick={handleDialogWishlist}
                           >
-                            {alreadyWishlisted ? (
-                              <HeartSolid extraClass="inline" />
+                            {alreadyWishlistedVariant ? (
+                              <HeartSolid extraClass="inline h-5 w-5" />
                             ) : (
-                              <Heart extraClass="inline" />
+                              <Heart extraClass="inline h-5 w-5" />
                             )}
                           </GhostButton>
                         </div>
