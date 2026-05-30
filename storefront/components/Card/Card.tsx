@@ -10,7 +10,6 @@ import Heart from "../../public/icons/Heart";
 import styles from "./Card.module.css";
 import HeartSolid from "../../public/icons/HeartSolid";
 import Button from "../Buttons/Button";
-import GhostButton from "../Buttons/GhostButton";
 import { itemType } from "../../context/cart/cart-types";
 import { useCart } from "../../context/cart/CartProvider";
 import { useWishlist } from "../../context/wishlist/WishlistProvider";
@@ -597,16 +596,22 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
                             extraClass="h-12 min-w-0 flex-1 text-center whitespace-nowrap px-4 text-base"
                             onClick={handleConfirmQuickAction}
                           />
-                          <GhostButton
-                            extraClass="h-12 w-12 shrink-0 min-w-0 flex items-center justify-center px-0 text-base"
+                          <button
+                            type="button"
+                            aria-label={categoryT("add_to_wishlist")}
+                            className={`h-12 w-12 shrink-0 min-w-0 flex items-center justify-center border border-gray500 transition-colors ${
+                              alreadyWishlistedVariant
+                                ? "bg-gray500 text-white"
+                                : "bg-white text-gray500 hover:bg-gray500 hover:text-white"
+                            }`}
                             onClick={handleDialogWishlist}
                           >
                             {alreadyWishlistedVariant ? (
-                              <HeartSolid extraClass="inline h-5 w-5" />
+                              <HeartSolid extraClass="h-5 w-5 block" />
                             ) : (
-                              <Heart extraClass="inline h-5 w-5" />
+                              <Heart extraClass="h-5 w-5 block" />
                             )}
-                          </GhostButton>
+                          </button>
                         </div>
                       </div>
                     )}
