@@ -1,9 +1,8 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "storefront/package.json",
-      "use": "@vercel/next"
-    }
-  ]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "cd storefront && npm install",
+  "buildCommand": "cd storefront && npm run build",
+  "devCommand": "cd storefront && npm run dev",
+  "outputDirectory": "storefront/.next"
 }
