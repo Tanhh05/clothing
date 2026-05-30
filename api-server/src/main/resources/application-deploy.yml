@@ -1,0 +1,25 @@
+server:
+  port: ${APP_PORT:8080}
+
+spring:
+  datasource:
+    # Supabase direct connection (IPv6) or session pooler (IPv4).
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:postgres}?sslmode=require
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+app:
+  integrations:
+    # Set true only if you also deploy these services in production.
+    redis:
+      enabled: ${REDIS_ENABLED:false}
+    rabbit:
+      enabled: ${RABBITMQ_ENABLED:false}
+    elasticsearch:
+      enabled: ${ELASTICSEARCH_ENABLED:false}
