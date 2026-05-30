@@ -128,14 +128,15 @@ export default function Menu({ categories }: Props) {
               >
                 <div className="flex justify-between items-center p-6 pb-0">
                   <Link href="/">
-                    <a>
+                    <a className="flex items-center gap-2">
                       <Image
                         className="justify-center"
-                        src="/logo.svg"
-                        alt="Picture of the author"
-                        width={85}
-                        height={22}
+                        src="/admin-logo.png"
+                        alt="TWENTY"
+                        width={28}
+                        height={28}
                       />
+                      <span className="text-base font-semibold">TWENTY</span>
                     </a>
                   </Link>
                   <button
@@ -373,14 +374,14 @@ export default function Menu({ categories }: Props) {
                       <a
                         href="#"
                         className="text-gray400 w-10 h-10 py-1 px-auto flex justify-center rounded-md active:bg-gray300"
-                        aria-label="Twenty Facebook Page"
+                        aria-label="TWENTY Facebook Page"
                       >
                         <FacebookLogo extraClass="h-8" />
                       </a>
                       <a
                         href="#"
                         className="text-gray400 w-10 h-10 py-1 px-auto flex justify-center rounded-md active:bg-gray300"
-                        aria-label="Twenty Facebook Page"
+                        aria-label="TWENTY Facebook Page"
                       >
                         <InstagramLogo extraClass="h-8" />
                       </a>

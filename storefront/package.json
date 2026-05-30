@@ -1,5 +1,5 @@
 {
-  "name": "twenty",
+  "name": "TWENTY",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -9,7 +9,10 @@
     "dev:restart": "pkill -f \"next dev -p 3000\" || true; npm run clean; next dev -p 3000",
     "lint": "next lint",
     "build": "npm run clean && next build",
-    "start": "next start"
+    "start": "next start",
+    "e2e": "playwright test",
+    "e2e:client": "playwright test --project=client",
+    "e2e:admin": "playwright test --project=admin"
   },
   "dependencies": {
     "@headlessui/react": "^1.0.0",
@@ -21,14 +24,17 @@
     "nprogress": "^0.2.0",
     "react": "17.0.2",
     "react-dom": "17.0.2",
-    "swiper": "^6.6.2"
+    "swiper": "^6.6.2",
+    "tslib": "^2.8.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/nprogress": "^0.2.0",
     "@types/react": "^17.0.3",
     "autoprefixer": "^10.2.5",
     "eslint": "8.9.0",
     "eslint-config-next": "12.1.0",
+    "playwright": "^1.60.0",
     "postcss": "^8.2.9",
     "tailwindcss": "^2.1.1",
     "typescript": "^4.2.4"

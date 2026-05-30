@@ -16,6 +16,7 @@ import { useCurrency } from "../context/CurrencyContext";
 import { useRouter } from "next/router";
 import { useAuth } from "../context/AuthContext";
 import { pushWithLang } from "../lib/router-utils";
+import { toLocalizedColorLabel } from "../lib/color-utils";
 
 type UserAddress = {
   id: number;
@@ -45,6 +46,7 @@ const unwrapApiData = <T,>(payload: any): T => {
 
 const ShoppingCart = () => {
   const t = useTranslations("CartWishlist");
+  const categoryT = useTranslations("Category");
   const { formatPrice } = useCurrency();
   const router = useRouter();
   const auth = useAuth();
@@ -151,7 +153,7 @@ const ShoppingCart = () => {
   return (
     <div>
       {/* ===== Head Section ===== */}
-      <Header title={`Shopping Cart - Twenty`} />
+      <Header title={`${t("shopping_cart")} - TWENTY`} />
 
       <main id="main-content">
         {/* ===== Heading & Continue Shopping */}
@@ -225,12 +227,13 @@ const ShoppingCart = () => {
                             {item.name}
                             {item.selectedSize ? (
                               <span className="block text-sm text-gray400">
-                                Size: {item.selectedSize}
+                                {categoryT("size")}: {item.selectedSize}
                               </span>
                             ) : null}
                             {item.selectedColor ? (
                               <span className="block text-sm text-gray400">
-                                Màu: {item.selectedColor}
+                                {categoryT("color")}:{" "}
+                                {toLocalizedColorLabel(item.selectedColor, router.locale)}
                               </span>
                             ) : null}
                           </span>

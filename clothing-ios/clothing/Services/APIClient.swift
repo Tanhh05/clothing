@@ -18,6 +18,10 @@ enum APIError: Error, LocalizedError {
     }
 }
 
+struct APIEnvelope<T: Codable>: Codable {
+    let data: T?
+}
+
 final class APIClient {
     static let shared = APIClient()
     private init() {}
@@ -71,5 +75,16 @@ final class APIClient {
             throw APIError.network(error.localizedDescription)
         }
     }
-}
 
+    func decodeResponse<T: Codable>(_ type: T.Type, from data: Data) throws -> T {
+        let decoder = JSONDecoder()
+        if let wrapped = try? decoder.decode(APIEnvelope<T>.self, from: data),
+           let value = wrapped.data {
+            return value
+        }
+        if let direct = try? decoder.decode(T.self, from: data) {
+            return direct
+        }
+        throw APIError.decoding
+    }
+}

@@ -1,5 +1,9 @@
 server:
   port: ${APP_PORT:8080}
+  compression:
+    enabled: true
+    min-response-size: 1024
+    mime-types: application/json,application/xml,text/html,text/plain,text/css,application/javascript
 
 spring:
   application:
@@ -56,6 +60,20 @@ spring:
 logging:
   level:
     org.springframework.security: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 app:
   integrations:
@@ -127,3 +145,14 @@ app:
     brevo:
       api-key: ${BREVO_API_KEY:}
       sender-email: ${BREVO_SENDER_EMAIL:}
+  security:
+    rate-limit:
+      login:
+        max-requests: ${RATE_LIMIT_LOGIN_MAX_REQUESTS:20}
+        window-seconds: ${RATE_LIMIT_LOGIN_WINDOW_SECONDS:60}
+      register:
+        max-requests: ${RATE_LIMIT_REGISTER_MAX_REQUESTS:10}
+        window-seconds: ${RATE_LIMIT_REGISTER_WINDOW_SECONDS:60}
+      order-create:
+        max-requests: ${RATE_LIMIT_ORDER_CREATE_MAX_REQUESTS:30}
+        window-seconds: ${RATE_LIMIT_ORDER_CREATE_WINDOW_SECONDS:60}

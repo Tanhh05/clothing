@@ -8,6 +8,7 @@ struct LoginRequest: Codable {
 }
 
 struct RegisterRequest: Codable {
+    var fullName: String
     var username: String
     var email: String
     var password: String
@@ -43,4 +44,8 @@ struct ErrorResponse: Codable {
     let message: String?
     let error: String?
     let status: Int?
+}
+
+struct ApiErrorEnvelope: Codable {
+    let data: ErrorResponse?
 }

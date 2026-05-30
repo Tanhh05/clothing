@@ -1,6 +1,6 @@
 import axios from "axios";
 import { getCookie, removeCookies, setCookies } from "cookies-next";
-import React, { useState, useEffect, useContext, createContext } from "react";
+import React, { useState, useEffect, useContext, createContext, useRef } from "react";
 import { useNotify } from "./NotificationContext";
 
 type authType = {
@@ -53,7 +53,7 @@ type authType = {
     success: boolean;
     message: string;
   }>;
-  logout?: () => void;
+  logout?: () => Promise<void>;
 };
 
 const initialAuth: authType = {
@@ -92,6 +92,8 @@ function useProvideAuth() {
   const { notify } = useNotify();
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const isRefreshingRef = useRef(false);
+  const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
 
   const getLocale = () => {
     if (typeof window === "undefined") return "vi";
@@ -171,15 +173,76 @@ function useProvideAuth() {
   useEffect(() => {
     const interceptorId = axios.interceptors.response.use(
       (response) => response,
-      (error) => {
+      async (error) => {
         const status = error?.response?.status;
         const url = error?.config?.url || "";
         const isAuthEndpoint =
           url.includes("/api/auth/login") ||
           url.includes("/api/auth/google") ||
-          url.includes("/api/auth/refresh");
+          url.includes("/api/auth/refresh") ||
+          url.includes("/api/auth/logout");
 
-        if (status === 401 && !isAuthEndpoint) {
+        const originalRequest: any = error?.config;
+        if (
+          status === 401 &&
+          !isAuthEndpoint &&
+          originalRequest &&
+          !originalRequest._retry
+        ) {
+          const cachedUserRaw = getCookie("user");
+          const cachedUser = cachedUserRaw
+            ? (JSON.parse(cachedUserRaw as string) as User)
+            : null;
+          const refreshToken = cachedUser?.refreshToken;
+          if (refreshToken) {
+            originalRequest._retry = true;
+            try {
+              if (!isRefreshingRef.current) {
+                isRefreshingRef.current = true;
+                refreshPromiseRef.current = axios
+                  .post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/refresh`, {
+                    refreshToken,
+                  })
+                  .then((res) => {
+                    const refreshed = res.data || {};
+                    const nextUser: User = {
+                      id: +(refreshed.userId || cachedUser?.id || 0),
+                      username: refreshed.username || cachedUser?.username,
+                      email: refreshed.email || cachedUser?.email || "",
+                      fullname:
+                        refreshed.username ||
+                        cachedUser?.fullname ||
+                        cachedUser?.email ||
+                        "",
+                      phone: cachedUser?.phone,
+                      token: refreshed.accessToken || "",
+                      refreshToken: refreshed.refreshToken || refreshToken,
+                      tokenType: refreshed.tokenType || cachedUser?.tokenType,
+                    };
+                    setUser(nextUser);
+                    return nextUser.token || null;
+                  })
+                  .catch(() => {
+                    setUser(null);
+                    removeCookies("user");
+                    return null;
+                  })
+                  .finally(() => {
+                    isRefreshingRef.current = false;
+                    refreshPromiseRef.current = null;
+                  });
+              }
+
+              const nextToken = await refreshPromiseRef.current;
+              if (nextToken) {
+                originalRequest.headers = originalRequest.headers || {};
+                originalRequest.headers.Authorization = `Bearer ${nextToken}`;
+                return axios(originalRequest);
+              }
+            } catch (refreshErr) {
+              return Promise.reject(refreshErr);
+            }
+          }
           notify(tr("login_required"), "error");
         }
         return Promise.reject(error);
@@ -199,24 +262,35 @@ function useProvideAuth() {
     phone: string
   ) => {
     try {
+      const normalizedFullName = fullname.trim();
+      const usernameFromEmail = email.split("@")[0]?.trim();
+      const username =
+        usernameFromEmail && usernameFromEmail.length > 0
+          ? usernameFromEmail
+          : normalizedFullName.replace(/\s+/g, "").toLowerCase();
+
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/register`,
         {
           email,
-          fullname,
+          fullName: normalizedFullName,
+          username,
           password,
           shippingAddress,
           phone,
         }
       );
-      const registerResponse = response.data;
+      const registerResponse = response.data?.data || response.data;
       const user: User = {
-        id: +registerResponse.id,
-        email,
-        fullname,
+        id: +(registerResponse.userId ?? registerResponse.id),
+        username: registerResponse.username || username,
+        email: registerResponse.email || email,
+        fullname: registerResponse.fullName || normalizedFullName,
         shippingAddress,
-        phone,
-        token: registerResponse.token,
+        phone: registerResponse.phone || phone,
+        token: registerResponse.accessToken || registerResponse.token,
+        refreshToken: registerResponse.refreshToken,
+        tokenType: registerResponse.tokenType,
       };
       setUser(user);
       return {
@@ -426,7 +500,17 @@ function useProvideAuth() {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    const refreshToken = user?.refreshToken;
+    if (refreshToken) {
+      try {
+        await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/logout`, {
+          refreshToken,
+        });
+      } catch (err) {
+        console.error("Logout API failed:", err);
+      }
+    }
     setUser(null);
     removeCookies("user");
   };

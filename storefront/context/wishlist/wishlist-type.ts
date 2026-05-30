@@ -16,8 +16,8 @@ export type itemType = {
 export type wishlistType = {
   wishlist: itemType[];
   // addItem?: (item: itemType) => void; // delete
-  addToWishlist?: (item: itemType) => void;
+  addToWishlist?: (item: itemType) => Promise<void>;
   // removeItem?: (item: itemType) => void; // delete
-  deleteWishlistItem?: (item: itemType) => void;
-  clearWishlist?: () => void;
+  deleteWishlistItem?: (item: itemType) => Promise<void>;
+  clearWishlist?: () => Promise<void>;
 };

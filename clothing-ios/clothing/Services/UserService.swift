@@ -23,7 +23,17 @@ final class UserService {
 
     func getAddresses() async throws -> [UserAddress] {
         let data = try await APIClient.shared.request(path: "/api/user/addresses", requiresAuth: true)
-        return try JSONDecoder().decode([UserAddress].self, from: data)
+        return try APIClient.shared.decodeResponse([UserAddress].self, from: data)
+    }
+
+    func createAddress(_ req: UserAddressUpsertRequest) async throws -> UserAddress {
+        let body = try JSONEncoder().encode(req)
+        let data = try await APIClient.shared.request(
+            path: "/api/user/addresses",
+            method: "POST",
+            body: body,
+            requiresAuth: true
+        )
+        return try APIClient.shared.decodeResponse(UserAddress.self, from: data)
     }
 }
-

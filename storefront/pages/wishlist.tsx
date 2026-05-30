@@ -34,11 +34,12 @@ const Wishlist = () => {
   return (
     <div>
       {/* ===== Head Section ===== */}
-      <Header title={`Wishlist - Twenty`} />
+      <Header title={`Wishlist - TWENTY`} />
 
       <main id="main-content">
+        <div className="app-max-width app-x-padding py-8 md:py-10">
         {/* ===== Heading & Continue Shopping */}
-        <div className="app-max-width px-4 sm:px-8 md:px-20 w-full border-t-2 border-gray100">
+        <div className="w-full">
           <h1 className="text-2xl sm:text-4xl text-center sm:text-left mt-6 mb-2 animatee__animated animate__bounce">
             {t("wishlist")}
           </h1>
@@ -53,7 +54,7 @@ const Wishlist = () => {
         </div>
 
         {/* ===== Wishlist Table Section ===== */}
-        <div className="app-max-width px-4 sm:px-8 md:px-20 mb-14 flex flex-col lg:flex-row">
+        <div className="mb-14 flex flex-col lg:flex-row">
           <div className="h-full w-full">
             <table className="w-full mb-6">
               <thead>
@@ -155,6 +156,7 @@ const Wishlist = () => {
               </GhostButton>
             </div>
           </div>
+        </div>
         </div>
       </main>
 

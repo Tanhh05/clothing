@@ -35,7 +35,11 @@ struct LoginView: View {
                         .padding()
                 } else {
                     Button(action: {
-                        viewModel.login()
+                        viewModel.login { success in
+                            if success {
+                                onLoginSuccess?()
+                            }
+                        }
                     }) {
                         Text("Đăng nhập")
                             .foregroundColor(.white)
@@ -67,11 +71,6 @@ struct LoginView: View {
                     message: Text(viewModel.errorMessage ?? "Có lỗi xảy ra"),
                     dismissButton: .default(Text("OK"))
                 )
-            }
-            .onChange(of: viewModel.isAuthenticated) { oldValue, newValue in
-                if newValue {
-                    onLoginSuccess?()
-                }
             }
         }
     }

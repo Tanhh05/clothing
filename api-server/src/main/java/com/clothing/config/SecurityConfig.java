@@ -4,6 +4,7 @@ import com.clothing.security.CustomUserDetailsService;
 import com.clothing.security.JwtAuthenticationFilter;
 import com.clothing.security.RestAccessDeniedHandler;
 import com.clothing.security.RestAuthenticationEntryPoint;
+import com.clothing.security.SimpleRateLimitFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,7 @@ public class SecurityConfig {
     private final CustomUserDetailsService userDetailsService;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
+    private final SimpleRateLimitFilter simpleRateLimitFilter;
     private final String allowedOrigins;
 
     public SecurityConfig(
@@ -40,12 +42,14 @@ public class SecurityConfig {
             CustomUserDetailsService userDetailsService,
             RestAuthenticationEntryPoint authenticationEntryPoint,
             RestAccessDeniedHandler accessDeniedHandler,
+            SimpleRateLimitFilter simpleRateLimitFilter,
             @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://localhost:5174}") String allowedOrigins
     ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.userDetailsService = userDetailsService;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.simpleRateLimitFilter = simpleRateLimitFilter;
         this.allowedOrigins = allowedOrigins;
     }
 
@@ -82,6 +86,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authenticationProvider(authenticationProvider())
+                .addFilterBefore(simpleRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

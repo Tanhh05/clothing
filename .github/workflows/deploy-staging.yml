@@ -105,3 +105,45 @@ jobs:
             exit 0
           fi
           bash scripts/smoke-test-api.sh
+
+  smoke_test_storefront:
+    name: Smoke Test Staging Storefront
+    runs-on: ubuntu-latest
+    needs: deploy_backend
+    environment: staging
+    if: ${{ needs.deploy_backend.result == 'success' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run storefront smoke test
+        env:
+          BASE_URL: ${{ secrets.STAGING_STOREFRONT_BASE_URL }}
+          TIMEOUT_SECONDS: "180"
+          RETRY_INTERVAL_SECONDS: "6"
+        run: |
+          if [[ -z "${BASE_URL}" ]]; then
+            echo "Skipping storefront smoke test: STAGING_STOREFRONT_BASE_URL is not configured."
+            exit 0
+          fi
+          bash scripts/smoke-test-storefront.sh
+
+  smoke_test_admin:
+    name: Smoke Test Staging Admin Portal
+    runs-on: ubuntu-latest
+    needs: deploy_backend
+    environment: staging
+    if: ${{ needs.deploy_backend.result == 'success' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run admin smoke test
+        env:
+          BASE_URL: ${{ secrets.STAGING_ADMIN_BASE_URL }}
+        run: |
+          if [[ -z "${BASE_URL}" ]]; then
+            echo "Skipping admin smoke test: STAGING_ADMIN_BASE_URL is not configured."
+            exit 0
+          fi
+          bash scripts/smoke-test-admin.sh

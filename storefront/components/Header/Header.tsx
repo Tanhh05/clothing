@@ -14,7 +14,6 @@ import CartItem from "../CartItem/CartItem";
 import Menu from "../Menu/Menu";
 import AppHeader from "./AppHeader";
 import { useWishlist } from "../../context/wishlist/WishlistProvider";
-import OrderIcon from "../../public/icons/OrderIcon";
 
 import styles from "./Header.module.css";
 
@@ -164,7 +163,7 @@ const Header: React.FC<Props> = ({ title }) => {
       >
         <div className="app-max-width w-full">
           <div
-            className={`flex justify-between align-baseline app-x-padding ${styles.mainMenu}`}
+            className={`flex items-center justify-between app-x-padding ${styles.mainMenu}`}
           >
             {/* Hamburger Menu and Mobile Nav */}
             <div className="flex-1 lg:flex-0 lg:hidden">
@@ -172,7 +171,7 @@ const Header: React.FC<Props> = ({ title }) => {
             </div>
 
             {/* Left Nav */}
-            <ul className={`flex-0 lg:flex-1 flex ${styles.leftMenu}`}>
+            <ul className={`hidden lg:flex lg:flex-1 items-center ${styles.leftMenu}`}>
               {parentCategories.map((category) => {
                 const children = childrenByParent[category.id] || [];
                 return (
@@ -207,26 +206,28 @@ const Header: React.FC<Props> = ({ title }) => {
               })}
             </ul>
 
-            {/* Twenty Logo */}
-            <div className="flex-1 flex justify-center items-center cursor-pointer">
-              <div className="w-32 h-auto">
+            {/* TWENTY Logo */}
+            <div className="flex-1 lg:flex-none flex justify-center items-center cursor-pointer">
+              <div className="h-auto">
                 <Link href="/">
-                  <a>
+                  <a className="flex items-center gap-2">
                     <Image
                       className="justify-center"
-                      src="/logo.svg"
-                      alt="Twenty"
-                      width={220}
-                      height={50}
-                      layout="responsive"
+                      src="/admin-logo.png"
+                      alt="TWENTY"
+                      width={32}
+                      height={32}
                     />
+                    <span className="text-base sm:text-lg font-semibold whitespace-nowrap">
+                      TWENTY
+                    </span>
                   </a>
                 </Link>
               </div>
             </div>
 
             {/* Right Nav */}
-            <ul className={`flex-1 flex justify-end ${styles.rightMenu}`}>
+            <ul className={`flex flex-1 items-center justify-end ${styles.rightMenu}`}>
               <li>
                 <SearchForm />
               </li>
@@ -253,17 +254,6 @@ const Header: React.FC<Props> = ({ title }) => {
                     )}
                   </button>
                   {/* </a> */}
-                </Link>
-              </li>
-              <li>
-                <Link href="/orders" passHref>
-                  <button
-                    type="button"
-                    className="relative"
-                    aria-label={t("my_orders")}
-                  >
-                    <OrderIcon />
-                  </button>
                 </Link>
               </li>
               <li>

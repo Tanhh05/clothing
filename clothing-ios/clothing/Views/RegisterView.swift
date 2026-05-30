@@ -14,6 +14,11 @@ struct RegisterView: View {
                 .padding(.bottom, 20)
             
             VStack(spacing: 15) {
+                TextField("Họ và tên", text: $viewModel.fullName)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
+
                 TextField("Tên đăng nhập", text: $viewModel.username)
                     .padding()
                     .background(Color(.systemGray6))

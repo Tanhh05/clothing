@@ -94,7 +94,7 @@ const Home: React.FC<Props> = ({
               <OverlayContainer
                 imgSrc="/bg-img/banner_minipage1.jpg"
                 imgSrc2="/bg-img/banner_minipage1-tablet.jpg"
-                imgAlt="New Arrivals"
+                imgAlt={t("new_arrivals")}
               >
                 <LinkButton
                   href="/product-category/new-arrivals"
@@ -107,7 +107,7 @@ const Home: React.FC<Props> = ({
             <div className="w-full">
               <OverlayContainer
                 imgSrc="/bg-img/banner_minipage2.jpg"
-                imgAlt="Women Collection"
+                imgAlt={t("women_collection")}
               >
                 <LinkButton
                   href="/product-category/women"
@@ -120,7 +120,7 @@ const Home: React.FC<Props> = ({
             <div className="w-full">
               <OverlayContainer
                 imgSrc="/bg-img/banner_minipage3.jpg"
-                imgAlt="Men Collection"
+                imgAlt={t("men_collection")}
               >
                 <LinkButton
                   href="/product-category/men"
@@ -181,7 +181,7 @@ const Home: React.FC<Props> = ({
             <span className="w-full">{t("our_shop_desc")}</span>
           </div>
           <div className="w-full app-x-padding flex justify-center">
-            <Image src={ourShop} alt="Our Shop" />
+            <Image src={ourShop} alt={t("our_shop")} />
           </div>
         </section>
       </main>
@@ -239,7 +239,11 @@ export const getStaticProps: GetStaticProps = async ({ locale }) => {
         name:
           typeof review.username === "string" && review.username.trim()
             ? review.username.trim()
-            : "Customer",
+            : locale === "en"
+            ? "Customer"
+            : locale === "my"
+            ? "ဖောက်သည်"
+            : "Khách hàng",
         occupation: `${Math.max(1, Math.min(5, Number(review.rating) || 5))}★`,
       }));
   } catch (error) {

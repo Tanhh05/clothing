@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/router";
 import axios from "axios";
 import Image from "next/image";
 import { GetStaticProps } from "next";
@@ -13,6 +14,7 @@ import Input from "../components/Input/Input";
 import { itemType } from "../context/wishlist/wishlist-type";
 import { useAuth } from "../context/AuthContext";
 import { useCurrency } from "../context/CurrencyContext";
+import { toLocalizedColorLabel } from "../lib/color-utils";
 
 // let w = window.innerWidth;
 type PaymentType = "CASH_ON_DELIVERY" | "MOMO" | "VNPAY" | "BANK_TRANSFER";
@@ -71,6 +73,23 @@ type ProductDetailApi = {
   variants?: ProductVariantApi[];
 };
 
+type VoucherResponse = {
+  code?: string;
+  discountType?: string;
+  discountValue?: number;
+  minOrderValue?: number;
+  startAt?: string;
+  endAt?: string;
+  status?: string;
+};
+
+type VoucherBestResponse = {
+  code?: string;
+  discountAmount?: number;
+  finalTotal?: number;
+  autoApplied?: boolean;
+};
+
 const unwrapApiData = <T,>(payload: any): T => {
   if (
     payload &&
@@ -84,6 +103,8 @@ const unwrapApiData = <T,>(payload: any): T => {
 
 const ShoppingCart = () => {
   const t = useTranslations("CartWishlist");
+  const categoryT = useTranslations("Category");
+  const router = useRouter();
   const { formatPrice } = useCurrency();
   const { cart, clearCart } = useCart();
   const auth = useAuth();
@@ -110,7 +131,14 @@ const ShoppingCart = () => {
   const [selectedProvinceId, setSelectedProvinceId] = useState("");
   const [selectedDistrictId, setSelectedDistrictId] = useState("");
   const [selectedWardCode, setSelectedWardCode] = useState("");
+  const [voucherCodeInput, setVoucherCodeInput] = useState("");
+  const [appliedVoucherCode, setAppliedVoucherCode] = useState("");
+  const [appliedVoucherMinOrder, setAppliedVoucherMinOrder] = useState(0);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [voucherMessage, setVoucherMessage] = useState("");
+  const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
   const placingOrderRef = useRef(false);
+  const placeOrderAttemptKeyRef = useRef("");
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -118,6 +146,7 @@ const ShoppingCart = () => {
     placingOrderRef.current = true;
 
     setErrorMsg("");
+    setOrderError("");
 
     const makeOrder = async () => {
       try {
@@ -177,6 +206,7 @@ const ShoppingCart = () => {
         );
 
         for (const cartItem of cart) {
+          const requestQty = Math.max(1, Number(cartItem.qty || 1));
           const productRes = await axios.get<ProductDetailApi>(
             `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products/${cartItem.id}`
           );
@@ -193,18 +223,18 @@ const ShoppingCart = () => {
             (variant) =>
               (variant.size || "").trim().toUpperCase() === normalizedSelectedSize &&
               (variant.color || "").trim().toUpperCase() === normalizedSelectedColor &&
-              Number(variant.stock || 0) > 0 &&
+              Number(variant.stock || 0) >= requestQty &&
               (variant.status || "").toUpperCase() !== "INACTIVE"
           );
           const pickedVariantBySize = variants.find(
             (variant) =>
               (variant.size || "").trim().toUpperCase() === normalizedSelectedSize &&
-              Number(variant.stock || 0) > 0 &&
+              Number(variant.stock || 0) >= requestQty &&
               (variant.status || "").toUpperCase() !== "INACTIVE"
           );
           const pickedVariantFallback = variants.find(
             (variant) =>
-              Number(variant.stock || 0) > 0 &&
+              Number(variant.stock || 0) >= requestQty &&
               (variant.status || "").toUpperCase() !== "INACTIVE"
           );
           const pickedVariant =
@@ -213,11 +243,11 @@ const ShoppingCart = () => {
             throw new Error(`${t("no_valid_variant_for_product")}: ${cartItem.name}`);
           }
           await axios.post(
-            `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/cart/items`,
-            {
-              variantId: pickedVariant.id,
-              quantity: cartItem.qty || 1,
-            },
+              `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/cart/items`,
+              {
+                variantId: pickedVariant.id,
+                quantity: requestQty,
+              },
             {
               headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -233,6 +263,8 @@ const ShoppingCart = () => {
           districts.find((item) => item.id === selectedDistrictId)?.name || "";
         const selectedWard =
           wards.find((item) => item.id === selectedWardCode)?.name || "";
+        const attemptKey = placeOrderAttemptKeyRef.current || `${Date.now()}-${Math.random()}`;
+        placeOrderAttemptKeyRef.current = attemptKey;
         const res = await axios.post(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders`,
           {
@@ -249,10 +281,12 @@ const ShoppingCart = () => {
             district: selectedDistrict,
             ward: selectedWard,
             shippingFee: deliFee ?? undefined,
+            voucherCode: appliedVoucherCode || undefined,
           },
           {
             headers: {
               Authorization: `Bearer ${authToken}`,
+              "X-Idempotency-Key": attemptKey,
             },
           }
         );
@@ -281,6 +315,7 @@ const ShoppingCart = () => {
 
         setCompletedOrder(createdOrder);
         clearCart!();
+        placeOrderAttemptKeyRef.current = "";
         setIsOrdering(false);
       } catch (err) {
         console.error("Create order failed:", err);
@@ -291,6 +326,7 @@ const ShoppingCart = () => {
           axiosErr?.message ||
           "";
         setOrderError(backendMessage || t("place_order_failed"));
+        placeOrderAttemptKeyRef.current = "";
         setIsOrdering(false);
       } finally {
         placingOrderRef.current = false;
@@ -551,6 +587,7 @@ const ShoppingCart = () => {
         ? false
         : true;
   }
+  disableOrder = disableOrder || cart.length === 0;
 
   let subtotal: number | string = 0;
 
@@ -561,6 +598,7 @@ const ShoppingCart = () => {
       0
     )
   );
+  const subtotalNumber = Number(subtotal) || 0;
 
   const [deliFee, setDeliFee] = useState<number | null>(null);
 
@@ -590,10 +628,124 @@ const ShoppingCart = () => {
     loadShippingFee();
   }, [selectedDistrictId, selectedWardCode]);
 
+  useEffect(() => {
+    if (!appliedVoucherCode) return;
+    if (subtotalNumber >= appliedVoucherMinOrder) return;
+    setAppliedVoucherCode("");
+    setAppliedVoucherMinOrder(0);
+    setDiscountAmount(0);
+    setVoucherMessage(t("voucher_unapplied_min_order"));
+  }, [appliedVoucherCode, appliedVoucherMinOrder, subtotalNumber, t]);
+
+  useEffect(() => {
+    let active = true;
+    const suggestVoucher = async () => {
+      if (voucherCodeInput || appliedVoucherCode || subtotalNumber <= 0) return;
+      try {
+        const res = await axios.get<VoucherBestResponse>(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/vouchers/best`,
+          { params: { subTotal: subtotalNumber } }
+        );
+        if (!active) return;
+        const suggestion = unwrapApiData<VoucherBestResponse>(res.data);
+        const suggestedCode = (suggestion?.code || "").trim();
+        if (!suggestedCode) return;
+        setVoucherCodeInput(suggestedCode);
+        if (Number(suggestion?.discountAmount || 0) > 0) {
+          setVoucherMessage(
+            t("voucher_suggested", {
+              code: suggestedCode,
+              amount: formatPrice(Number(suggestion.discountAmount)),
+            })
+          );
+        }
+      } catch (err) {
+        console.error("Suggest voucher failed:", err);
+      }
+    };
+    suggestVoucher();
+    return () => {
+      active = false;
+    };
+  }, [voucherCodeInput, appliedVoucherCode, subtotalNumber, t, formatPrice]);
+
+  const handleApplyVoucher = async () => {
+    const normalizedCode = voucherCodeInput.trim().toUpperCase();
+    if (!normalizedCode) {
+      setVoucherMessage(t("voucher_empty"));
+      setAppliedVoucherCode("");
+      setAppliedVoucherMinOrder(0);
+      setDiscountAmount(0);
+      return;
+    }
+    setIsApplyingVoucher(true);
+    setVoucherMessage("");
+    try {
+      const res = await axios.get<VoucherResponse[]>(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/vouchers`
+      );
+      const vouchers = unwrapApiData<VoucherResponse[]>(res.data);
+      const now = new Date();
+      const matched = (Array.isArray(vouchers) ? vouchers : []).find((voucher) => {
+        const code = String(voucher?.code || "").trim().toUpperCase();
+        if (code !== normalizedCode) return false;
+        const status = String(voucher?.status || "").trim().toUpperCase();
+        if (status && status !== "ACTIVE") return false;
+        const startAt = voucher?.startAt ? new Date(voucher.startAt) : null;
+        const endAt = voucher?.endAt ? new Date(voucher.endAt) : null;
+        if (startAt && startAt > now) return false;
+        if (endAt && endAt < now) return false;
+        return true;
+      });
+
+      if (!matched) {
+        setAppliedVoucherCode("");
+        setAppliedVoucherMinOrder(0);
+        setDiscountAmount(0);
+        setVoucherMessage(t("voucher_invalid"));
+        return;
+      }
+
+      const minOrderValue = Number(matched.minOrderValue || 0);
+      if (subtotalNumber < minOrderValue) {
+        setAppliedVoucherCode("");
+        setAppliedVoucherMinOrder(minOrderValue);
+        setDiscountAmount(0);
+        setVoucherMessage(t("voucher_min_order", { min: formatPrice(minOrderValue) }));
+        return;
+      }
+
+      const discountType = String(matched.discountType || "").toUpperCase();
+      const discountValue = Number(matched.discountValue || 0);
+      const rawDiscount =
+        discountType === "PERCENT"
+          ? Math.round((subtotalNumber * discountValue) / 100)
+          : discountValue;
+      const normalizedDiscount = Math.max(0, Math.min(subtotalNumber, rawDiscount));
+      setAppliedVoucherCode(normalizedCode);
+      setAppliedVoucherMinOrder(minOrderValue);
+      setDiscountAmount(normalizedDiscount);
+      setVoucherMessage(
+        t("voucher_applied", {
+          code: normalizedCode,
+          amount: formatPrice(normalizedDiscount),
+        })
+      );
+    } catch (err) {
+      console.error("Apply voucher failed:", err);
+      setAppliedVoucherCode("");
+      setAppliedVoucherMinOrder(0);
+      setDiscountAmount(0);
+      setVoucherMessage(t("voucher_apply_failed"));
+    } finally {
+      setIsApplyingVoucher(false);
+    }
+  };
+
   return (
     <div>
       {/* ===== Head Section ===== */}
-      <Header title={`${t("checkout")} - Twenty`} />
+      <Header title={`${t("checkout")} - TWENTY`} />
 
       <main id="main-content">
         {/* ===== Heading & Continue Shopping */}
@@ -796,7 +948,7 @@ const ShoppingCart = () => {
                         ) : null}
                         {item.selectedColor ? (
                           <span className="text-gray400 ml-1">
-                            [{item.selectedColor}]
+                            [{categoryT("color")}: {toLocalizedColorLabel(item.selectedColor, router.locale)}]
                           </span>
                         ) : null}{" "}
                         <span className="text-gray400">x {item.qty}</span>
@@ -818,10 +970,21 @@ const ShoppingCart = () => {
                   <span>{deliFee === null ? "_" : formatPrice(deliFee)}</span>
                 </div>
 
+                <div className="py-3 flex justify-between">
+                  <span className="uppercase">{t("discount")}</span>
+                  <span>
+                    {discountAmount > 0 ? `- ${formatPrice(discountAmount)}` : formatPrice(0)}
+                  </span>
+                </div>
+
                 <div>
                   <div className="flex justify-between py-3">
                     <span>{t("order_total")}</span>
-                    <span>{formatPrice(roundDecimal(+subtotal + (deliFee ?? 0)))}</span>
+                    <span>
+                      {formatPrice(
+                        roundDecimal(+subtotal + (deliFee ?? 0) - discountAmount)
+                      )}
+                    </span>
                   </div>
 
                   <div className="grid gap-3 mt-2 mb-4">
@@ -993,13 +1156,62 @@ const ShoppingCart = () => {
                       {t("send_order_email")}
                     </label>
                   </div>
+
+                  <div className="border-t border-gray200 pt-4 mb-4">
+                    <label htmlFor="voucher-code" className="text-sm uppercase block mb-2">
+                      {t("voucher_code")}
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        id="voucher-code"
+                        type="text"
+                        className="w-full border border-gray300 p-2 outline-none uppercase"
+                        value={voucherCodeInput}
+                        onChange={(e) =>
+                          setVoucherCodeInput(
+                            (e.target as HTMLInputElement).value.toUpperCase()
+                          )
+                        }
+                        placeholder={t("voucher_placeholder")}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyVoucher}
+                        disabled={isApplyingVoucher}
+                        className="px-4 py-2 border border-gray300 whitespace-nowrap disabled:opacity-50"
+                      >
+                        {isApplyingVoucher ? t("applying") : t("apply_voucher")}
+                      </button>
+                    </div>
+                    {voucherMessage ? (
+                      <p className="text-xs mt-2 text-gray500">{voucherMessage}</p>
+                    ) : null}
+                    {appliedVoucherCode ? (
+                      <div className="flex justify-between text-sm mt-3">
+                        <span>
+                          {t("discount_code_label")}: {appliedVoucherCode}
+                        </span>
+                        <span>-{formatPrice(discountAmount)}</span>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
                 <Button
                   value={t("place_order")}
                   size="xl"
                   extraClass={`w-full`}
-                  onClick={() => setIsOrdering(true)}
+                  onClick={() => {
+                    if (cart.length === 0) {
+                      setOrderError(t("cart_is_empty"));
+                      return;
+                    }
+                    if (placingOrderRef.current || isOrdering) return;
+                    if (!placeOrderAttemptKeyRef.current) {
+                      placeOrderAttemptKeyRef.current = `${Date.now()}-${Math.random()}`;
+                    }
+                    setIsOrdering(true);
+                  }}
                   disabled={disableOrder || isOrdering}
                 />
               </div>
@@ -1105,15 +1317,14 @@ const ShoppingCart = () => {
                   </div>
                 ) : (
                   <div className="flex justify-center items-center h-56">
-                    <div className="w-3/4">
+                    <div className="flex items-center gap-3">
                       <Image
-                        className="justify-center"
-                        src="/logo.svg"
-                        alt="Twenty"
-                        width={220}
-                        height={50}
-                        layout="responsive"
+                        src="/admin-logo.png"
+                        alt="TWENTY"
+                        width={36}
+                        height={36}
                       />
+                      <span className="text-3xl font-semibold tracking-wide">TWENTY</span>
                     </div>
                   </div>
                 )}

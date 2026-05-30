@@ -1,8 +1,8 @@
 import { Html, Head, Main, NextScript } from "next/document";
 
-const title = "Twenty";
-const desc = "Twenty e-commerce web app built with Next.js.";
-const keywords = "Twenty, Online Shop, E-commerce, NextJS";
+const title = "TWENTY";
+const desc = "TWENTY e-commerce web app built with Next.js.";
+const keywords = "TWENTY, Online Shop, E-commerce, NextJS";
 
 export default function Document() {
   return (
@@ -17,29 +17,31 @@ export default function Document() {
         <meta content="#282828" name="theme-color" />
         <meta content="#282828" name="msapplication-TileColor" />
 
+        <link href="/favicon.ico?v=2" rel="icon" sizes="any" />
+        <link href="/favicons/favicon-32x32.png?v=2" rel="icon" type="image/png" />
         <link
-          href="/favicons/apple-touch-icon.png"
+          href="/favicons/apple-touch-icon.png?v=2"
           rel="apple-touch-icon"
           sizes="180x180"
         />
         <link
-          href="/favicons/favicon-32x32.png"
+          href="/favicons/favicon-32x32.png?v=2"
           rel="icon"
           sizes="32x32"
           type="image/png"
         />
         <link
-          href="/favicons/favicon-16x16.png"
+          href="/favicons/favicon-16x16.png?v=2"
           rel="icon"
           sizes="16x16"
           type="image/png"
         />
-        <link href="/favicons/favicon.ico" rel="shortcut icon" />
-        <link href="/favicons/site.webmanifest" rel="manifest" />
+        <link href="/favicon.ico?v=2" rel="shortcut icon" />
+        <link href="/favicons/site.webmanifest?v=2" rel="manifest" />
 
         <meta property="og:url" content="https://twenty.vercel.app" />
         <link rel="canonical" href="https://twenty.vercel.app" />
-        <meta property="og:site_name" content="Twenty" />
+        <meta property="og:site_name" content="TWENTY" />
         <meta property="og:description" content={desc} key="og_description" />
         <meta property="og:title" content={title} key="og_title" />
         <meta

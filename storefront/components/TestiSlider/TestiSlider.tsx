@@ -1,4 +1,5 @@
 import { FC, useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import LeftArrow from "../../public/icons/LeftArrow";
 import RightArrow from "../../public/icons/RightArrow";
 
@@ -12,17 +13,19 @@ type Props = {
   items?: TestimonialItem[];
 };
 
-const fallbackTesti: TestimonialItem[] = [
-  {
-    speech: "Chưa có đánh giá khách hàng.",
-    name: "Twenty",
-    occupation: "Customer Reviews",
-  },
-];
 // animate__fadeIn
 // animate__lightSpeedInRight
 const TestiSlider: FC<Props> = ({ items = [] }) => {
-  const testi = items.length ? items : fallbackTesti;
+  const t = useTranslations("Category");
+  const testi = items.length
+    ? items
+    : [
+        {
+          speech: t("no_reviews"),
+          name: "TWENTY",
+          occupation: t("customer_reviews"),
+        },
+      ];
   const [arrIndex, setArrIndex] = useState(0);
   const [animate, setAnimate] = useState("animate__lightSpeedInRight");
 
