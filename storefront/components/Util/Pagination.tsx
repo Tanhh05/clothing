@@ -12,10 +12,12 @@ type Props = {
 const Pagination: React.FC<Props> = ({ lastPage, currentPage, orderby }) => {
   const router = useRouter();
   const { category } = router.query;
+  const safeLastPage = Math.max(1, lastPage);
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), safeLastPage);
 
   let pageNumbers: number[] = [];
 
-  for (let i = 1; i <= lastPage; i++) {
+  for (let i = 1; i <= safeLastPage; i++) {
     pageNumbers.push(i);
   }
 
@@ -23,36 +25,38 @@ const Pagination: React.FC<Props> = ({ lastPage, currentPage, orderby }) => {
   let startPageNumbers = false;
   let endPageNumbers = false;
 
-  if (currentPage <= 2) {
+  if (safeCurrentPage <= 2) {
     pageNumbers = [1, 2, 3];
     startPageNumbers = true;
     midPageNumbers = false;
     endPageNumbers = false;
-  } else if (currentPage >= lastPage - 1) {
-    pageNumbers = [lastPage - 2, lastPage - 1, lastPage];
+  } else if (safeCurrentPage >= safeLastPage - 1) {
+    pageNumbers = [safeLastPage - 2, safeLastPage - 1, safeLastPage];
     endPageNumbers = true;
     midPageNumbers = false;
     startPageNumbers = false;
   } else {
-    pageNumbers = [currentPage - 1, currentPage, currentPage + 1];
+    pageNumbers = [safeCurrentPage - 1, safeCurrentPage, safeCurrentPage + 1];
     midPageNumbers = true;
     startPageNumbers = false;
     endPageNumbers = false;
   }
 
-  if (lastPage === 3) {
+  if (safeLastPage === 3) {
     pageNumbers = [1, 2, 3];
     startPageNumbers = false;
     midPageNumbers = false;
     endPageNumbers = false;
   }
 
-  if (lastPage === 1) {
+  if (safeLastPage === 1) {
     pageNumbers = [1];
     startPageNumbers = false;
     midPageNumbers = false;
     endPageNumbers = false;
   }
+
+  pageNumbers = pageNumbers.filter((num) => num >= 1 && num <= safeLastPage);
 
   return (
     <div className="w-full">
@@ -65,12 +69,12 @@ const Pagination: React.FC<Props> = ({ lastPage, currentPage, orderby }) => {
               pushWithLang(
                 router,
                 `/product-category/${category}?page=${
-                  currentPage - 1
+                  safeCurrentPage - 1
                 }&orderby=${orderby}`
               )
             }
             className={`${
-              currentPage === 1
+              safeCurrentPage === 1
                 ? "pointer-events-none cursor-not-allowed text-gray400"
                 : "cursor-pointer"
             } focus:outline-none flex justify-center items-center h-10 w-16 px-3 border mx-1 hover:bg-gray500 hover:text-gray100`}
@@ -95,7 +99,7 @@ const Pagination: React.FC<Props> = ({ lastPage, currentPage, orderby }) => {
                   )
                 }
                 className={`${
-                  num === currentPage && "bg-gray500 text-gray100"
+                  num === safeCurrentPage && "bg-gray500 text-gray100"
                 } focus:outline-none cursor-pointer flex justify-center items-center w-10 h-10 border mx-1 hover:bg-gray500 hover:text-gray100`}
               >
                 {num}
@@ -116,12 +120,12 @@ const Pagination: React.FC<Props> = ({ lastPage, currentPage, orderby }) => {
               pushWithLang(
                 router,
                 `/product-category/${category}?page=${
-                  currentPage + 1
+                  safeCurrentPage + 1
                 }&orderby=${orderby}`
               )
             }
             className={`${
-              currentPage >= lastPage
+              safeCurrentPage >= safeLastPage
                 ? "pointer-events-none cursor-not-allowed text-gray400"
                 : "cursor-pointer"
             } focus:outline-none flex justify-center items-center h-10 w-16 px-3 border mx-1 hover:bg-gray500 hover:text-gray100`}

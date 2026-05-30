@@ -44,14 +44,14 @@ const ProductCategory: React.FC<Props> = ({
 
   const router = useRouter();
   const { category } = router.query;
-  const lastPage = Math.ceil(numberOfProducts / 10);
+  const lastPage = Math.max(1, Math.ceil(numberOfProducts / 10));
 
   const capitalizedCategory =
     category!.toString().charAt(0).toUpperCase() +
     category!.toString().slice(1);
   const categoryLabel = category!.toString().replace(/-/g, " ");
 
-  const firstIndex = page === 1 ? page : page * 10 - 9;
+  const firstIndex = numberOfProducts === 0 ? 0 : page === 1 ? page : page * 10 - 9;
   const lastIndex = page * 10;
 
   return (
@@ -94,7 +94,7 @@ const ProductCategory: React.FC<Props> = ({
               <Card key={item.id} item={item} />
             ))}
           </div>
-          {category !== "new-arrivals" && (
+          {category !== "new-arrivals" && numberOfProducts > 0 && (
             <Pagination
               currentPage={page}
               lastPage={lastPage}
