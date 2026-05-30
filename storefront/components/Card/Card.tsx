@@ -89,6 +89,7 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
   const [isWLHovered, setIsWLHovered] = useState(false);
 
   const [openVariantDialog, setOpenVariantDialog] = useState(false);
+  const [dialogMode, setDialogMode] = useState<"cart" | "wishlist">("cart");
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [dialogSizeOptions, setDialogSizeOptions] = useState<string[]>([]);
   const [dialogColorOptions, setDialogColorOptions] = useState<string[]>([]);
@@ -146,7 +147,12 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
   };
 
   const handleWishlist = () => {
-    alreadyWishlisted ? deleteWishlistItem!(item) : addToWishlist!(item);
+    if (alreadyWishlisted) {
+      deleteWishlistItem!(item);
+      return;
+    }
+    setDialogMode("wishlist");
+    openQuickAddDialog();
   };
 
   const handleDialogWishlist = () => {
@@ -208,16 +214,22 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
       notify(authT("added_to_cart"), "success");
       return;
     }
+    setDialogMode("cart");
     openQuickAddDialog();
   };
 
-  const handleConfirmQuickAdd = () => {
+  const handleConfirmQuickAction = () => {
     if (!selectedSize || (colorOptions.length > 0 && !selectedColor)) {
       notify("Vui lòng chọn size và màu", "error");
       return;
     }
-    addItem!(currentItem);
-    notify(authT("added_to_cart"), "success");
+    if (dialogMode === "wishlist") {
+      addToWishlist!(currentItem);
+      notify(categoryT("add_to_wishlist"), "success");
+    } else {
+      addItem!(currentItem);
+      notify(authT("added_to_cart"), "success");
+    }
     setOpenVariantDialog(false);
   };
 
@@ -488,10 +500,14 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
                             </button>
                           </div>
                           <Button
-                            value={t("add_to_cart")}
+                            value={
+                              dialogMode === "wishlist"
+                                ? categoryT("add_to_wishlist")
+                                : t("add_to_cart")
+                            }
                             size="lg"
                             extraClass="h-12 flex-grow text-center whitespace-nowrap"
-                            onClick={handleConfirmQuickAdd}
+                            onClick={handleConfirmQuickAction}
                           />
                           <GhostButton
                             extraClass="h-12 min-w-[3rem] flex items-center justify-center"
