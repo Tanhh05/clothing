@@ -567,20 +567,20 @@ const Card: FC<Props> = ({ item, enableVariantDialog = false }) => {
                         )}
 
                         <div className="flex items-stretch gap-3 pt-2 w-full flex-nowrap">
-                          <div className="h-12 w-[9.25rem] shrink-0 flex border border-gray300 divide-x divide-gray300">
+                          <div className="h-12 w-[9.25rem] shrink-0 grid grid-cols-3 border border-gray300">
                             <button
                               type="button"
-                              className="w-12 text-xl cursor-pointer hover:bg-gray500 hover:text-gray100"
+                              className="h-full w-full text-2xl leading-none font-normal flex items-center justify-center cursor-pointer text-gray500 hover:bg-gray500 hover:text-gray100 border-r border-gray300"
                               onClick={() => setSelectedQty((q) => Math.max(1, q - 1))}
                             >
                               -
                             </button>
-                            <div className="w-[3.25rem] flex items-center justify-center">
+                            <div className="h-full w-full flex items-center justify-center text-lg font-medium text-gray500">
                               {selectedQty}
                             </div>
                             <button
                               type="button"
-                              className="w-12 text-xl cursor-pointer hover:bg-gray500 hover:text-gray100"
+                              className="h-full w-full text-2xl leading-none font-normal flex items-center justify-center cursor-pointer text-gray500 hover:bg-gray500 hover:text-gray100 border-l border-gray300"
                               onClick={() => setSelectedQty((q) => q + 1)}
                             >
                               +
