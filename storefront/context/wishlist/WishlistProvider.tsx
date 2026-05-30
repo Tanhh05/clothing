@@ -94,15 +94,18 @@ const useProvideWishlist = () => {
           );
         }
 
-        const wishlistRes = await axios.get(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/wishlist`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const wishlistData = toRecord(wishlistRes.data);
-        const productIds: number[] = Array.isArray(wishlistData?.productIds)
-          ? wishlistData.productIds
-          : [];
-        await fetchWishlistItems(productIds);
+        if (localIds.length === 0) {
+          const wishlistRes = await axios.get(
+            `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/wishlist`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          const wishlistData = toRecord(wishlistRes.data);
+          const productIds: number[] = Array.isArray(wishlistData?.productIds)
+            ? wishlistData.productIds
+            : [];
+          await fetchWishlistItems(productIds);
+        }
+
         syncedTokenRef.current = token;
       } catch (err) {
         console.error("Failed to sync wishlist with backend:", err);
@@ -110,49 +113,39 @@ const useProvideWishlist = () => {
     };
 
     syncServerWishlist();
-  }, [auth.user?.token, state.wishlist]);
+  }, [auth.user?.token]);
 
   const addToWishlist = async (item: itemType) => {
+    dispatch({ type: ADD_TO_WISHLIST, payload: item });
     const token = auth.user?.token;
     if (token) {
       try {
-        const wishlistRes = await axios.post(
+        await axios.post(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/wishlist/items`,
           { productId: item.id },
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        const wishlistData = toRecord(wishlistRes.data);
-        const productIds: number[] = Array.isArray(wishlistData?.productIds)
-          ? wishlistData.productIds
-          : [];
-        await fetchWishlistItems(productIds);
         return;
       } catch (err) {
         console.error("Failed to add wishlist item on backend:", err);
       }
     }
-    dispatch({ type: ADD_TO_WISHLIST, payload: item });
   };
 
   const deleteWishlistItem = async (item: itemType) => {
+    dispatch({ type: DELETE_WISHLIST_ITEM, payload: item });
     const token = auth.user?.token;
     if (token) {
       try {
-        const wishlistRes = await axios.delete(
+        await axios.delete(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/wishlist/items/${item.id}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        const wishlistData = toRecord(wishlistRes.data);
-        const productIds: number[] = Array.isArray(wishlistData?.productIds)
-          ? wishlistData.productIds
-          : [];
-        await fetchWishlistItems(productIds);
         return;
       } catch (err) {
         console.error("Failed to delete wishlist item on backend:", err);
       }
     }
-    dispatch({ type: DELETE_WISHLIST_ITEM, payload: item });
   };
 
   const clearWishlist = async () => {
