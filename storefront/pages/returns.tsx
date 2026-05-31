@@ -85,39 +85,39 @@ const ReturnsPage = () => {
       <Header title={`${accountT("returns")} - TWENTY`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
         <AccountPageLayout section={accountT("returns")}>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
           <h1 className="text-2xl font-semibold">{accountT("returns")}</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => pushWithLang(router, "/returns")}
-              className="px-4 py-2 border border-gray300 hover:bg-gray100"
+              className="px-3 py-2 text-sm border border-gray300 hover:bg-gray100"
             >
               {router.locale === "en" ? "All" : "Tất cả"}
             </button>
             <button
               type="button"
               onClick={() => pushWithLang(router, "/returns?status=PENDING")}
-              className="px-4 py-2 border border-gray300 hover:bg-gray100"
+              className="px-3 py-2 text-sm border border-gray300 hover:bg-gray100"
             >
               {router.locale === "en" ? "Pending" : "Chờ xử lý"}
             </button>
             <button
               type="button"
               onClick={() => pushWithLang(router, "/returns?status=APPROVED")}
-              className="px-4 py-2 border border-gray300 hover:bg-gray100"
+              className="px-3 py-2 text-sm border border-gray300 hover:bg-gray100"
             >
               {router.locale === "en" ? "Approved" : "Đã duyệt"}
             </button>
             <button
               type="button"
               onClick={() => pushWithLang(router, "/returns?status=REJECTED")}
-              className="px-4 py-2 border border-gray300 hover:bg-gray100"
+              className="px-3 py-2 text-sm border border-gray300 hover:bg-gray100"
             >
               {router.locale === "en" ? "Rejected" : "Từ chối"}
             </button>
             <Link href="/orders">
-              <a className="px-4 py-2 border border-gray300 hover:bg-gray100">{accountT("order_tracking")}</a>
+              <a className="px-3 py-2 text-sm border border-gray300 hover:bg-gray100">{accountT("order_tracking")}</a>
             </Link>
           </div>
         </div>
@@ -144,7 +144,19 @@ const ReturnsPage = () => {
                   ? new Date(request.requestedAt).toLocaleString("vi-VN")
                   : "-"}
               </p>
-              <div className="mt-3 overflow-auto">
+              <div className="mt-3 md:hidden space-y-2">
+                {(request.items || []).map((item) => (
+                  <div
+                    key={item.id || `${request.id}-${item.orderItemId}`}
+                    className="border border-gray200 p-2 text-sm"
+                  >
+                    <p><span className="text-gray400">SKU:</span> {item.sku || "-"}</p>
+                    <p className="mt-1"><span className="text-gray400">Sản phẩm:</span> {item.productName || "-"}</p>
+                    <p className="mt-1"><span className="text-gray400">SL:</span> {item.requestedQuantity || 0}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 overflow-auto hidden md:block">
                 <table className="w-full min-w-[520px]">
                   <thead>
                     <tr className="border-b border-gray200 bg-gray100">

@@ -417,12 +417,12 @@ const ProfileAddressesPage = () => {
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
         <AccountPageLayout section={accountT("shipping_addresses")}>
             <div className="mb-6">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
                 <h2 className="text-2xl font-semibold">{t("default_address")}</h2>
                 <button
                   type="button"
                   onClick={resetAddressForm}
-                  className="px-5 py-2 border border-gray300 bg-white hover:bg-gray100"
+                  className="px-4 py-2 border border-gray300 bg-white hover:bg-gray100 text-sm sm:text-base"
                 >
                   {t("add_new_address")}
                 </button>
@@ -618,7 +618,7 @@ const ProfileAddressesPage = () => {
               {addressMessage && <p className="text-green-700 mb-4">{addressMessage}</p>}
               {addressError && <p className="text-red mb-4">{addressError}</p>}
 
-              <div className="pt-2">
+              <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-3">
                 <Button
                   type="submit"
                   value={isSavingAddress ? indexT("loading") : t("save_address")}
@@ -627,7 +627,7 @@ const ProfileAddressesPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddressForm(false)}
-                  className="ml-3 px-5 py-2 border border-gray300 bg-white hover:bg-gray100"
+                  className="px-5 py-2 border border-gray300 bg-white hover:bg-gray100"
                 >
                   {accountT("hide_form")}
                 </button>

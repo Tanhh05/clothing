@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "../../context/AuthContext";
 import { useNotify } from "../../context/NotificationContext";
 import { pushWithLang } from "../../lib/router-utils";
+import DownArrow from "../../public/icons/DownArrow";
 
 type Item = {
   labelKey: string;
@@ -24,8 +26,14 @@ const AccountSidebar = () => {
   const router = useRouter();
   const auth = useAuth();
   const { notify } = useNotify();
+  const [mobileOpen, setMobileOpen] = useState(false);
   const currentPath = router.asPath || "";
   const normalizedPath = currentPath.split("?")[0];
+  const activeItem = items.find(
+    (item) =>
+      normalizedPath === item.href ||
+      (item.href !== "/profile" && normalizedPath.startsWith(`${item.href}/`))
+  );
 
   const handleLogout = async () => {
     await auth.logout?.();
@@ -33,9 +41,8 @@ const AccountSidebar = () => {
     pushWithLang(router, "/");
   };
 
-  return (
-    <aside className="w-full h-fit border border-gray200 p-5 md:p-6 bg-white md:sticky md:top-6">
-      <h2 className="text-2xl font-semibold mb-5">{t("account")}</h2>
+  const menuItems = (
+    <>
       <ul className="space-y-1.5">
         {items.map((item) => {
           const active =
@@ -65,7 +72,37 @@ const AccountSidebar = () => {
       >
         {authT("logout")}
       </button>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      <aside className="hidden md:block w-full h-fit border border-gray200 p-5 md:p-6 bg-white md:sticky md:top-6">
+        <h2 className="text-2xl font-semibold mb-5">{t("account")}</h2>
+        {menuItems}
+      </aside>
+
+      <aside className="md:hidden w-full border border-gray200 bg-white p-4">
+        <button
+          type="button"
+          onClick={() => setMobileOpen((prev) => !prev)}
+          className="w-full flex items-center justify-between"
+        >
+          <div className="text-left">
+            <p className="text-xl font-semibold">{t("account")}</p>
+            <p className="text-sm text-gray400 mt-1">
+              {activeItem ? t(activeItem.labelKey) : t("my_profile")}
+            </p>
+          </div>
+          <DownArrow
+            extraClass={`w-5 h-5 text-gray500 transition-transform ${
+              mobileOpen ? "rotate-0" : "rotate-180"
+            }`}
+          />
+        </button>
+        {mobileOpen && <div className="mt-4">{menuItems}</div>}
+      </aside>
+    </>
   );
 };
 

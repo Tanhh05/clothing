@@ -15,8 +15,8 @@ const AccountPageLayout = ({ section, children }: Props) => {
       <div className="md:col-span-4 lg:col-span-3">
         <AccountSidebar />
       </div>
-      <section className="md:col-span-8 lg:col-span-9 max-w-5xl">
-        <div className="text-sm text-gray500 mb-4 bg-gray100 px-4 py-3">
+      <section className="md:col-span-8 lg:col-span-9 max-w-5xl min-w-0">
+        <div className="text-xs sm:text-sm text-gray500 mb-4 bg-gray100 px-3 sm:px-4 py-3 break-words">
           <Link href="/">
             <a className="hover:text-black">{t("home")}</a>
           </Link>{" "}

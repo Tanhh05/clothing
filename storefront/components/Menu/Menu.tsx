@@ -14,7 +14,6 @@ import SearchIcon from "../../public/icons/SearchIcon";
 import DownArrow from "../../public/icons/DownArrow";
 import InstagramLogo from "../../public/icons/InstagramLogo";
 import FacebookLogo from "../../public/icons/FacebookLogo";
-import OrderIcon from "../../public/icons/OrderIcon";
 import { useWishlist } from "../../context/wishlist/WishlistProvider";
 import { useAuth } from "../../context/AuthContext";
 import { useCurrency } from "../../context/CurrencyContext";
@@ -55,12 +54,14 @@ export default function Menu({ categories }: Props) {
   const auth = useAuth();
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  const [expandedParentId, setExpandedParentId] = useState<number | null>(null);
 
   // Calculate Number of Wishlist
   let noOfWishlist = wishlist.length;
 
   function closeModal() {
     setOpen(false);
+    setExpandedParentId(null);
   }
 
   function openModal() {
@@ -164,27 +165,50 @@ export default function Menu({ categories }: Props) {
                     </form>
                     {parentCategories.map((category) => (
                       <div key={category.id} className="w-full">
-                        <Link href={`/product-category/${toCategoryPath(category)}`}>
-                          <a
-                            className="w-full text-xl hover:bg-gray100 text-left py-2 block"
-                            onClick={closeModal}
-                          >
-                            {category.name}
-                          </a>
-                        </Link>
-                        {(childrenByParent[category.id] || []).map((child) => (
-                          <Link
-                            key={child.id}
-                            href={`/product-category/${toCategoryPath(child)}`}
-                          >
+                        <div className="w-full flex items-center justify-between py-2">
+                          <Link href={`/product-category/${toCategoryPath(category)}`}>
                             <a
-                              className="w-full text-lg text-gray400 hover:bg-gray100 text-left py-1 pl-5 block"
+                              className="flex-1 text-xl hover:bg-gray100 text-left block"
                               onClick={closeModal}
                             >
-                              {child.name}
+                              {category.name}
                             </a>
                           </Link>
-                        ))}
+                          {(childrenByParent[category.id] || []).length > 0 && (
+                            <button
+                              type="button"
+                              aria-label={`toggle-${category.id}`}
+                              className="ml-2 p-1 text-gray400 hover:text-black"
+                              onClick={() =>
+                                setExpandedParentId((prev) =>
+                                  prev === category.id ? null : category.id
+                                )
+                              }
+                            >
+                              <DownArrow
+                                extraClass={`w-4 h-4 transition-transform ${
+                                  expandedParentId === category.id
+                                    ? "rotate-0"
+                                    : "rotate-180"
+                                }`}
+                              />
+                            </button>
+                          )}
+                        </div>
+                        {expandedParentId === category.id &&
+                          (childrenByParent[category.id] || []).map((child) => (
+                            <Link
+                              key={child.id}
+                              href={`/product-category/${toCategoryPath(child)}`}
+                            >
+                              <a
+                                className="w-full text-lg text-gray400 hover:bg-gray100 text-left py-1 pl-5 block"
+                                onClick={closeModal}
+                              >
+                                {child.name}
+                              </a>
+                            </Link>
+                          ))}
                       </div>
                     ))}
                     <Link href="/blogs">
@@ -218,16 +242,6 @@ export default function Menu({ categories }: Props) {
                         <UserIcon />
                       </AuthForm>
                     </div>
-                    <hr className="border border-gray300 w-full" />
-                    <Link href="/orders">
-                      <a
-                        className="text-xl py-2 my-3 w-full flex justify-between"
-                        onClick={closeModal}
-                      >
-                        <span>{t("my_orders")}</span>
-                        <OrderIcon />
-                      </a>
-                    </Link>
                     <hr className="border border-gray300 w-full" />
                     <Link href="/wishlist">
                       <a className="text-xl py-2 my-3 w-full flex justify-between">

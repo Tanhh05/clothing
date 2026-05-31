@@ -280,8 +280,8 @@ const OrderDetailPage = () => {
       <Header title={`${t("order_detail")} - TWENTY`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
         <AccountPageLayout section="CHI TIẾT ĐƠN HÀNG">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl">{t("order_detail")}</h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+          <h1 className="text-2xl sm:text-3xl">{t("order_detail")}</h1>
           <Link href="/orders">
             <a className="px-4 py-2 border border-gray300 hover:bg-gray100">{t("back")}</a>
           </Link>
@@ -294,7 +294,40 @@ const OrderDetailPage = () => {
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <section className="xl:col-span-2 border border-gray200 p-5">
               <h2 className="text-xl mb-4">{t("products")}</h2>
-              <div className="overflow-auto">
+              <div className="md:hidden space-y-3">
+                {(order.items || []).map((item) => {
+                  const url =
+                    item.productImage ||
+                    (item.productId ? productImageMap[item.productId] : "");
+                  return (
+                    <div key={item.id} className="border border-gray200 p-3">
+                      <div className="flex items-center gap-3">
+                        {url ? (
+                          <Image
+                            src={url}
+                            alt={item.productName || "product"}
+                            width={56}
+                            height={56}
+                            className="h-14 w-14 object-cover border border-gray200 shrink-0"
+                          />
+                        ) : (
+                          <div className="h-14 w-14 bg-gray100 border border-gray200 shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium line-clamp-2">{item.productName || "-"}</p>
+                          <p className="text-xs text-gray400 mt-1">SKU: {item.sku || "-"}</p>
+                        </div>
+                      </div>
+                      <div className="mt-2 space-y-1 text-sm">
+                        <p>{t("qty")}: {item.quantity || 0}</p>
+                        <p>{t("unit_price")}: {formatPrice(item.price || 0)}</p>
+                        <p className="font-medium">{t("line_total")}: {formatPrice(item.lineTotal || 0)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="overflow-auto hidden md:block">
                 <table className="w-full min-w-[640px]">
                   <thead>
                     <tr className="border-b border-gray200 bg-gray100">
@@ -438,7 +471,7 @@ const OrderDetailPage = () => {
                 <p className="text-gray400">{t("no_status_timeline")}</p>
               ) : (
                 order.statusHistory.map((entry, index) => (
-                  <div key={`${entry.status || "status"}-${index}`} className="flex justify-between border-b border-gray100 pb-2">
+                  <div key={`${entry.status || "status"}-${index}`} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border-b border-gray100 pb-2">
                     <span>{entry.status || "-"}</span>
                     <span className="text-gray400">
                       {entry.changedAt

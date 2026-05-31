@@ -354,8 +354,20 @@ const OrdersPage = () => {
       <Header title={`${t("my_orders")} - TWENTY`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
         <AccountPageLayout section={t("my_orders")}>
-        <div className="mb-4">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <h1 className="text-2xl font-semibold">{t("my_orders")}</h1>
+          <select
+            id="order-status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as OrderStatusFilter)}
+            className="w-full sm:w-auto border border-gray300 px-3 py-2 bg-white text-sm"
+          >
+            {ORDER_STATUS_FILTERS.map((status) => (
+              <option key={status} value={status}>
+                {status === "ALL" ? t("all_statuses") : status}
+              </option>
+            ))}
+          </select>
         </div>
         {paymentResult && (
           <div
@@ -392,20 +404,7 @@ const OrdersPage = () => {
             )}
           </div>
         )}
-        <div className="mb-4 flex items-center justify-end">
-          <select
-            id="order-status-filter"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as OrderStatusFilter)}
-            className="border border-gray300 px-3 py-2 bg-white text-sm"
-          >
-            {ORDER_STATUS_FILTERS.map((status) => (
-              <option key={status} value={status}>
-                {status === "ALL" ? t("all_statuses") : status}
-              </option>
-            ))}
-          </select>
-        </div>
+
 
         {isLoading && <p>{t("loading")}</p>}
         {errorKey && <p className="text-red">{t(errorKey)}</p>}
@@ -416,97 +415,166 @@ const OrdersPage = () => {
 
         {!isLoading && !errorKey && filteredOrders.length > 0 && (
           <div className="space-y-4">
-            <div className="border border-gray200">
-            <table className="w-full table-fixed">
-              <thead>
-                <tr className="border-b border-gray200 bg-gray100">
-                  <th className="w-[24%] text-left font-medium px-3 py-3">{t("product")}</th>
-                  <th className="w-[12%] text-left font-medium px-3 py-3">{t("order_code")}</th>
-                  <th className="w-[16%] text-left font-medium px-3 py-3">{t("created_at")}</th>
-                  <th className="w-[12%] text-left font-medium px-3 py-3">{t("status")}</th>
-                  <th className="w-[12%] text-left font-medium px-3 py-3">{t("payment")}</th>
-                  <th className="w-[10%] text-right font-medium px-3 py-3">{t("total")}</th>
-                  <th className="w-[14%] text-right font-medium px-3 py-3">{t("action")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOrders.map((order) => (
-                  <tr key={order.id} className="border-b border-gray200">
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-3">
-                        {(() => {
-                          const firstItem = (order.items || [])[0];
-                          const pid = firstItem?.productId;
-                          const url =
-                            firstItem?.productImage ||
-                            (pid ? productImageMap[pid] : "");
-                          if (!url) {
-                            return (
-                              <div className="h-12 w-12 bg-gray100 border border-gray200" />
-                            );
-                          }
-                          return (
-                            <Image
-                              src={url}
-                              alt={firstItem?.productName || "product"}
-                              width={48}
-                              height={48}
-                              className="h-12 w-12 object-cover border border-gray200"
-                            />
-                          );
-                        })()}
-                        <span className="line-clamp-2 text-sm leading-5">
-                          {(order.items || [])[0]?.productName || "-"}
-                        </span>
+            <div className="space-y-3 md:hidden">
+              {filteredOrders.map((order) => {
+                const firstItem = (order.items || [])[0];
+                const pid = firstItem?.productId;
+                const url = firstItem?.productImage || (pid ? productImageMap[pid] : "");
+                return (
+                  <div key={order.id} className="border border-gray200 p-3">
+                    <div className="flex items-center gap-3">
+                      {url ? (
+                        <Image
+                          src={url}
+                          alt={firstItem?.productName || "product"}
+                          width={56}
+                          height={56}
+                          className="h-14 w-14 object-cover border border-gray200 shrink-0"
+                        />
+                      ) : (
+                        <div className="h-14 w-14 bg-gray100 border border-gray200 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium line-clamp-2">
+                          {firstItem?.productName || "-"}
+                        </p>
+                        <p className="text-xs text-gray400 break-all mt-1">
+                          {t("order_code")}: {getInvoiceCode(order)}
+                        </p>
                       </div>
-                    </td>
-                    <td className="px-3 py-3 text-sm break-all">{getInvoiceCode(order)}</td>
-                    <td className="px-3 py-3 text-sm">
-                      {order.createdAt
-                        ? new Date(order.createdAt).toLocaleString(
-                            router.locale === "en" ? "en-US" : "vi-VN"
-                          )
-                        : "-"}
-                    </td>
-                    <td className="px-3 py-3 text-sm break-words">{order.status || "-"}</td>
-                    <td className="px-3 py-3 text-sm break-words">{order.paymentMethod || "-"}</td>
-                    <td className="px-3 py-3 text-right text-sm">
-                      {formatPrice(order.totalPrice || 0)}
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <div className="inline-flex items-center justify-end flex-wrap gap-x-3 gap-y-1 text-sm">
-                        <Link href={`/orders/${order.id}`}>
-                          <a className="text-blue-600 hover:underline">{t("view")}</a>
-                        </Link>
+                    </div>
+                    <div className="mt-3 space-y-1.5 text-sm">
+                      <p>
+                        {t("created_at")}:{" "}
+                        {order.createdAt
+                          ? new Date(order.createdAt).toLocaleString(
+                              router.locale === "en" ? "en-US" : "vi-VN"
+                            )
+                          : "-"}
+                      </p>
+                      <p>{t("status")}: {order.status || "-"}</p>
+                      <p>{t("payment")}: {order.paymentMethod || "-"}</p>
+                      <p className="font-medium">{t("total")}: {formatPrice(order.totalPrice || 0)}</p>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                      <Link href={`/orders/${order.id}`}>
+                        <a className="text-blue-600 hover:underline">{t("view")}</a>
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleReorder(order.id)}
+                        disabled={reorderLoadingId === order.id}
+                        className="text-gray500 hover:underline disabled:opacity-50"
+                      >
+                        {reorderLoadingId === order.id ? t("reordering") : t("reorder")}
+                      </button>
+                      {isCancelableOrder(order.status) && (
                         <button
                           type="button"
-                          onClick={() => handleReorder(order.id)}
-                          disabled={reorderLoadingId === order.id}
-                          className="text-gray500 hover:underline disabled:opacity-50"
+                          onClick={() => handleCancelOrder(order.id)}
+                          disabled={actionLoadingId === order.id}
+                          className="text-red hover:underline disabled:opacity-50"
                         >
-                          {reorderLoadingId === order.id
-                            ? t("reordering")
-                            : t("reorder")}
+                          {actionLoadingId === order.id ? t("cancelling") : t("cancel_order")}
                         </button>
-                        {isCancelableOrder(order.status) && (
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="hidden md:block border border-gray200">
+              <table className="w-full table-fixed">
+                <thead>
+                  <tr className="border-b border-gray200 bg-gray100">
+                    <th className="w-[24%] text-left font-medium px-3 py-3">{t("product")}</th>
+                    <th className="w-[12%] text-left font-medium px-3 py-3">{t("order_code")}</th>
+                    <th className="w-[16%] text-left font-medium px-3 py-3">{t("created_at")}</th>
+                    <th className="w-[12%] text-left font-medium px-3 py-3">{t("status")}</th>
+                    <th className="w-[12%] text-left font-medium px-3 py-3">{t("payment")}</th>
+                    <th className="w-[10%] text-right font-medium px-3 py-3">{t("total")}</th>
+                    <th className="w-[14%] text-right font-medium px-3 py-3">{t("action")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredOrders.map((order) => (
+                    <tr key={order.id} className="border-b border-gray200">
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-3">
+                          {(() => {
+                            const firstItem = (order.items || [])[0];
+                            const pid = firstItem?.productId;
+                            const url =
+                              firstItem?.productImage ||
+                              (pid ? productImageMap[pid] : "");
+                            if (!url) {
+                              return (
+                                <div className="h-12 w-12 bg-gray100 border border-gray200" />
+                              );
+                            }
+                            return (
+                              <Image
+                                src={url}
+                                alt={firstItem?.productName || "product"}
+                                width={48}
+                                height={48}
+                                className="h-12 w-12 object-cover border border-gray200"
+                              />
+                            );
+                          })()}
+                          <span className="line-clamp-2 text-sm leading-5">
+                            {(order.items || [])[0]?.productName || "-"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-sm break-all">{getInvoiceCode(order)}</td>
+                      <td className="px-3 py-3 text-sm">
+                        {order.createdAt
+                          ? new Date(order.createdAt).toLocaleString(
+                              router.locale === "en" ? "en-US" : "vi-VN"
+                            )
+                          : "-"}
+                      </td>
+                      <td className="px-3 py-3 text-sm break-words">{order.status || "-"}</td>
+                      <td className="px-3 py-3 text-sm break-words">{order.paymentMethod || "-"}</td>
+                      <td className="px-3 py-3 text-right text-sm">
+                        {formatPrice(order.totalPrice || 0)}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <div className="inline-flex items-center justify-end flex-wrap gap-x-3 gap-y-1 text-sm">
+                          <Link href={`/orders/${order.id}`}>
+                            <a className="text-blue-600 hover:underline">{t("view")}</a>
+                          </Link>
                           <button
                             type="button"
-                            onClick={() => handleCancelOrder(order.id)}
-                            disabled={actionLoadingId === order.id}
-                            className="text-red hover:underline disabled:opacity-50"
+                            onClick={() => handleReorder(order.id)}
+                            disabled={reorderLoadingId === order.id}
+                            className="text-gray500 hover:underline disabled:opacity-50"
                           >
-                            {actionLoadingId === order.id
-                              ? t("cancelling")
-                              : t("cancel_order")}
+                            {reorderLoadingId === order.id
+                              ? t("reordering")
+                              : t("reorder")}
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          {isCancelableOrder(order.status) && (
+                            <button
+                              type="button"
+                              onClick={() => handleCancelOrder(order.id)}
+                              disabled={actionLoadingId === order.id}
+                              className="text-red hover:underline disabled:opacity-50"
+                            >
+                              {actionLoadingId === order.id
+                                ? t("cancelling")
+                                : t("cancel_order")}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray400">
                 {t("page")} {currentPage}/{totalPages}
