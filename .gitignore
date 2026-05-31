@@ -5,6 +5,7 @@ pm ru
 # Environment files
 api-server/.env
 api-server/.env.local
+api-server/.env.deploy
 storefront/.env
 storefront/.env.local
 
@@ -13,6 +14,7 @@ api-server/target/
 api-server/.git.backup-single-repo/
 
 # Frontend dependencies/build
+/node_modules/
 storefront/node_modules/
 storefront/dist/
 storefront/.next/
