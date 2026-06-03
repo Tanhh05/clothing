@@ -30,6 +30,8 @@ app:
       enabled: ${REDIS_ENABLED:false}
     rabbit:
       enabled: ${RABBITMQ_ENABLED:false}
+    mail:
+      enabled: false
     elasticsearch:
       enabled: ${ELASTICSEARCH_ENABLED:false}
 
