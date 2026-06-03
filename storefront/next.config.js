@@ -1,4 +1,6 @@
 const productionBackendUrl = "https://clothing-api-znok.onrender.com";
+const googleClientId =
+  "44695475394-6mj3nra82h8mv483juk05pv86t8sbdo3.apps.googleusercontent.com";
 
 module.exports = {
   i18n: {
@@ -10,6 +12,8 @@ module.exports = {
       ? productionBackendUrl
       : process.env.NEXT_PUBLIC_BACKEND_URL || productionBackendUrl,
     NEXT_PUBLIC_PROD_BACKEND_URL: productionBackendUrl,
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID:
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || googleClientId,
   },
   reactStrictMode: true,
   // swcMinify: true,
