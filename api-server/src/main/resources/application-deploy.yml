@@ -11,7 +11,7 @@ spring:
     hibernate:
       ddl-auto: ${JPA_DDL_AUTO:validate}
   flyway:
-    enabled: true
+    enabled: ${SPRING_FLYWAY_ENABLED:true}
     baseline-on-migrate: true
 
 app:
