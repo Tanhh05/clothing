@@ -1,7 +1,15 @@
+const productionBackendUrl = "https://clothing-api-znok.onrender.com";
+
 module.exports = {
   i18n: {
     locales: ["en", "my", "vi"],
     defaultLocale: "vi",
+  },
+  env: {
+    NEXT_PUBLIC_BACKEND_URL: process.env.VERCEL
+      ? productionBackendUrl
+      : process.env.NEXT_PUBLIC_BACKEND_URL || productionBackendUrl,
+    NEXT_PUBLIC_PROD_BACKEND_URL: productionBackendUrl,
   },
   reactStrictMode: true,
   // swcMinify: true,
