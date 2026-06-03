@@ -2,6 +2,15 @@ server:
   port: ${APP_PORT:8080}
 
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.elasticsearch.ReactiveElasticsearchRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestClientAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
   datasource:
     # Supabase direct connection (IPv6) or session pooler (IPv4).
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:postgres}?sslmode=require
@@ -23,3 +32,12 @@ app:
       enabled: ${RABBITMQ_ENABLED:false}
     elasticsearch:
       enabled: ${ELASTICSEARCH_ENABLED:false}
+
+management:
+  health:
+    elasticsearch:
+      enabled: ${ELASTICSEARCH_ENABLED:false}
+    redis:
+      enabled: ${REDIS_ENABLED:false}
+    rabbit:
+      enabled: ${RABBITMQ_ENABLED:false}
