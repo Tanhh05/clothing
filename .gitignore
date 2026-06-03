@@ -1,7 +1,7 @@
 # macOS / IDE
 .DS_Store
 .idea/
-pm ru
+
 # Environment files
 api-server/.env
 api-server/.env.local
@@ -15,6 +15,9 @@ api-server/.git.backup-single-repo/
 
 # Frontend dependencies/build
 /node_modules/
+/package-lock.json
 storefront/node_modules/
 storefront/dist/
 storefront/.next/
+admin-portal/node_modules/
+admin-portal/dist/
