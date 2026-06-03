@@ -15,7 +15,7 @@ INSERT INTO users (username, email, password, full_name, phone, status)
 VALUES (
     'admin',
     'admin@clothing.local',
-    '$2a$10$hwb5l9S6gLBlf9wYyx1IIuMVNQfG3v1R4Lw2y6vJxDf9G9xW2m8uG',
+    '$2a$10$EKGcC5TmHSNe/EoyUNvusO1NNivHKOhb/ifNKJ0tsCRlqp1y1mS2u',
     'System Admin',
     '0900000000',
     'ACTIVE'
