@@ -4,5 +4,9 @@
   "installCommand": "npm install && cd storefront && npm install",
   "buildCommand": "cd storefront && npm run build",
   "devCommand": "cd storefront && npm run dev",
-  "outputDirectory": "storefront/.next"
+  "outputDirectory": "storefront/.next",
+  "env": {
+    "NEXT_PUBLIC_BACKEND_URL": "https://clothing-api-znok.onrender.com",
+    "NEXT_PUBLIC_PROD_BACKEND_URL": "https://clothing-api-znok.onrender.com"
+  }
 }
