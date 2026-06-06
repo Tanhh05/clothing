@@ -31,6 +31,7 @@ import java.util.stream.Stream;
 @EnableMethodSecurity
 public class SecurityConfig {
     private static final String PRODUCTION_STOREFRONT_ORIGIN = "https://clothing.id.vn";
+    private static final String ADMIN_VERCEL_ORIGIN_PATTERN = "https://clothingadmin-*.vercel.app";
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CustomUserDetailsService userDetailsService;
@@ -117,7 +118,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         List<String> configuredOrigins = Stream.concat(
                         Arrays.stream(allowedOrigins.split(",")),
-                        Stream.of(PRODUCTION_STOREFRONT_ORIGIN)
+                        Stream.of(PRODUCTION_STOREFRONT_ORIGIN, ADMIN_VERCEL_ORIGIN_PATTERN)
                 )
                 .map(String::trim)
                 .filter(origin -> !origin.isBlank())
