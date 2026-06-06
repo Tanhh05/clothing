@@ -49,7 +49,10 @@ public class ApiResponseBodyAdvice implements ResponseBodyAdvice<Object> {
                 : null;
         if (servletRequest != null) {
             String uri = servletRequest.getRequestURI();
-            if (uri != null && uri.startsWith("/api/orders")) {
+            if (uri != null && (uri.startsWith("/api/orders")
+                    || uri.equals("/api/payments/momo/ipn")
+                    || uri.equals("/api/payments/vnpay/ipn")
+                    || uri.equals("/api/payments/return/status"))) {
                 return body;
             }
         }

@@ -243,8 +243,8 @@ public class MomoPaymentServiceImpl implements PaymentService {
 
     @Override
     public void handleMomoIpn(Map<String, Object> payload) {
-        if (payload == null) {
-            return;
+        if (payload == null || payload.isEmpty()) {
+            throw new BusinessException("MoMo payload is required", HttpStatus.BAD_REQUEST);
         }
         verifyMomoIpnSignature(payload);
 
