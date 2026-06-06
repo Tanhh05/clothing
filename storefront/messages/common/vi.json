@@ -308,7 +308,11 @@
     "payment_failed": "Thanh toán thất bại",
     "payment_cancelled": "Bạn đã hủy thanh toán",
     "retry_payment": "Thanh toán lại",
-    "payment_result_not_found": "Không tìm thấy kết quả thanh toán."
+    "payment_result_not_found": "Không tìm thấy kết quả thanh toán.",
+    "payment_processing_title": "Đang xác nhận thanh toán",
+    "payment_processing": "Hệ thống đang chờ cổng thanh toán xác nhận. Bạn có thể kiểm tra lại trong đơn hàng.",
+    "payment_verified": "Giao dịch đã được cổng thanh toán xác nhận và ghi nhận trong hệ thống.",
+    "payment_verification_failed": "Không thể xác minh chữ ký hoặc thông tin giao dịch. Đơn hàng chưa được ghi nhận là đã thanh toán."
   },
   "Account": {
     "home": "Trang chủ",

@@ -6,6 +6,7 @@ import com.clothing.entity.OrderEntity;
 import com.clothing.entity.PaymentEntity;
 import com.clothing.exception.BusinessException;
 import com.clothing.repository.PaymentRepository;
+import com.clothing.service.PaymentNotificationResult;
 import com.clothing.service.PaymentService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,6 +17,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
@@ -27,11 +29,9 @@ import java.net.URLEncoder;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -65,7 +65,10 @@ public class MomoPaymentServiceImpl implements PaymentService {
             VnpayProperties vnpayProperties,
             PaymentRepository paymentRepository
     ) {
-        this.restTemplate = new RestTemplate();
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(10_000);
+        requestFactory.setReadTimeout(30_000);
+        this.restTemplate = new RestTemplate(requestFactory);
         this.momoProperties = momoProperties;
         this.vnpayProperties = vnpayProperties;
         this.paymentRepository = paymentRepository;
@@ -166,17 +169,11 @@ public class MomoPaymentServiceImpl implements PaymentService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        ResponseEntity<JsonNode> response = callMomoCreateWithSignatureFallback(
-                payload,
-                headers,
-                amount,
-                extraData,
-                orderId,
-                orderInfo,
-                requestId,
-                requestType,
-                partnerClientId
+        String rawSignature = buildMomoCreateSignature(
+                amount, extraData, orderId, orderInfo, requestId, requestType
         );
+        payload.put("signature", signHmacSha256(rawSignature, momoProperties.getSecretKey()));
+        ResponseEntity<JsonNode> response = callMomoCreate(payload, headers);
 
         JsonNode body = response.getBody();
         if (body == null) {
@@ -209,72 +206,31 @@ public class MomoPaymentServiceImpl implements PaymentService {
         return payUrl;
     }
 
-    private ResponseEntity<JsonNode> callMomoCreateWithSignatureFallback(
-            Map<String, Object> payload,
-            HttpHeaders headers,
-            String amount,
-            String extraData,
-            String orderId,
-            String orderInfo,
-            String requestId,
-            String requestType,
-            String partnerClientId
-    ) {
-        List<String> rawSignatures = buildCreateSignatureCandidates(
-                amount,
-                extraData,
-                orderId,
-                orderInfo,
-                requestId,
-                requestType,
-                partnerClientId
-        );
-        BusinessException lastError = null;
-        for (String rawSignature : rawSignatures) {
-            payload.put("signature", signHmacSha256(rawSignature, momoProperties.getSecretKey()));
-            try {
-                ResponseEntity<JsonNode> response = restTemplate.postForEntity(
-                        momoProperties.getEndpoint(),
-                        new HttpEntity<>(payload, headers),
-                        JsonNode.class
-                );
-                JsonNode body = response.getBody();
-                if (body != null && body.path("resultCode").asInt(0) == 11007) {
-                    lastError = new BusinessException(
-                            "MoMo sai chữ ký (11007). Kiểm tra MOMO_PARTNER_CODE, MOMO_ACCESS_KEY, MOMO_SECRET_KEY và requestType.",
-                            HttpStatus.BAD_GATEWAY
-                    );
-                    continue;
-                }
-                return response;
-            } catch (HttpStatusCodeException ex) {
-                BusinessException mapped = mapMomoHttpError(ex);
-                if (mapped.getMessage().contains("(11007)")) {
-                    lastError = mapped;
-                    continue;
-                }
-                throw mapped;
-            } catch (Exception ex) {
-                log.error("Cannot call MoMo API", ex);
-                throw new BusinessException("Failed to call MoMo API", HttpStatus.BAD_GATEWAY);
-            }
+    private ResponseEntity<JsonNode> callMomoCreate(Map<String, Object> payload, HttpHeaders headers) {
+        try {
+            return restTemplate.postForEntity(
+                    momoProperties.getEndpoint(),
+                    new HttpEntity<>(payload, headers),
+                    JsonNode.class
+            );
+        } catch (HttpStatusCodeException ex) {
+            throw mapMomoHttpError(ex);
+        } catch (Exception ex) {
+            log.error("Cannot call MoMo API", ex);
+            throw new BusinessException("Failed to call MoMo API", HttpStatus.BAD_GATEWAY);
         }
-        throw lastError == null
-                ? new BusinessException("Failed to call MoMo API", HttpStatus.BAD_GATEWAY)
-                : lastError;
     }
 
-    private List<String> buildCreateSignatureCandidates(
+    private String buildMomoCreateSignature(
             String amount,
             String extraData,
             String orderId,
             String orderInfo,
             String requestId,
-            String requestType,
-            String partnerClientId
+            String requestType
     ) {
-        ArrayList<String> candidates = new ArrayList<>();
-        String common = "amount=" + amount
+        return "accessKey=" + momoProperties.getAccessKey()
+                + "&amount=" + amount
                 + "&extraData=" + extraData
                 + "&ipnUrl=" + momoProperties.getIpnUrl()
                 + "&orderId=" + orderId
@@ -283,17 +239,6 @@ public class MomoPaymentServiceImpl implements PaymentService {
                 + "&redirectUrl=" + momoProperties.getRedirectUrl()
                 + "&requestId=" + requestId
                 + "&requestType=" + requestType;
-
-        // Legacy format (commonly used in many MoMo v2 examples).
-        String legacy = "accessKey=" + momoProperties.getAccessKey() + "&" + common
-                + (isInitiateRequest(requestType) ? "&partnerClientId=" + partnerClientId : "");
-        candidates.add(legacy);
-
-        // Some integrations validate signature without `accessKey`.
-        String noAccessKey = common + (isInitiateRequest(requestType) ? "&partnerClientId=" + partnerClientId : "");
-        candidates.add(noAccessKey);
-
-        return candidates;
     }
 
     @Override
@@ -312,6 +257,13 @@ public class MomoPaymentServiceImpl implements PaymentService {
 
         PaymentEntity payment = paymentRepository.findByTransactionCode(transactionCode).orElse(null);
         if (payment == null) {
+            throw new BusinessException("MoMo transaction not found", HttpStatus.NOT_FOUND);
+        }
+        long callbackAmount = parseLong(payload.get("amount"), -1L);
+        if (callbackAmount < 0 || payment.getAmount() == null || callbackAmount != payment.getAmount()) {
+            throw new BusinessException("MoMo payment amount does not match", HttpStatus.BAD_REQUEST);
+        }
+        if (STATUS_PAID.equalsIgnoreCase(safeTrim(payment.getStatus()))) {
             return;
         }
         payment.setStatus(resultCode == 0 ? STATUS_PAID : STATUS_FAILED);
@@ -345,26 +297,85 @@ public class MomoPaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    public void handleVnpayIpn(Map<String, String> payload) {
+    public PaymentNotificationResult handleVnpayIpn(Map<String, String> payload) {
         if (payload == null || payload.isEmpty()) {
-            return;
+            throw new BusinessException("VNPAY payload is required", HttpStatus.BAD_REQUEST);
         }
         verifyVnpayIpnSignature(payload);
 
         String txnRef = safeTrim(payload.get("vnp_TxnRef"));
         if (txnRef.isBlank()) {
-            return;
+            return PaymentNotificationResult.notFound();
         }
         PaymentEntity payment = paymentRepository.findByTransactionCode(txnRef).orElse(null);
         if (payment == null) {
-            return;
+            return PaymentNotificationResult.notFound();
+        }
+        long callbackAmount = parseLong(payload.get("vnp_Amount"), -1L);
+        if (payment.getAmount() == null || callbackAmount != payment.getAmount() * 100L) {
+            return PaymentNotificationResult.invalidAmount();
         }
 
         String responseCode = safeTrim(payload.get("vnp_ResponseCode"));
         String txnStatus = safeTrim(payload.get("vnp_TransactionStatus"));
         boolean success = "00".equals(responseCode) && (txnStatus.isBlank() || "00".equals(txnStatus));
+        boolean alreadyProcessed = STATUS_PAID.equalsIgnoreCase(safeTrim(payment.getStatus()));
+        if (alreadyProcessed) {
+            return PaymentNotificationResult.alreadyProcessed(true);
+        }
         payment.setStatus(success ? STATUS_PAID : STATUS_FAILED);
         paymentRepository.save(payment);
+        return PaymentNotificationResult.success(success);
+    }
+
+    @Override
+    public Map<String, Object> verifyPaymentReturn(String gateway, Map<String, String> payload) {
+        String normalizedGateway = safeTrim(gateway).toUpperCase(Locale.ROOT);
+        String transactionCode;
+        boolean gatewaySuccessful;
+        long callbackAmount;
+        boolean amountMatches;
+        if (METHOD_MOMO.equals(normalizedGateway)) {
+            Map<String, Object> momoPayload = new LinkedHashMap<>();
+            payload.forEach(momoPayload::put);
+            verifyMomoIpnSignature(momoPayload);
+            transactionCode = safeTrim(payload.get("orderId"));
+            gatewaySuccessful = parseInt(payload.get("resultCode"), -1) == 0;
+            callbackAmount = parseLong(payload.get("amount"), -1L);
+            amountMatches = callbackAmount >= 0;
+        } else if (METHOD_VNPAY.equals(normalizedGateway)) {
+            verifyVnpayIpnSignature(payload);
+            transactionCode = safeTrim(payload.get("vnp_TxnRef"));
+            gatewaySuccessful = "00".equals(safeTrim(payload.get("vnp_ResponseCode")))
+                    && "00".equals(safeTrim(payload.get("vnp_TransactionStatus")));
+            callbackAmount = parseLong(payload.get("vnp_Amount"), -1L);
+            amountMatches = callbackAmount >= 0 && callbackAmount % 100L == 0;
+        } else {
+            throw new BusinessException("Unsupported payment gateway", HttpStatus.BAD_REQUEST);
+        }
+
+        PaymentEntity payment = paymentRepository.findByTransactionCode(transactionCode)
+                .orElseThrow(() -> new BusinessException("Payment transaction not found", HttpStatus.NOT_FOUND));
+        if (METHOD_VNPAY.equals(normalizedGateway)) {
+            amountMatches = amountMatches
+                    && payment.getAmount() != null
+                    && callbackAmount == payment.getAmount() * 100L;
+        } else {
+            amountMatches = amountMatches
+                    && payment.getAmount() != null
+                    && callbackAmount == payment.getAmount();
+        }
+        if (!amountMatches) {
+            throw new BusinessException("Payment amount does not match", HttpStatus.BAD_REQUEST);
+        }
+        String status = safeTrim(payment.getStatus()).toUpperCase(Locale.ROOT);
+        return Map.of(
+                "gateway", normalizedGateway,
+                "transactionCode", transactionCode,
+                "status", status,
+                "paid", STATUS_PAID.equals(status),
+                "gatewaySuccessful", gatewaySuccessful
+        );
     }
 
     private void verifyMomoIpnSignature(Map<String, Object> payload) {
@@ -382,18 +393,14 @@ public class MomoPaymentServiceImpl implements PaymentService {
             }
         }
 
-        boolean matched = buildMomoIpnSignatureCandidates(payload).stream()
-                .map(raw -> signHmacSha256(raw, momoProperties.getSecretKey()))
-                .anyMatch(sig -> sig.equalsIgnoreCase(expectedSignature));
-        if (!matched) {
+        String rawSignature = buildMomoIpnSignature(payload);
+        String actualSignature = signHmacSha256(rawSignature, momoProperties.getSecretKey());
+        if (!actualSignature.equalsIgnoreCase(expectedSignature)) {
             throw new BusinessException("Invalid MoMo IPN signature", HttpStatus.BAD_REQUEST);
         }
     }
 
-    private java.util.List<String> buildMomoIpnSignatureCandidates(Map<String, Object> payload) {
-        ArrayList<String> candidates = new ArrayList<>();
-
-        // Common MoMo callback raw signature format for v2 gateway.
+    private String buildMomoIpnSignature(Map<String, Object> payload) {
         LinkedHashMap<String, String> strict = new LinkedHashMap<>();
         strict.put("accessKey", momoProperties.getAccessKey());
         strict.put("amount", toText(payload.get("amount")));
@@ -408,28 +415,7 @@ public class MomoPaymentServiceImpl implements PaymentService {
         strict.put("responseTime", toText(payload.get("responseTime")));
         strict.put("resultCode", toText(payload.get("resultCode")));
         strict.put("transId", toText(payload.get("transId")));
-        candidates.add(joinAsRawData(strict));
-
-        // Compatibility candidate: without accessKey in callback payload.
-        LinkedHashMap<String, String> withoutAccessKey = new LinkedHashMap<>(strict);
-        withoutAccessKey.remove("accessKey");
-        candidates.add(joinAsRawData(withoutAccessKey));
-
-        // Fallback candidate: sign sorted callback fields except signature itself.
-        TreeMap<String, String> sortedFields = new TreeMap<>();
-        Set<String> ignored = Set.of("signature");
-        for (Map.Entry<String, Object> entry : payload.entrySet()) {
-            String key = entry.getKey();
-            if (key == null || ignored.contains(key)) {
-                continue;
-            }
-            sortedFields.put(key, toText(entry.getValue()));
-        }
-        if (!sortedFields.isEmpty()) {
-            candidates.add(joinAsRawData(sortedFields));
-        }
-
-        return candidates;
+        return joinAsRawData(strict);
     }
 
     private String joinAsRawData(Map<String, String> fields) {
@@ -501,6 +487,12 @@ public class MomoPaymentServiceImpl implements PaymentService {
         }
         if (isBlank(vnpayProperties.getHashSecret())) {
             throw new BusinessException("VNPAY hash secret is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        String tmnCode = safeTrim(payload.get("vnp_TmnCode"));
+        if (!isBlank(vnpayProperties.getTmnCode())
+                && !tmnCode.isBlank()
+                && !vnpayProperties.getTmnCode().equals(tmnCode)) {
+            throw new BusinessException("Invalid VNPAY merchant code", HttpStatus.BAD_REQUEST);
         }
 
         TreeMap<String, String> fields = new TreeMap<>();
@@ -597,6 +589,15 @@ public class MomoPaymentServiceImpl implements PaymentService {
         if (value == null) return fallback;
         try {
             return Integer.parseInt(String.valueOf(value));
+        } catch (Exception ex) {
+            return fallback;
+        }
+    }
+
+    private long parseLong(Object value, long fallback) {
+        if (value == null) return fallback;
+        try {
+            return Long.parseLong(String.valueOf(value));
         } catch (Exception ex) {
             return fallback;
         }

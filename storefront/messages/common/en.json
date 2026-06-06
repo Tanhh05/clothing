@@ -308,7 +308,11 @@
     "payment_failed": "Payment failed",
     "payment_cancelled": "Payment cancelled",
     "retry_payment": "Pay again",
-    "payment_result_not_found": "Payment result was not found."
+    "payment_result_not_found": "Payment result was not found.",
+    "payment_processing_title": "Confirming payment",
+    "payment_processing": "The payment gateway confirmation is still pending. You can check again from your orders.",
+    "payment_verified": "The payment gateway confirmed this transaction and it was recorded successfully.",
+    "payment_verification_failed": "The transaction signature or details could not be verified. The order has not been marked as paid."
   },
   "Account": {
     "home": "Home",

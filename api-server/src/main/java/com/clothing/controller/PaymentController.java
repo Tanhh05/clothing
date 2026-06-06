@@ -7,6 +7,7 @@ import com.clothing.repository.MomoIpnLogRepository;
 import com.clothing.repository.OrderRepository;
 import com.clothing.repository.PaymentRepository;
 import com.clothing.service.OrderService;
+import com.clothing.service.PaymentNotificationResult;
 import com.clothing.service.PaymentService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -53,13 +54,13 @@ public class PaymentController {
     }
 
     @PostMapping("/momo/ipn")
-    public ResponseEntity<Map<String, Object>> momoIpn(@RequestBody(required = false) Map<String, Object> payload) {
+    public ResponseEntity<Void> momoIpn(@RequestBody(required = false) Map<String, Object> payload) {
         MomoIpnLogEntity log = createMomoIpnLog(payload);
         try {
             paymentService.handleMomoIpn(payload);
             orderService.handleMomoPaymentIpn(payload);
             markMomoIpnLog(log, "SUCCESS", "Processed successfully");
-            return ResponseEntity.ok(Map.of("resultCode", 0, "message", "success"));
+            return ResponseEntity.noContent().build();
         } catch (RuntimeException ex) {
             markMomoIpnLog(log, "FAILED", ex.getMessage());
             throw ex;
@@ -68,13 +69,31 @@ public class PaymentController {
 
     @GetMapping("/vnpay/ipn")
     public ResponseEntity<Map<String, String>> vnpayIpn(@RequestParam Map<String, String> payload) {
+        if (payload == null || payload.isEmpty()) {
+            return ResponseEntity.ok(Map.of("RspCode", "99", "Message", "Invalid request"));
+        }
         try {
-            paymentService.handleVnpayIpn(payload);
-            orderService.handleVnpayPaymentIpn(payload);
-            return ResponseEntity.ok(Map.of("RspCode", "00", "Message", "Confirm Success"));
+            PaymentNotificationResult result = paymentService.handleVnpayIpn(payload);
+            if (result.paymentSuccessful()) {
+                orderService.handleVnpayPaymentIpn(payload);
+            }
+            return ResponseEntity.ok(Map.of(
+                    "RspCode", result.responseCode(),
+                    "Message", result.message()
+            ));
         } catch (RuntimeException ex) {
             return ResponseEntity.ok(Map.of("RspCode", "97", "Message", ex.getMessage()));
         }
+    }
+
+    @GetMapping("/return/status")
+    public ResponseEntity<Map<String, Object>> verifyPaymentReturn(
+            @RequestParam String gateway,
+            @RequestParam Map<String, String> payload
+    ) {
+        Map<String, String> gatewayPayload = new LinkedHashMap<>(payload);
+        gatewayPayload.remove("gateway");
+        return ResponseEntity.ok(paymentService.verifyPaymentReturn(gateway, gatewayPayload));
     }
 
     @GetMapping("/orders/{orderId}/status")

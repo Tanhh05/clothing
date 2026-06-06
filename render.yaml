@@ -91,7 +91,7 @@ services:
       - key: MOMO_REDIRECT_URL
         value: https://clothing.id.vn/payment/result
       - key: MOMO_IPN_URL
-        sync: false
+        value: https://clothing-api-znok.onrender.com/api/payments/momo/ipn
       - key: MOMO_REQUEST_TYPE
         value: captureWallet
       - key: VNPAY_ENDPOINT
@@ -103,7 +103,7 @@ services:
       - key: VNPAY_RETURN_URL
         value: https://clothing.id.vn/payment/result
       - key: VNPAY_IPN_URL
-        sync: false
+        value: https://clothing-api-znok.onrender.com/api/payments/vnpay/ipn
       - key: VNPAY_LOCALE
         value: vn
       - key: VNPAY_ORDER_TYPE

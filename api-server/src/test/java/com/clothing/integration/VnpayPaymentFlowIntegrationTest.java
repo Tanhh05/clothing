@@ -16,6 +16,7 @@ import com.clothing.service.AuditLogService;
 import com.clothing.service.GhnShippingService;
 import com.clothing.service.InventoryMovementService;
 import com.clothing.service.OrderService;
+import com.clothing.service.PaymentNotificationResult;
 import com.clothing.service.PaymentService;
 import com.clothing.service.StoreSettingService;
 import com.clothing.messaging.publisher.OrderEventPublisher;
@@ -152,6 +153,51 @@ class VnpayPaymentFlowIntegrationTest {
         assertEquals("CREATED", payment.getStatus());
         assertEquals("PENDING", session.getStatus());
         assertEquals(0, orders.size());
+    }
+
+    @Test
+    void invalidAmountIsRejectedWithoutUpdatingPayment() {
+        TestData testData = seedVnpaySession(false);
+        Map<String, String> payload = buildSignedVnpayIpnPayload(testData.txnRef, false);
+        payload.put("vnp_Amount", "24999900");
+        payload.put("vnp_SecureHash", sign(buildSigningData(payload), VNPAY_SECRET));
+
+        PaymentNotificationResult result = paymentService.handleVnpayIpn(payload);
+
+        PaymentEntity payment = paymentRepository.findByTransactionCode(testData.txnRef).orElseThrow();
+        assertEquals("04", result.responseCode());
+        assertEquals("CREATED", payment.getStatus());
+        assertEquals(0, orderRepository.findByUserIdOrderByIdDesc(testData.user.getId()).size());
+    }
+
+    @Test
+    void signedReturnIsVerifiedAgainstStoredPayment() {
+        TestData testData = seedVnpaySession(false);
+        Map<String, String> payload = buildSignedVnpayIpnPayload(testData.txnRef, false);
+        paymentService.handleVnpayIpn(payload);
+
+        Map<String, Object> result = paymentService.verifyPaymentReturn("VNPAY", payload);
+
+        assertEquals(true, result.get("paid"));
+        assertEquals(true, result.get("gatewaySuccessful"));
+        assertEquals("PAID", result.get("status"));
+    }
+
+    @Test
+    void duplicateFailureNotificationCannotDowngradePaidPayment() {
+        TestData testData = seedVnpaySession(false);
+        Map<String, String> successPayload = buildSignedVnpayIpnPayload(testData.txnRef, false);
+        paymentService.handleVnpayIpn(successPayload);
+
+        Map<String, String> failedPayload = new LinkedHashMap<>(successPayload);
+        failedPayload.put("vnp_ResponseCode", "24");
+        failedPayload.put("vnp_TransactionStatus", "02");
+        failedPayload.put("vnp_SecureHash", sign(buildSigningData(failedPayload), VNPAY_SECRET));
+        PaymentNotificationResult result = paymentService.handleVnpayIpn(failedPayload);
+
+        PaymentEntity payment = paymentRepository.findByTransactionCode(testData.txnRef).orElseThrow();
+        assertEquals("02", result.responseCode());
+        assertEquals("PAID", payment.getStatus());
     }
 
     @Test

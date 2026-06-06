@@ -70,6 +70,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/address/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/momo/ipn").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/ipn").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/payments/return/status").permitAll()
                         .requestMatchers(HttpMethod.POST, "/webhook/ghn").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/search/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()

@@ -29,5 +29,7 @@ public interface PaymentService {
             String bankCode
     );
 
-    void handleVnpayIpn(Map<String, String> payload);
+    PaymentNotificationResult handleVnpayIpn(Map<String, String> payload);
+
+    Map<String, Object> verifyPaymentReturn(String gateway, Map<String, String> payload);
 }
