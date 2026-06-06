@@ -206,7 +206,7 @@ const Header: React.FC<Props> = ({ title }) => {
               })}
             </ul>
 
-            {/* CLOTHING Logo */}
+            {/* Clothing Logo */}
             <div className="flex-1 lg:flex-none flex justify-center items-center cursor-pointer">
               <div className="h-auto">
                 <Link href="/">
@@ -214,12 +214,12 @@ const Header: React.FC<Props> = ({ title }) => {
                     <Image
                       className="justify-center"
                       src="/admin-logo.png"
-                      alt="CLOTHING"
+                      alt="Clothing"
                       width={32}
                       height={32}
                     />
                     <span className="text-base sm:text-lg font-semibold whitespace-nowrap">
-                      CLOTHING
+                      Clothing
                     </span>
                   </a>
                 </Link>

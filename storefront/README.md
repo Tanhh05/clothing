@@ -1,6 +1,6 @@
-# CLOTHING-Fashion E-commerce Web Application
+# Clothing Fashion E-commerce Web Application
 
-![CLOTHING-Fashion Responsive Design (2)](https://user-images.githubusercontent.com/53733092/139094836-3c75c8fa-4f7a-43a7-b8c8-7cf45af53b71.png)
+![Clothing Fashion Responsive Design](https://user-images.githubusercontent.com/53733092/139094836-3c75c8fa-4f7a-43a7-b8c8-7cf45af53b71.png)
 ![ts](https://badgen.net/badge/Built%20With/TypeScript/blue) ![vercel](https://img.shields.io/github/deployments/satnaing/e-commerce/production?label=vercel&logo=vercel&logoColor=white) [![Prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)](https://github.com/prettier/prettier)
 
 An e-commerce web application developed with Next.JS and TypeScript. Tailwind CSS is used for styling and React's Context API is used as a backend.
@@ -8,7 +8,7 @@ An e-commerce web application developed with Next.JS and TypeScript. Tailwind CS
 ## Demo
 
 <p align="center">
-<a href="https://clothing.id.vn/"><img src="https://user-images.githubusercontent.com/53733092/139051262-7d501510-17ab-4e57-83da-c07385a85f9c.gif" alt="CLOTHING-Fashion Demo" /></a><br/><br/>
+<a href="https://clothing.id.vn/"><img src="https://user-images.githubusercontent.com/53733092/139051262-7d501510-17ab-4e57-83da-c07385a85f9c.gif" alt="Clothing Fashion Demo" /></a><br/><br/>
 <a href="https://clothing.id.vn/"><img src="https://user-images.githubusercontent.com/53733092/139092307-3e364931-a083-40d9-9f0e-604db4170c2b.png" width="130"/></a>
 </p>
 

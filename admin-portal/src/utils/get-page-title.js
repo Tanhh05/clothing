@@ -1,6 +1,6 @@
 import defaultSettings from '@/settings'
 
-const title = defaultSettings.title || 'CLOTHING ADMIN'
+const title = defaultSettings.title || 'Clothing Admin'
 
 export default function getPageTitle(pageTitle) {
   if (pageTitle) {

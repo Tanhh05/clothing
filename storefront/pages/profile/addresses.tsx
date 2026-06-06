@@ -413,7 +413,7 @@ const ProfileAddressesPage = () => {
 
   return (
     <div>
-      <Header title={`${accountT("shipping_addresses")} - CLOTHING`} />
+      <Header title={`${accountT("shipping_addresses")} - Clothing`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
         <AccountPageLayout section={accountT("shipping_addresses")}>
             <div className="mb-6">

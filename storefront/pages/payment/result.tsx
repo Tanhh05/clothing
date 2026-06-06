@@ -158,7 +158,7 @@ const PaymentResultPage = () => {
 
   return (
     <div>
-      <Header title={`${title} - CLOTHING`} />
+      <Header title={`${title} - Clothing`} />
       <main id="main-content" className="app-max-width app-x-padding py-10">
         <div
           className={`border p-6 ${

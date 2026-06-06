@@ -82,7 +82,7 @@ const ReturnsPage = () => {
 
   return (
     <div>
-      <Header title={`${accountT("returns")} - CLOTHING`} />
+      <Header title={`${accountT("returns")} - Clothing`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
         <AccountPageLayout section={accountT("returns")}>
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">

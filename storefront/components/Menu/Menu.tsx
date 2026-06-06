@@ -133,11 +133,11 @@ export default function Menu({ categories }: Props) {
                       <Image
                         className="justify-center"
                         src="/admin-logo.png"
-                        alt="CLOTHING"
+                        alt="Clothing"
                         width={28}
                         height={28}
                       />
-                      <span className="text-base font-semibold">CLOTHING</span>
+                      <span className="text-base font-semibold">Clothing</span>
                     </a>
                   </Link>
                   <button
@@ -388,14 +388,14 @@ export default function Menu({ categories }: Props) {
                       <a
                         href="#"
                         className="text-gray400 w-10 h-10 py-1 px-auto flex justify-center rounded-md active:bg-gray300"
-                        aria-label="CLOTHING Facebook Page"
+                        aria-label="Clothing Facebook Page"
                       >
                         <FacebookLogo extraClass="h-8" />
                       </a>
                       <a
                         href="#"
                         className="text-gray400 w-10 h-10 py-1 px-auto flex justify-center rounded-md active:bg-gray300"
-                        aria-label="CLOTHING Facebook Page"
+                        aria-label="Clothing Facebook Page"
                       >
                         <InstagramLogo extraClass="h-8" />
                       </a>

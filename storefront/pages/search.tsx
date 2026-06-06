@@ -28,7 +28,7 @@ const Search: React.FC<Props> = ({ items, searchWord }) => {
   return (
     <div>
       {/* ===== Head Section ===== */}
-      <Header title={`CLOTHING`} />
+      <Header title={`Clothing`} />
 
       <main id="main-content">
         {/* ===== Breadcrumb Section ===== */}

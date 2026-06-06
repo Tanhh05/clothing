@@ -22,7 +22,7 @@ const TestiSlider: FC<Props> = ({ items = [] }) => {
     : [
         {
           speech: t("no_reviews"),
-          name: "CLOTHING",
+          name: "Clothing",
           occupation: t("customer_reviews"),
         },
       ];

@@ -10,7 +10,7 @@ const Custom404 = () => {
   const categoryT = useTranslations("Category");
   return (
     <>
-      <AppHeader title={`${t("page_not_found")} - CLOTHING`} />
+      <AppHeader title={`${t("page_not_found")} - Clothing`} />
       <div className="flex flex-col h-screen justify-center items-center">
         <h1 className="text-2xl">{t("page_not_found")}</h1>
         <Image

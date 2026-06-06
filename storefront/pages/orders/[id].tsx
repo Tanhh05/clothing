@@ -277,7 +277,7 @@ const OrderDetailPage = () => {
 
   return (
     <div>
-      <Header title={`${t("order_detail")} - CLOTHING`} />
+      <Header title={`${t("order_detail")} - Clothing`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
         <AccountPageLayout section="CHI TIẾT ĐƠN HÀNG">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
