@@ -132,7 +132,7 @@ const Product: React.FC<Props> = ({
   return (
     <div>
       {/* ===== Head Section ===== */}
-      <Header title={`${product.name} - TWENTY`} />
+      <Header title={`${product.name} - CLOTHING`} />
 
       <main id="main-content">
         {/* ===== Breadcrumb Section ===== */}

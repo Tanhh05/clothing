@@ -1,8 +1,8 @@
 import { Html, Head, Main, NextScript } from "next/document";
 
-const title = "TWENTY";
-const desc = "TWENTY e-commerce web app built with Next.js.";
-const keywords = "TWENTY, Online Shop, E-commerce, NextJS";
+const title = "CLOTHING";
+const desc = "CLOTHING e-commerce web app built with Next.js.";
+const keywords = "CLOTHING, Online Shop, E-commerce, NextJS";
 const siteUrl = "https://clothing.id.vn";
 
 export default function Document() {
@@ -42,7 +42,7 @@ export default function Document() {
 
         <meta property="og:url" content={siteUrl} />
         <link rel="canonical" href={siteUrl} />
-        <meta property="og:site_name" content="TWENTY" />
+        <meta property="og:site_name" content="CLOTHING" />
         <meta property="og:description" content={desc} key="og_description" />
         <meta property="og:title" content={title} key="og_title" />
         <meta

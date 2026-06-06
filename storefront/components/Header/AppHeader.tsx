@@ -7,13 +7,13 @@ type Props = {
   keywords?: string;
 };
 
-// "Discover affordable and fashionable men's and women's clothing online at TWENTY. Free Returns ✓ 1000+ New Arrivals Dropped Daily."
+// "Discover affordable and fashionable men's and women's clothing online at CLOTHING. Free Returns ✓ 1000+ New Arrivals Dropped Daily."
 const defaultDesc =
-  "TWENTY e-commerce web app built with Next.js.";
-const defaultKeywords = "TWENTY, Online Shop, E-commerce, NextJS";
+  "CLOTHING e-commerce web app built with Next.js.";
+const defaultKeywords = "CLOTHING, Online Shop, E-commerce, NextJS";
 
 const AppHeader: React.FC<Props> = ({
-  title = "TWENTY",
+  title = "CLOTHING",
   desc = defaultDesc,
   keywords = defaultKeywords,
 }) => {

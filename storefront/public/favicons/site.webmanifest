@@ -4,9 +4,9 @@
   "display": "standalone",
   "scope": "/",
   "start_url": "/",
-  "name": "TWENTY ",
-  "short_name": "TWENTY",
-  "description": "Discover affordable and fashionable men's and women's clothing online at TWENTY",
+  "name": "CLOTHING ",
+  "short_name": "CLOTHING",
+  "description": "Discover affordable and fashionable men's and women's clothing online at CLOTHING",
   "icons": [
     {
       "src": "/favicons/android-chrome-192x192.png",

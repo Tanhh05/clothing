@@ -68,7 +68,7 @@ const ProfilePage = () => {
 
   return (
     <div>
-      <Header title={`${t("profile")} - TWENTY`} />
+      <Header title={`${t("profile")} - CLOTHING`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
         <AccountPageLayout section={accountT("my_profile")}>
           <section className="max-w-3xl">

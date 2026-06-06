@@ -153,7 +153,7 @@ const ShoppingCart = () => {
   return (
     <div>
       {/* ===== Head Section ===== */}
-      <Header title={`${t("shopping_cart")} - TWENTY`} />
+      <Header title={`${t("shopping_cart")} - CLOTHING`} />
 
       <main id="main-content">
         {/* ===== Heading & Continue Shopping */}

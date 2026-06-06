@@ -1,5 +1,5 @@
 module.exports = {
-  title: 'TWENTY ADMIN',
+  title: 'CLOTHING ADMIN',
 
   /**
    * @type {boolean} true | false

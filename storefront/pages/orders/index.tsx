@@ -351,7 +351,7 @@ const OrdersPage = () => {
 
   return (
     <div>
-      <Header title={`${t("my_orders")} - TWENTY`} />
+      <Header title={`${t("my_orders")} - CLOTHING`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
         <AccountPageLayout section={t("my_orders")}>
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">

@@ -745,7 +745,7 @@ const ShoppingCart = () => {
   return (
     <div>
       {/* ===== Head Section ===== */}
-      <Header title={`${t("checkout")} - TWENTY`} />
+      <Header title={`${t("checkout")} - CLOTHING`} />
 
       <main id="main-content">
         {/* ===== Heading & Continue Shopping */}
@@ -1320,11 +1320,11 @@ const ShoppingCart = () => {
                     <div className="flex items-center gap-3">
                       <Image
                         src="/admin-logo.png"
-                        alt="TWENTY"
+                        alt="CLOTHING"
                         width={36}
                         height={36}
                       />
-                      <span className="text-3xl font-semibold tracking-wide">TWENTY</span>
+                      <span className="text-3xl font-semibold tracking-wide">CLOTHING</span>
                     </div>
                   </div>
                 )}

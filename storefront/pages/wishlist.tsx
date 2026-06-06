@@ -35,7 +35,7 @@ const Wishlist = () => {
   return (
     <div>
       {/* ===== Head Section ===== */}
-      <Header title={`Wishlist - TWENTY`} />
+      <Header title={`Wishlist - CLOTHING`} />
 
       <main id="main-content">
         <div className="app-max-width app-x-padding py-8 md:py-10">

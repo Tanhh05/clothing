@@ -105,7 +105,7 @@ const NotificationsPage = () => {
 
   return (
     <div>
-      <Header title={`${accountT("notifications")} - TWENTY`} />
+      <Header title={`${accountT("notifications")} - CLOTHING`} />
       <main id="main-content" className="app-max-width app-x-padding py-8 md:py-10">
         <AccountPageLayout section={accountT("notifications")}>
         <div className="flex items-center justify-between mb-6">
