@@ -25,10 +25,12 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
+    private static final String PRODUCTION_STOREFRONT_ORIGIN = "https://clothing.id.vn";
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CustomUserDetailsService userDetailsService;
@@ -113,9 +115,13 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        List<String> configuredOrigins = Arrays.stream(allowedOrigins.split(","))
+        List<String> configuredOrigins = Stream.concat(
+                        Arrays.stream(allowedOrigins.split(",")),
+                        Stream.of(PRODUCTION_STOREFRONT_ORIGIN)
+                )
                 .map(String::trim)
-                .filter(s -> !s.isBlank())
+                .filter(origin -> !origin.isBlank())
+                .distinct()
                 .toList();
         if (configuredOrigins.stream().anyMatch(origin -> origin.contains("*"))) {
             configuration.setAllowedOriginPatterns(configuredOrigins);
