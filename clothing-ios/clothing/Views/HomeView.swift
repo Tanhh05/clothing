@@ -24,7 +24,7 @@ struct HomeView: View {
                     Image(systemName: "line.3.horizontal")
                 }
                 ToolbarItem(placement: .principal) {
-                    Text("TWENTY")
+                    Text("Clothing")
                         .font(.system(size: 34, weight: .black, design: .serif))
                         .tracking(1)
                 }
