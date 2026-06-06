@@ -3,6 +3,7 @@ import { Html, Head, Main, NextScript } from "next/document";
 const title = "TWENTY";
 const desc = "TWENTY e-commerce web app built with Next.js.";
 const keywords = "TWENTY, Online Shop, E-commerce, NextJS";
+const siteUrl = "https://clothing.id.vn";
 
 export default function Document() {
   return (
@@ -39,14 +40,14 @@ export default function Document() {
         <link href="/favicon.ico?v=2" rel="shortcut icon" />
         <link href="/favicons/site.webmanifest?v=2" rel="manifest" />
 
-        <meta property="og:url" content="https://twenty.vercel.app" />
-        <link rel="canonical" href="https://twenty.vercel.app" />
+        <meta property="og:url" content={siteUrl} />
+        <link rel="canonical" href={siteUrl} />
         <meta property="og:site_name" content="TWENTY" />
         <meta property="og:description" content={desc} key="og_description" />
         <meta property="og:title" content={title} key="og_title" />
         <meta
           property="og:image"
-          content="https://twenty.vercel.app/og.png"
+          content={`${siteUrl}/og.png`}
         />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:site" content="@satnaing.dev" />
@@ -58,7 +59,7 @@ export default function Document() {
         />
         <meta
           name="twitter:image"
-          content="https://twenty.vercel.app/og.png"
+          content={`${siteUrl}/og.png`}
         />
 
         <meta name="apple-mobile-web-app-capable" content="yes" />

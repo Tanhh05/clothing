@@ -15,7 +15,9 @@ services:
       - key: PORT
         value: "8080"
       - key: APP_CORS_ALLOWED_ORIGINS
-        value: https://clothing-jet-eight.vercel.app
+        value: https://clothing.id.vn
+      - key: STOREFRONT_BASE_URL
+        value: https://clothing.id.vn
       - key: SPRING_FLYWAY_ENABLED
         value: "false"
       - key: JPA_DDL_AUTO
@@ -87,7 +89,7 @@ services:
       - key: MOMO_SECRET_KEY
         sync: false
       - key: MOMO_REDIRECT_URL
-        value: https://clothing-jet-eight.vercel.app/orders
+        value: https://clothing.id.vn/payment/result
       - key: MOMO_IPN_URL
         sync: false
       - key: MOMO_REQUEST_TYPE
@@ -99,7 +101,7 @@ services:
       - key: VNPAY_HASH_SECRET
         sync: false
       - key: VNPAY_RETURN_URL
-        value: https://clothing-jet-eight.vercel.app/orders
+        value: https://clothing.id.vn/payment/result
       - key: VNPAY_IPN_URL
         sync: false
       - key: VNPAY_LOCALE

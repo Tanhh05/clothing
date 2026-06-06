@@ -1,4 +1,5 @@
 const productionBackendUrl = "https://clothing-api-znok.onrender.com";
+const productionSiteUrl = "https://clothing.id.vn";
 const googleClientId =
   "44695475394-6mj3nra82h8mv483juk05pv86t8sbdo3.apps.googleusercontent.com";
 
@@ -12,6 +13,9 @@ module.exports = {
       ? productionBackendUrl
       : process.env.NEXT_PUBLIC_BACKEND_URL || productionBackendUrl,
     NEXT_PUBLIC_PROD_BACKEND_URL: productionBackendUrl,
+    NEXT_PUBLIC_SITE_URL: process.env.VERCEL
+      ? productionSiteUrl
+      : process.env.NEXT_PUBLIC_SITE_URL || productionSiteUrl,
     NEXT_PUBLIC_GOOGLE_CLIENT_ID:
       process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || googleClientId,
   },
@@ -25,6 +29,7 @@ module.exports = {
       "robohash.org",
       "res.cloudinary.com",
       "pub-1726861237464c8c92a49dc524de988f.r2.dev",
+      "images.unsplash.com",
       "example.com",
     ],
   },
